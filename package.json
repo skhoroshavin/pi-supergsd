@@ -8,9 +8,13 @@
     "test:updater": "tsx --test updater/lib/**/*.test.ts"
   },
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": [
+      "./index.ts"
+    ]
   },
   "devDependencies": {
-    "tsx": "^4.0.0"
+    "@types/node": "^25.9.1",
+    "tsx": "^4.0.0",
+    "typescript": "^6.0.3"
   }
 }
