@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { applyPatches } from './patcher.js';
-import type { Patch } from './types.js';
+
 
 describe('applyPatches', () => {
   it('returns unmatched patches when find string is missing', () => {
@@ -80,7 +80,7 @@ describe('applyPatches', () => {
 
   it('throws on invalid patch operation', () => {
     assert.throws(() => {
-      applyPatches('test', [{ op: 'invalid' as unknown as Patch['op'], find: 'x', replace: 'y' }]);
+      applyPatches('test', [{ op: 'invalid' as any, find: 'x', replace: 'y' }]);
     }, /Invalid patch operation/);
   });
 });
