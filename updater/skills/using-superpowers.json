@@ -1,0 +1,20 @@
+{
+  "name": "using-superpowers",
+  "source": {
+    "repo": "obra/superpowers",
+    "ref": "main",
+    "path": "skills/using-superpowers"
+  },
+  "output": "system-prompt.md",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "patches": [
+        { "op": "replace", "find": "## How to Access Skills\n\n**In Pi:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.\n\n**In Copilot CLI:** Use the `skill` tool. Skills are auto-discovered from installed plugins. The `skill` tool works the same as Pi's `Skill` tool.\n\n**In Gemini CLI:** Skills activate via the `activate_skill` tool. Gemini loads skill metadata at session start and activates the full content on demand.\n\n**In other environments:** Check your platform's documentation for how skills are loaded.", "replace": "## How to Access Skills\n\n**In Pi:** Skills are discovered automatically via the extension's `resources_discover` event. Use the `read` tool to load skill content from the discovered skill paths. Follow skill instructions exactly once loaded." },
+        { "op": "delete-block", "findStart": "## Platform Adaptation", "findEnd": "loaded automatically via GEMINI.md." },
+        { "op": "replace", "find": "Invoke Skill tool", "replace": "Load skill content with the read tool" },
+        { "op": "replace", "find": "Create a todo list todo per item", "replace": "Track each checklist item" }
+      ]
+    }
+  ]
+}

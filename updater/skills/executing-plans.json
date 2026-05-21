@@ -1,0 +1,18 @@
+{
+  "name": "executing-plans",
+  "source": {
+    "repo": "obra/superpowers",
+    "ref": "main",
+    "path": "skills/executing-plans"
+  },
+  "files": [
+    {
+      "path": "SKILL.md",
+      "patches": [
+        { "op": "delete-line", "find": "Tell your human partner that Superpowers works much better with access to subagents." },
+        { "op": "delete-line", "find": "If subagents are available, use /skill:subagent-driven-development instead of this skill." },
+        { "op": "delete-line", "find": "- **/skill:using-git-worktrees**" }
+      ]
+    }
+  ]
+}

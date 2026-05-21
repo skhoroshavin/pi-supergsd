@@ -1,0 +1,24 @@
+{
+  "name": "writing-skills",
+  "source": {
+    "repo": "obra/superpowers",
+    "ref": "main",
+    "path": "skills/writing-skills"
+  },
+  "files": [
+    {
+      "path": "SKILL.md",
+      "patches": [
+        { "op": "replace", "find": "Personal skills live in agent-specific directories (`~/.claude/skills` for Pi, `~/.agents/skills/` for Codex)", "replace": "Personal skills live in agent-specific directories (`~/.pi/skills` for Pi, `~/.agents/skills/` for Codex)" },
+        { "op": "replace", "find": "Pressure scenario with subagents", "replace": "Pressure scenario with agent behavior" },
+        { "op": "replace", "find": "subagent test harness", "replace": "test harness" },
+        { "op": "replace", "find": "Always use subagents (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.", "replace": "Use the read tool to load skills when needed." }
+      ]
+    },
+    { "path": "anthropic-best-practices.md", "patches": [] },
+    { "path": "persuasion-principles.md", "patches": [] },
+    { "path": "graphviz-conventions.dot", "patches": [] },
+    { "path": "render-graphs.js", "patches": [] },
+    { "path": "examples/CLAUDE_MD_TESTING.md", "patches": [] }
+  ]
+}
