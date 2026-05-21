@@ -1,0 +1,25 @@
+{
+  "name": "requesting-code-review",
+  "source": {
+    "repo": "obra/superpowers",
+    "ref": "main",
+    "path": "skills/requesting-code-review"
+  },
+  "files": [
+    {
+      "path": "SKILL.md",
+      "patches": [
+        { "op": "replace", "find": "Dispatch a code reviewer subagent to catch issues before they cascade.", "replace": "Request a code review to catch issues before they cascade." },
+        { "op": "replace", "find": "Dispatch code reviewer subagent:", "replace": "Request code review:" },
+        { "op": "replace", "find": "Use Task tool with `general-purpose` type, fill template at `code-reviewer.md`", "replace": "Use the code-reviewer.md template for your review process." }
+      ]
+    },
+    {
+      "path": "code-reviewer.md",
+      "patches": [
+        { "op": "replace", "find": "Use this template when dispatching a code reviewer subagent.", "replace": "Use this template when requesting a code review." },
+        { "op": "replace", "find": "Task tool (general-purpose):", "replace": "Review request:" }
+      ]
+    }
+  ]
+}
