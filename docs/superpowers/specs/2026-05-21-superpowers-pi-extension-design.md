@@ -10,7 +10,7 @@
 
 ### What We're Building
 
-A Pi extension called `pi-superpowers` that packages a curated, patched subset of the [Superpowers skills library](https://github.com/obra/superpowers) for Pi users.
+A Pi extension called `pi-supergsd` that packages a curated, patched subset of the [Superpowers skills library](https://github.com/obra/superpowers) for Pi users.
 
 ### How It Works
 
@@ -28,12 +28,17 @@ Pi users get high-quality Superpowers skills (brainstorming, TDD, debugging, cod
 ## 2. Architecture & Components
 
 ```
-pi-superpowers/
+pi-supergsd/
 ├── index.ts                    # Pi extension entry point
-├── package.json                # Extension metadata + npm run update target
-├── update/
-│   ├── update.ts               # Build-time fetch + patch script
+├── package.json                # Extension metadata + npm scripts
+├── updater/
+│   ├── updater.ts              # Thin entry point script
 │   ├── common-patch.json       # Patches applied to EVERY file
+│   ├── lib/                    # Updater logic + tests
+│   │   ├── patcher.ts          # Patch engine (pure function)
+│   │   ├── fetcher.ts          # GitHub raw content fetcher
+│   │   ├── types.ts            # Shared types
+│   │   └── patcher.test.ts     # Unit tests for patch engine
 │   └── skills/                 # One definition file per included skill
 │       ├── brainstorming.json
 │       ├── test-driven-development.json
@@ -80,7 +85,7 @@ export default function (pi: ExtensionAPI) {
 
 No runtime network calls. No dynamic fetching. Pure static file serving.
 
-### 2.2 Skill Definition File (`update/skills/<name>.json`)
+### 2.2 Skill Definition File (`updater/skills/<name>.json`)
 
 Each file is a **standalone skill definition** — no root manifest needed.
 
@@ -140,7 +145,7 @@ Each file is a **standalone skill definition** — no root manifest needed.
 | `files[].path` | string | Yes | Relative path within skill directory |
 | `files[].patches` | array | Yes | Ordered list of patch ops (empty array = fetch only) |
 
-### 2.3 Common Patch (`update/common-patch.json`)
+### 2.3 Common Patch (`updater/common-patch.json`)
 
 Applied to **every fetched file** before per-file patches:
 
@@ -154,7 +159,17 @@ Applied to **every fetched file** before per-file patches:
 ]
 ```
 
-### 2.4 Patch Operation Types
+### 2.4 Patch Engine (`updater/lib/patcher.ts`)
+
+The patch engine is a pure function with no side effects — all replacement logic lives here:
+
+```typescript
+function applyPatches(content: string, patches: Patch[]): { result: string; unmatched: Patch[] };
+```
+
+Returns the patched content plus a list of patches that failed to match (for reporting).
+
+**Patch Operation Types:**
 
 | Op | Parameters | Behavior |
 |---|---|---|
@@ -175,7 +190,7 @@ Applied to **every fetched file** before per-file patches:
 
 ## 3. Data Flow
 
-The `update.ts` script runs in this sequence:
+The `updater.ts` script runs in this sequence:
 
 1. **Discover skill definitions** — reads all `update/skills/*.json` files.
 2. **Load common patch** — reads `update/common-patch.json`.
@@ -191,7 +206,7 @@ The `update.ts` script runs in this sequence:
 **Example flow for `systematic-debugging`:**
 
 ```
-update/skills/systematic-debugging.json
+updater/skills/systematic-debugging.json
   → fetch https://raw.githubusercontent.com/obra/superpowers/main/skills/systematic-debugging/SKILL.md
   → fetch https://raw.githubusercontent.com/obra/superpowers/main/skills/systematic-debugging/root-cause-tracing.md
   → fetch .../defense-in-depth.md
@@ -225,16 +240,16 @@ update/skills/systematic-debugging.json
 | Test | Approach |
 |---|---|
 | **Unit: patch application** | Small test harness that feeds known input + patches through `applyPatches()`, asserts expected output. Tests each operation type in isolation and in combination. |
-| **Integration: full update run** | Run `npm run update`, verify `skills/` directory structure matches definitions, spot-check 2–3 files for expected replacements (e.g., "Claude Code" → "Pi"). |
+| **Integration: full update run** | Run `npm run updater`, verify `skills/` directory structure matches definitions, spot-check 2–3 files for expected replacements (e.g., "Claude Code" → "Pi"). |
 | **Regression: upstream drift** | A CI workflow (GitHub Actions) that runs `npm run update` nightly against `obra/superpowers@main`. Fails if any patch no longer matches (catches upstream text changes early). |
 
-The patch engine should be a pure function:
+The patch engine is a pure function in `updater/lib/patcher.ts`:
 
 ```typescript
-function applyPatches(content: string, patches: Patch[]): string;
+function applyPatches(content: string, patches: Patch[]): { result: string; unmatched: Patch[] };
 ```
 
-Easily unit-testable without network calls.
+Unit tests in `updater/lib/patcher.test.ts` cover each operation type in isolation, combinations, and edge cases (no match, overlapping rules, regex capture groups). No network calls needed. |
 
 ---
 
@@ -254,11 +269,12 @@ These could be revisited if Pi's subagent extension becomes a standard, document
 
 ```json
 {
-  "name": "pi-superpowers",
+  "name": "pi-supergsd",
   "version": "1.0.0",
   "description": "Superpowers skills packaged for Pi",
   "scripts": {
-    "update": "tsx update/update.ts"
+    "updater": "tsx updater/updater.ts",
+    "test:updater": "node --test updater/lib/**/*.test.ts"
   },
   "pi": {
     "extensions": ["./index.ts"]
