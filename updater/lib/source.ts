@@ -1,10 +1,10 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const REPO = 'obra/superpowers';
 const REF = 'main';
@@ -21,21 +21,24 @@ export async function superpowersUpdate(): Promise<void> {
     statSync(dir);
   } catch {
     // Directory does not exist — clone fresh
-    await execAsync(
-      `git clone --depth 1 --branch ${REF} https://github.com/${REPO}.git "${dir}"`
-    );
+    await execFileAsync('git', [
+      'clone', '--depth', '1', '--branch', REF,
+      `https://github.com/${REPO}.git`, dir,
+    ]);
     return;
   }
 
   // Directory exists — try to update
   try {
-    await execAsync(`cd "${dir}" && git fetch --depth 1 origin ${REF} && git reset --hard origin/${REF}`);
+    await execFileAsync('git', ['fetch', '--depth', '1', 'origin', REF], { cwd: dir });
+    await execFileAsync('git', ['reset', '--hard', `origin/${REF}`], { cwd: dir });
   } catch {
     // Update failed — wipe and re-clone
     rmSync(dir, { recursive: true, force: true });
-    await execAsync(
-      `git clone --depth 1 --branch ${REF} https://github.com/${REPO}.git "${dir}"`
-    );
+    await execFileAsync('git', [
+      'clone', '--depth', '1', '--branch', REF,
+      `https://github.com/${REPO}.git`, dir,
+    ]);
   }
 }
 
@@ -43,6 +46,12 @@ export function superpowersGetSkill(name: string): string[] {
   const dir = cacheDir();
   const skillPath = join(dir, 'skills', name);
   const results: string[] = [];
+
+  try {
+    statSync(skillPath);
+  } catch {
+    return [];
+  }
 
   function walk(currentPath: string, prefix: string): void {
     const entries = readdirSync(currentPath, { withFileTypes: true });

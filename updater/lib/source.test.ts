@@ -1,11 +1,13 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { superpowersUpdate, superpowersGetSkill, superpowersGetFile } from './source.js';
 
 describe('source', () => {
   before(async () => {
     // Use a test-specific cache dir to avoid clobbering the default
-    process.env.PI_SUPERGSD_CACHE_DIR = '/tmp/pi-supergsd-test-cache';
+    process.env.PI_SUPERGSD_CACHE_DIR = join(tmpdir(), 'pi-supergsd-test-cache');
     await superpowersUpdate();
   });
 

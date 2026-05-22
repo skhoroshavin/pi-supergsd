@@ -13,10 +13,11 @@ export function applyPatches(content: string, patches: Patch[]): PatchResult {
       }
     } else if (patch.op === 'regex-replace') {
       const regex = new RegExp(patch.find, 'g');
-      if (!regex.test(result)) {
+      const after = result.replace(regex, patch.replace);
+      if (after === result) {
         unmatched.push(patch);
       } else {
-        result = result.replace(new RegExp(patch.find, 'g'), patch.replace);
+        result = after;
       }
     } else if (patch.op === 'delete-line') {
       const lines = result.split('\n');
