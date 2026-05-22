@@ -8,7 +8,7 @@ import {
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyPatches } from './lib/patcher.js';
-import { fetchFile } from './lib/fetcher.js';
+import { superpowersUpdate, superpowersGetSkill, superpowersGetFile } from './lib/source.js';
 import type { SkillDefinition, Patch } from './lib/types.js';
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -26,8 +26,10 @@ function loadDefinitions(): SkillDefinition[] {
   });
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function getPatchesForFile(def: SkillDefinition, filePath: string): Patch[] {
+  // filePath is relative to skill dir, e.g. "SKILL.md"
+  const entry = def.files?.find((f) => f.path === filePath);
+  return entry?.patches ?? [];
 }
 
 async function main(): Promise<void> {
@@ -36,6 +38,8 @@ async function main(): Promise<void> {
   );
   const definitions = loadDefinitions();
 
+  await superpowersUpdate();
+
   let totalFiles = 0;
   let totalPatches = 0;
   let failedPatches = 0;
@@ -43,50 +47,48 @@ async function main(): Promise<void> {
   for (const def of definitions) {
     console.log(`Processing: ${def.name}`);
 
-    const outputPath = def.output
-      ? join(projectDir, def.output)
-      : join(skillsOutputDir, def.name);
+    const outputPath = join(skillsOutputDir, def.name);
+    mkdirSync(outputPath, { recursive: true });
 
-    if (!def.output) {
-      mkdirSync(outputPath, { recursive: true });
-    } else if (def.output.includes('/')) {
-      mkdirSync(dirname(outputPath), { recursive: true });
-    }
+    const skillFiles = superpowersGetSkill(def.name);
 
-    let outputContent = '';
+    for (const repoPath of skillFiles) {
+      // repoPath is "skills/{name}/{filePath}"
+      const relativePath = repoPath.slice(`skills/${def.name}/`.length);
 
-    for (const file of def.files) {
-      const url = `https://raw.githubusercontent.com/${def.source.repo}/${def.source.ref}/${def.source.path}/${file.path}`;
-      console.log(`  Fetching: ${file.path}`);
+      // Check excludes
+      if (
+        def.exclude?.some(
+          (e) => relativePath === e || relativePath.startsWith(e + '/')
+        )
+      ) {
+        console.log(`  Skipping (excluded): ${relativePath}`);
+        continue;
+      }
 
-      const raw = await fetchFile(url);
-      await delay(100);
+      console.log(`  Copying: ${relativePath}`);
 
-      const afterCommon = applyPatches(raw, commonPatches);
-      const afterFile = applyPatches(afterCommon.result, file.patches);
+      const raw = superpowersGetFile(repoPath);
+      const perFilePatches = getPatchesForFile(def, relativePath);
 
-      totalPatches += file.patches.length;
-      failedPatches += afterFile.unmatched.length;
+      // Per-file patches first (against original content), then common patches
+      const mergedPatches = [...perFilePatches, ...commonPatches];
+      const { result, unmatched } = applyPatches(raw, mergedPatches);
 
-      for (const unmatched of afterFile.unmatched) {
+      totalPatches += perFilePatches.length;
+      failedPatches += unmatched.length;
+
+      for (const u of unmatched) {
         console.warn(
-          `    WARNING: patch did not match in ${file.path}: ${JSON.stringify(unmatched)}`
+          `    WARNING: patch did not match in ${relativePath}: ${JSON.stringify(u)}`
         );
       }
 
-      if (def.output) {
-        outputContent += (outputContent ? '\n\n' : '') + afterFile.result;
-      } else {
-        const fileOutputPath = join(outputPath, file.path);
-        mkdirSync(dirname(fileOutputPath), { recursive: true });
-        writeFileSync(fileOutputPath, afterFile.result);
-      }
+      const fileOutputPath = join(outputPath, relativePath);
+      mkdirSync(dirname(fileOutputPath), { recursive: true });
+      writeFileSync(fileOutputPath, result);
 
       totalFiles++;
-    }
-
-    if (def.output && outputContent) {
-      writeFileSync(outputPath, outputContent);
     }
   }
 
