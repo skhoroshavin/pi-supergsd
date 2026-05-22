@@ -1,3 +1,4 @@
 {
-  "name": "systematic-debugging"
+  "name": "systematic-debugging",
+  "exclude": ["CREATION-LOG.md"]
 }

@@ -1,3 +1,28 @@
 {
-  "name": "writing-plans"
+  "name": "writing-plans",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "patches": [
+        {
+          "op": "delete-line",
+          "find": "using-git-worktrees"
+        },
+        {
+          "op": "regex-replace",
+          "find": "superpowers:subagent-driven-development \\(recommended\\) or superpowers:executing-plans",
+          "replace": "superpowers:executing-plans"
+        },
+        {
+          "op": "delete-block",
+          "findStart": "**If Subagent-Driven chosen:**",
+          "findEnd": "Fresh subagent per task + two-stage review"
+        },
+        {
+          "op": "delete-line",
+          "find": "Subagent-Driven"
+        }
+      ]
+    }
+  ]
 }

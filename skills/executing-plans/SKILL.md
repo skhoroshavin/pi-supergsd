@@ -11,7 +11,6 @@ Load plan, review critically, execute all tasks, report when complete.
 
 **Announce at start:** "I'm using the executing-plans skill to implement this plan."
 
-**Note:** Tell your human partner that Superpowers works much better with access to subagents. The quality of its work will be significantly higher if run on a platform with subagent support (such as Pi or Codex). If subagents are available, use /skill:subagent-driven-development instead of this skill.
 
 ## The Process
 
@@ -65,6 +64,5 @@ After all tasks complete and verified:
 ## Integration
 
 **Required workflow skills:**
-- **/skill:using-git-worktrees** - Ensures isolated workspace (creates one or verifies existing)
 - **/skill:writing-plans** - Creates the plan this skill executes
 - **/skill:finishing-a-development-branch** - Complete development after all tasks

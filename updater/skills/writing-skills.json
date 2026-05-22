@@ -6,8 +6,29 @@
       "patches": [
         { "op": "replace", "find": "Personal skills live in agent-specific directories (`~/.claude/skills` for Claude Code, `~/.agents/skills/` for Codex)", "replace": "Personal skills live in agent-specific directories (`~/.pi/skills` for Pi, `~/.agents/skills/` for Codex)" },
         { "op": "replace", "find": "Pressure scenario with subagent", "replace": "Pressure scenario with agent behavior" },
-        { "op": "replace", "find": "Always use subagents (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.", "replace": "Use the read tool to load skills when needed." }
+        { "op": "replace", "find": "Always use subagents (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.", "replace": "Use the read tool to load skills when needed." },
+        { "op": "replace", "find": "Skills help future Claude instances find", "replace": "Skills help future agent instances find" },
+        { "op": "replace", "find": "## Claude Search Optimization", "replace": "## Agent Search Optimization" },
+        { "op": "replace", "find": "Future Claude needs to FIND", "replace": "The agent needs to FIND" },
+        { "op": "replace", "find": "Claude reads description", "replace": "The agent reads description" },
+        { "op": "replace", "find": "a description summarizes the skill's workflow, Claude", "replace": "a description summarizes the skill's workflow, the agent" },
+        { "op": "replace", "find": "shortcut Claude will take", "replace": "shortcut the agent will take" },
+        { "op": "replace", "find": "Claude may follow this", "replace": "the agent may follow this" },
+        { "op": "replace", "find": "Use words Claude would search for:", "replace": "Use words an LLM would search for:" },
+        { "op": "replace", "find": "How future Claude finds your skill:", "replace": "How the agent finds your skill:" },
+        { "op": "replace", "find": "caused Claude to do ONE review", "replace": "caused the agent to do ONE review" },
+        { "op": "replace", "find": "Claude correctly read the flowchart", "replace": "the agent correctly read the flowchart" },
+        { "op": "replace", "find": "documentation Claude skips", "replace": "documentation the agent skips" }
+      ]
+    },
+    {
+      "path": "examples/CLAUDE_MD_TESTING.md",
+      "patches": [
+        { "op": "replace", "find": "~/.claude/skills/", "replace": "~/.pi/skills/" },
+        { "op": "replace", "find": "Claude might think it knows how to approach tasks", "replace": "An agent might think it knows how to approach tasks" },
+        { "op": "replace", "find": "Claude.AI Emphatic Style", "replace": "Anthropic Emphatic Style" }
       ]
     }
-  ]
+  ],
+  "exclude": ["render-graphs.js"]
 }
