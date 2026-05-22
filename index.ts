@@ -1,5 +1,4 @@
 import { dirname, join } from 'node:path';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
@@ -9,16 +8,5 @@ export default function (pi: ExtensionAPI) {
   pi.on('resources_discover', () => {
     const skillDir = join(baseDir, 'skills');
     return { skillPaths: [skillDir] };
-  });
-
-  const superpowersGuide = readFileSync(
-    join(baseDir, 'system-prompt.md'),
-    'utf-8'
-  );
-
-  pi.on('before_agent_start', (event) => {
-    return {
-      systemPrompt: event.systemPrompt + '\n\n' + superpowersGuide,
-    };
   });
 }
