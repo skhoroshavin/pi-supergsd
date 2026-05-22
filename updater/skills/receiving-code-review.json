@@ -1,11 +1,3 @@
 {
-  "name": "receiving-code-review",
-  "source": {
-    "repo": "obra/superpowers",
-    "ref": "main",
-    "path": "skills/receiving-code-review"
-  },
-  "files": [
-    { "path": "SKILL.md", "patches": [] }
-  ]
+  "name": "receiving-code-review"
 }

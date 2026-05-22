@@ -1,10 +1,5 @@
 {
   "name": "brainstorming",
-  "source": {
-    "repo": "obra/superpowers",
-    "ref": "main",
-    "path": "skills/brainstorming"
-  },
   "files": [
     {
       "path": "SKILL.md",
@@ -12,12 +7,6 @@
         { "op": "replace", "find": "invoke writing-plans skill", "replace": "invoke the /skill:writing-plans command" },
         { "op": "replace", "find": "Invoke writing-plans skill", "replace": "Invoke the /skill:writing-plans command" }
       ]
-    },
-    { "path": "visual-companion.md", "patches": [] },
-    { "path": "scripts/frame-template.html", "patches": [] },
-    { "path": "scripts/helper.js", "patches": [] },
-    { "path": "scripts/server.cjs", "patches": [] },
-    { "path": "scripts/start-server.sh", "patches": [] },
-    { "path": "scripts/stop-server.sh", "patches": [] }
+    }
   ]
 }

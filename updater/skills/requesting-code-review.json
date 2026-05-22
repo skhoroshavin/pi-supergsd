@@ -1,10 +1,5 @@
 {
   "name": "requesting-code-review",
-  "source": {
-    "repo": "obra/superpowers",
-    "ref": "main",
-    "path": "skills/requesting-code-review"
-  },
   "files": [
     {
       "path": "SKILL.md",

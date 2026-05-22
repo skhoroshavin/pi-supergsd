@@ -1,16 +1,3 @@
 {
-  "name": "systematic-debugging",
-  "source": {
-    "repo": "obra/superpowers",
-    "ref": "main",
-    "path": "skills/systematic-debugging"
-  },
-  "files": [
-    { "path": "SKILL.md", "patches": [] },
-    { "path": "root-cause-tracing.md", "patches": [] },
-    { "path": "defense-in-depth.md", "patches": [] },
-    { "path": "condition-based-waiting.md", "patches": [] },
-    { "path": "condition-based-waiting-example.ts", "patches": [] },
-    { "path": "find-polluter.sh", "patches": [] }
-  ]
+  "name": "systematic-debugging"
 }

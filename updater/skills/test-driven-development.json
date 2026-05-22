@@ -1,12 +1,3 @@
 {
-  "name": "test-driven-development",
-  "source": {
-    "repo": "obra/superpowers",
-    "ref": "main",
-    "path": "skills/test-driven-development"
-  },
-  "files": [
-    { "path": "SKILL.md", "patches": [] },
-    { "path": "testing-anti-patterns.md", "patches": [] }
-  ]
+  "name": "test-driven-development"
 }

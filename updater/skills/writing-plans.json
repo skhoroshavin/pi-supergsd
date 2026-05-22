@@ -1,17 +1,3 @@
 {
-  "name": "writing-plans",
-  "source": {
-    "repo": "obra/superpowers",
-    "ref": "main",
-    "path": "skills/writing-plans"
-  },
-  "files": [
-    {
-      "path": "SKILL.md",
-      "patches": [
-        { "op": "delete-line", "find": "If working in an isolated worktree" },
-        { "op": "replace", "find": "**\"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Two execution options:**\n\n**1. Subagent-Driven (recommended)** - I dispatch a fresh subagent per task, review between tasks, fast iteration\n\n**2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints\n\n**Which approach?\"**\n\n**If Subagent-Driven chosen:**\n- **REQUIRED SUB-SKILL:** Use /skill:subagent-driven-development\n- Fresh subagent per task + two-stage review\n\n**If Inline Execution chosen:**\n- **REQUIRED SUB-SKILL:** Use /skill:executing-plans\n- Batch execution with checkpoints for review", "replace": "**\"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Use the `execute-plan` prompt to execute tasks sequentially.\"**" }
-      ]
-    }
-  ]
+  "name": "writing-plans"
 }

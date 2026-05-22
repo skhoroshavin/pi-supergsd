@@ -1,10 +1,5 @@
 {
   "name": "writing-skills",
-  "source": {
-    "repo": "obra/superpowers",
-    "ref": "main",
-    "path": "skills/writing-skills"
-  },
   "files": [
     {
       "path": "SKILL.md",
@@ -13,11 +8,6 @@
         { "op": "replace", "find": "Pressure scenario with subagent", "replace": "Pressure scenario with agent behavior" },
         { "op": "replace", "find": "Always use subagents (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.", "replace": "Use the read tool to load skills when needed." }
       ]
-    },
-    { "path": "anthropic-best-practices.md", "patches": [] },
-    { "path": "persuasion-principles.md", "patches": [] },
-    { "path": "graphviz-conventions.dot", "patches": [] },
-    { "path": "render-graphs.js", "patches": [] },
-    { "path": "examples/CLAUDE_MD_TESTING.md", "patches": [] }
+    }
   ]
 }
