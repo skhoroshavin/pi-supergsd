@@ -1,17 +1,44 @@
 {
   "name": "pi-supergsd",
   "version": "1.0.0",
-  "description": "Superpowers skills packaged for Pi",
+  "description": "Curated, patched Superpowers skills packaged for Pi",
   "type": "module",
   "scripts": {
     "updater": "tsx updater/updater.ts",
     "test:updater": "tsx --test updater/lib/patcher.test.ts updater/lib/source.test.ts",
-    "test": "npm run test:updater"
+    "test:package": "tsx --test scripts/publishable-package.test.ts",
+    "test": "npm run test:updater && npm run test:package",
+    "verify": "npm test && npm run updater && git diff --exit-code -- skills && npm pack --dry-run"
   },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "skills",
+    "superpowers",
+    "coding-agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/skhoroshavin/pi-supergsd.git"
+  },
+  "homepage": "https://github.com/skhoroshavin/pi-supergsd#readme",
+  "bugs": {
+    "url": "https://github.com/skhoroshavin/pi-supergsd/issues"
+  },
+  "license": "MIT",
+  "files": [
+    "index.ts",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
   "pi": {
     "extensions": [
       "./index.ts"
     ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
