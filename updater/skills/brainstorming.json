@@ -4,8 +4,36 @@
     {
       "path": "SKILL.md",
       "patches": [
-        { "op": "replace", "find": "invoke writing-plans skill", "replace": "invoke the /skill:writing-plans command" },
-        { "op": "replace", "find": "Invoke writing-plans skill", "replace": "Invoke the /skill:writing-plans command" }
+        {
+          "op": "replace",
+          "find": "9. **Transition to implementation** — invoke writing-plans skill to create implementation plan",
+          "replace": "9. **Transition to planning** — invoke /skill:writing-roadmaps for large/multi-phase designs, otherwise invoke /skill:writing-plans"
+        },
+        {
+          "op": "replace",
+          "find": "Invoke writing-plans skill",
+          "replace": "Choose writing-roadmaps or writing-plans"
+        },
+        {
+          "op": "replace",
+          "find": "**The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.",
+          "replace": "**The terminal state is choosing the next planning skill.** For designs too large for one detailed implementation plan or context window, invoke /skill:writing-roadmaps. For designs that fit in one plan, invoke /skill:writing-plans. Do NOT invoke frontend-design, mcp-builder, or any other implementation skill."
+        },
+        {
+          "op": "replace",
+          "find": "- If the project is too large for a single spec, help the user decompose into sub-projects: what are the independent pieces, how do they relate, what order should they be built? Then brainstorm the first sub-project through the normal design flow. Each sub-project gets its own spec → plan → implementation cycle.",
+          "replace": "- If the project is too large for a single spec, help the user decompose into sub-projects: what are the independent pieces, how do they relate, what order should they be built? Then brainstorm the first sub-project through the normal design flow. Each sub-project gets its own spec → roadmap-or-plan → implementation cycle.\n- If the design fits in one spec but is too large for one detailed implementation plan or one context window, finish the design doc, then use /skill:writing-roadmaps to define ordered phases before any detailed plan."
+        },
+        {
+          "op": "replace",
+          "find": "> \"Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan.\"",
+          "replace": "> \"Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we choose the next planning step.\""
+        },
+        {
+          "op": "replace",
+          "find": "- Invoke the writing-plans skill to create a detailed implementation plan\n- Do NOT invoke any other skill. writing-plans is the next step.",
+          "replace": "- If the design is large, multi-phase, or likely to exceed one context window as a detailed plan, invoke /skill:writing-roadmaps\n- Otherwise, invoke /skill:writing-plans to create a detailed implementation plan\n- Do NOT invoke any other skill. Roadmap/planning is the next step."
+        }
       ]
     }
   ]
