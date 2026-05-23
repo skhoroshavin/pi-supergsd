@@ -1,76 +1,52 @@
 # AGENTS.md — pi-supergsd
 
-## What this project is
-
-A Pi extension that packages curated, patched [Superpowers](https://github.com/obra/superpowers) skills for Pi users.
-
-**Build time:** `npm run update` clones the upstream Superpowers repo, applies declarative patches, and writes patched skills to `skills/`.
-
-**Runtime:** `index.ts` serves skills via Pi's `resources_discover` event.
+A Pi extension packaging patched [Superpowers](https://github.com/obra/superpowers) skills.
 
 ## Architecture
 
+- **`skills/`** — generated skills (from updater) + custom skills (`writing-roadmaps`). Committed. Served at runtime via `package.json` → `pi.skills`.
+- **`updater/`** — build-time only. Clones upstream, applies declarative patches, writes results to `skills/`.
+
 ```
-pi-supergsd/
-├── index.ts                    # Pi extension entry point (runtime, no network calls)
-├── skills/                     # Skills: generated (from updater) + custom (hand-written; committed)
-├── updater/
-│   ├── updater.ts              # Entry script: clones, patches, writes
-│   ├── common-patch.json       # Patches applied to EVERY file after per-file patches
-│   ├── skills/                 # One JSON definition per upstream-derived skill
-│   │   ├── brainstorming.json
-│   │   ├── systematic-debugging.json
-│   │   └── ... (10 total)
-│   └── lib/
-│       ├── patcher.ts          # Pure patch engine (no side effects)
-│       ├── patcher.test.ts     # Unit tests for patch engine
-│       ├── source.ts           # Git clone/update and local file reader
-│       ├── source.test.ts      # Black-box tests for git source module
-│       └── types.ts            # Shared TypeScript types
+updater/
+├── updater.ts              # Entry: clones, patches, writes
+├── common-patch.json       # Patches applied to every file after per-file patches
+├── skills/                 # JSON defs (brainstorming.json, …)
+└── lib/                    # patcher, source, types (all with tests)
 ```
 
-## Key conventions
+## Conventions
 
-- **TypeScript**, ES modules (`"type": "module"`), Node 20+, `tsx` for execution
-- **Native `fetch`**, Node built-in test runner (`node:test`)
-- Patches are applied in order: **per-file patches first, then common patches**
-- The `updater/` directory is build-time tooling. `index.ts` and `skills/` are runtime assets.
+- TypeScript, ES modules, Node 20+, `tsx` for execution
+- Node built-in test runner (`node:test`)
+- Patches: per-file first, then `common-patch.json` across all files
 
-## How to test
+## Commands
 
 ```bash
-# Run all tests (updater tests + release scripts)
-npm test
-
-# Run the updater — fetches fresh skills from upstream, applies patches
-npm run update
-
-# Type-check everything
-npx tsc --noEmit
+npm test              # All tests (updater/ + scripts/)
+npm run updater       # Regenerate skills from upstream + patches
+npx tsc --noEmit      # Type-check updater/ + scripts/
 ```
 
-The updater exits non-zero if any patch fails to match upstream content. This is intentional — it catches upstream drift.
+The updater exits non-zero if any patch fails to match — intentional drift detection.
 
-## How to add or modify a skill
+## Adding or modifying a skill
 
 ### Upstream-derived skills
 
-Skills that originate from the [Superpowers](https://github.com/obra/superpowers) repo are defined in `updater/skills/<name>.json` and regenerated via `npm run update`.
-
-1. Create `updater/skills/<name>.json` (see existing files for format)
-2. Run `npm run updater`
-3. Verify the output in `skills/<name>/`
-4. Commit both the definition and generated files
+1. Create `updater/skills/<name>.json` (see existing for format)
+2. `npm run updater`
+3. Verify output in `skills/<name>/`
+4. Commit definition + generated files
 
 ### Custom skills
 
-Skills that don't exist upstream (e.g. `writing-roadmaps`) are written directly into `skills/<name>/`.
+1. Create `skills/<name>/SKILL.md` with frontmatter (`name`, `description`)
+2. Add supporting files alongside
+3. Commit
 
-1. Create `skills/<name>/SKILL.md` with proper frontmatter (`name`, `description`)
-2. Add any supporting files alongside SKILL.md
-3. Commit the changes
-
-Custom skills in `skills/` coexist with updater-generated skills. Running `npm run updater` only touches skills that have definitions in `updater/skills/` — custom skills are left alone.
+Custom skills coexist with updater-generated ones. The updater only touches skills with definitions in `updater/skills/`.
 
 ### Skill definition format
 
@@ -94,17 +70,14 @@ Custom skills in `skills/` coexist with updater-generated skills. Running `npm r
 | Op | Behavior |
 |---|---|
 | `replace` | Exact string replacement, all occurrences |
-| `regex-replace` | Regex replacement with `$1`, `$2` capture groups |
-| `delete-line` | Delete any line containing the find string |
-| `delete-block` | Delete lines from `findStart` through `findEnd` (inclusive) |
+| `regex-replace` | Regex replacement with capture groups (`$1`, …) |
+| `delete-line` | Delete lines containing `find` |
+| `delete-block` | Delete from `findStart` through `findEnd` (inclusive) |
 | `prepend` | Add text at start of file |
 | `append` | Add text at end of file |
 
-Patches that don't match are returned in `unmatched` and reported as warnings. The updater exits non-zero if any fail.
+## Gotchas
 
-## Important gotchas
-
-- **Patches are applied sequentially.** A `delete-line` that removes a line will cause later patches targeting text on that same line to fail. Merge or order carefully.
-- **Per-file patches run first.** They operate on original upstream content. Common patches normalize afterward. Write per-file `find` strings against upstream text (e.g. `superpowers:`, not `/skill:`).
-- **Always verify after running updater.** Check that generated files look correct before committing.
-- **`index.ts` is not type-checked cleanly without Pi's runtime types.** The `@earendil-works/pi-coding-agent` types are provided at runtime by Pi. Only `updater/` files need to compile with `npx tsc --noEmit`.
+- **Patches are sequential.** A `delete-line` removing a line will cause later patches targeting that line to fail. Merge or order carefully.
+- **Per-file patches target upstream text** (`superpowers:`, not `/skill:`). Common patches normalize afterward.
+- **Verify after running updater.** Check generated files before committing.
