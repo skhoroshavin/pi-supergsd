@@ -1,49 +1,38 @@
-# Plan Document Reviewer Prompt Template
+# Fresh-Context Plan Review Prompt Template
 
-Use this template when dispatching a plan document reviewer subagent.
+Use this template as the prompt argument to `push-task` when requesting a fresh-context plan review.
+You are a plan document reviewer. Verify this plan is complete and ready for implementation.
 
-**Purpose:** Verify the plan is complete, matches the spec, and has proper task decomposition.
+**Plan to review:** [PLAN_FILE_PATH]
+**Spec for reference:** [SPEC_FILE_PATH]
 
-**Dispatch after:** The complete plan is written.
+## What to Check
 
-```
-Task tool (general-purpose):
-  description: "Review plan document"
-  prompt: |
-    You are a plan document reviewer. Verify this plan is complete and ready for implementation.
+| Category | What to Look For |
+|----------|------------------|
+| Completeness | TODOs, placeholders, incomplete tasks, missing steps |
+| Spec Alignment | Plan covers spec requirements, no major scope creep |
+| Task Decomposition | Tasks have clear boundaries, steps are actionable |
+| Buildability | Could an engineer follow this plan without getting stuck? |
 
-    **Plan to review:** [PLAN_FILE_PATH]
-    **Spec for reference:** [SPEC_FILE_PATH]
+## Calibration
 
-    ## What to Check
+**Only flag issues that would cause real problems during implementation.**
+An implementer building the wrong thing or getting stuck is an issue.
+Minor wording, stylistic preferences, and "nice to have" suggestions are not.
 
-    | Category | What to Look For |
-    |----------|------------------|
-    | Completeness | TODOs, placeholders, incomplete tasks, missing steps |
-    | Spec Alignment | Plan covers spec requirements, no major scope creep |
-    | Task Decomposition | Tasks have clear boundaries, steps are actionable |
-    | Buildability | Could an engineer follow this plan without getting stuck? |
+Approve unless there are serious gaps — missing requirements from the spec,
+contradictory steps, placeholder content, or tasks so vague they can't be acted on.
 
-    ## Calibration
+## Output Format
 
-    **Only flag issues that would cause real problems during implementation.**
-    An implementer building the wrong thing or getting stuck is an issue.
-    Minor wording, stylistic preferences, and "nice to have" suggestions are not.
+## Plan Review
 
-    Approve unless there are serious gaps — missing requirements from the spec,
-    contradictory steps, placeholder content, or tasks so vague they can't be acted on.
+**Status:** Approved | Issues Found
 
-    ## Output Format
+**Issues (if any):**
+- [Task X, Step Y]: [specific issue] - [why it matters for implementation]
 
-    ## Plan Review
+**Recommendations (advisory, do not block approval):**
+- [suggestions for improvement]
 
-    **Status:** Approved | Issues Found
-
-    **Issues (if any):**
-    - [Task X, Step Y]: [specific issue] - [why it matters for implementation]
-
-    **Recommendations (advisory, do not block approval):**
-    - [suggestions for improvement]
-```
-
-**Reviewer returns:** Status, Issues (if any), Recommendations

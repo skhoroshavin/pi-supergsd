@@ -12,7 +12,7 @@ export function applyPatches(content: string, patches: Patch[]): PatchResult {
         result = result.split(patch.find).join(patch.replace);
       }
     } else if (patch.op === 'regex-replace') {
-      const regex = new RegExp(patch.find, 'g');
+      const regex = new RegExp(patch.find, 'gm');
       const after = result.replace(regex, patch.replace);
       if (after === result) {
         unmatched.push(patch);

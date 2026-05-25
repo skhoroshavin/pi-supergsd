@@ -11,7 +11,7 @@ description: Use when creating new skills, editing existing skills, or verifying
 
 **Personal skills live in agent-specific directories (`~/.pi/skills` for Pi, `~/.agents/skills/` for Codex)** 
 
-You write test cases (pressure scenarios with subagents), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
+You write test cases (pressure scenarios with fresh context), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
 
 **Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill teaches the right thing.
 
@@ -536,7 +536,13 @@ Follow the TDD cycle:
 
 ### RED: Write Failing Test (Baseline)
 
-Run pressure scenario with subagent WITHOUT the skill. Document exact behavior:
+**If the `push-task` tool is available:**
+1. Call `push-task({ prompt: <pressure scenario> })`
+2. Tell the user: "Run `/start-fresh` to run the baseline scenario."
+3. After `/return`, document the agent's choices and rationalizations verbatim.
+
+**Otherwise:**
+Run the scenario in the current session and document the agent's behavior:
 - What choices did they make?
 - What rationalizations did they use (verbatim)?
 - Which pressures triggered violations?
@@ -549,11 +555,21 @@ Write skill that addresses those specific rationalizations. Don't add extra cont
 
 Run same scenarios WITH skill. Agent should now comply.
 
+**If `push-task` is available:** Call `push-task({ prompt: "<pressure scenario with skill loaded>" })` and tell the user to run `/start-fresh`. After `/return`, confirm compliance.
+
+**Otherwise:** Run in the current session.
+
 ### REFACTOR: Close Loopholes
 
+**If the `push-task` tool is available:**
+1. Call `push-task({ prompt: <updated scenario + updated skill loaded> })`
+2. Tell the user: "Run `/start-fresh` to verify the updated skill works."
+3. After `/return`, confirm the agent now complies and no new rationalizations appear.
+
+**Otherwise:**
 Agent found new rationalization? Add explicit counter. Re-test until bulletproof.
 
-**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology:
+**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology (filename references a legacy term; content uses current navigator terminology):
 - How to write pressure scenarios
 - Pressure types (time, sunk cost, authority, exhaustion)
 - Plugging holes systematically

@@ -47,6 +47,34 @@
           "op": "replace",
           "find": "## Execution Handoff\n\nAfter saving the plan, offer execution choice:\n\n**\"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Two execution options:**\n\n**1. Subagent-Driven (recommended)** - I dispatch a fresh subagent per task, review between tasks, fast iteration\n\n**2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints\n\n**Which approach?\"**\n\n**If Subagent-Driven chosen:**\n- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development\n- Fresh subagent per task + two-stage review\n\n**If Inline Execution chosen:**\n- **REQUIRED SUB-SKILL:** Use superpowers:executing-plans\n- Batch execution with checkpoints for review",
           "replace": "## Execution Handoff\n\nAfter saving the plan, offer execution with phase-boundary clarity:\n\n**\"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Ready to execute it using /skill:executing-plans?\"**\n\nIf this plan covers a roadmap phase, add:\n\n**\"This plan intentionally stops at `[Phase N: Name]`. Future roadmap phases need separate detailed plans.\"**\n\n**If execution chosen:**\n- **REQUIRED SUB-SKILL:** Use /skill:executing-plans\n- Batch execution with checkpoints for review"
+        },
+        {
+          "op": "replace",
+          "find": "## Self-Review\n\nAfter writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.",
+          "replace": "## Self-Review\n\n**Fresh-context plan review (optional but recommended):**\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: \"<content from plan-document-reviewer-prompt.md>\" })`\n2. Tell the user: \"Run `/start-fresh` for a fresh-context review of the plan.\"\n3. After `/return`, fix any gaps before committing the plan.\n\n**Otherwise:**\nRun the Self-Review checklist inline."
+        }
+      ]
+    },
+    {
+      "path": "plan-document-reviewer-prompt.md",
+      "patches": [
+        {
+          "op": "replace",
+          "find": "# Plan Document Reviewer Prompt Template\n\nUse this template when dispatching a plan document reviewer subagent.\n\n**Purpose:** Verify the plan is complete, matches the spec, and has proper task decomposition.\n\n**Dispatch after:** The complete plan is written.\n\n```\nTask tool (general-purpose):\n  description: \"Review plan document\"\n  prompt: |",
+          "replace": "# Fresh-Context Plan Review Prompt Template\n\nUse this template as the prompt argument to `push-task` when requesting a fresh-context plan review."
+        },
+        {
+          "op": "delete-line",
+          "find": "```"
+        },
+        {
+          "op": "delete-line",
+          "find": "**Reviewer returns:** Status, Issues (if any), Recommendations"
+        },
+        {
+          "op": "regex-replace",
+          "find": "^    ",
+          "replace": ""
         }
       ]
     }
