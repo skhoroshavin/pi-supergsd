@@ -1340,7 +1340,7 @@ npm run lint && npx tsc --noEmit
 
 Expected: clean output.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add package.json tsconfig.json && git commit -m "config: add extension entry point and peer dependencies for task tooling"

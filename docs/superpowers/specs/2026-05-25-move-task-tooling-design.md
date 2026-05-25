@@ -41,7 +41,7 @@ createAbortTaskCommand(pi)     → navigates to task-start (no injection),
                                   appends TASK_DONE
 
 // ── Registration ──
-export default function register(pi) → 1 tool + 4 commands
+export default function registerTaskCommands(pi) → 1 tool + 4 commands
 ```
 
 `/finish-task` always injects the last assistant message — no summary mode, no handoff field, no `/finish-task last` override. When there's no assistant message on the branch, it notifies and returns with no injection.
@@ -55,7 +55,7 @@ Entry types use `'task-start'` instead of `'checkpoint'` — no collision with p
 **`package.json`:**
 - Add `peerDependencies`: `"@earendil-works/pi-coding-agent": "*"`, `"typebox": "*"`
 - Add `pi.extensions: ["./index.ts"]`
-- Add `"index.ts"`, `"index.test.ts"` to `files`
+- Add `"index.ts"` to `files` (tests aren't shipped)
 
 **`tsconfig.json`:**
 - Add `"index.ts"`, `"index.test.ts"` to includes
