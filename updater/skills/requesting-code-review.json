@@ -17,12 +17,12 @@
         {
           "op": "replace",
           "find": "**2. Dispatch code reviewer subagent:**\n\nUse Task tool with `general-purpose` type, fill template at `code-reviewer.md`\n\n**Placeholders:**\n- `{DESCRIPTION}` - Brief summary of what you built\n- `{PLAN_OR_REQUIREMENTS}` - What it should do\n- `{BASE_SHA}` - Starting commit\n- `{HEAD_SHA}` - Ending commit",
-          "replace": "**2. Request code review:**\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: \"<review prompt with BASE_SHA, HEAD_SHA, description>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context code review.\"\n3. After `/return`, read the review output and act on feedback.\n\n**Otherwise:**\nUse the code-reviewer.md template for your review process."
+          "replace": "**2. Request code review:**\n\n1. Call `push-task({ prompt: \"<review prompt with BASE_SHA, HEAD_SHA, description>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context code review.\"\n3. After `/finish-task`, read the review output and act on feedback."
         },
         {
           "op": "replace",
           "find": "[Dispatch code reviewer subagent]\n  DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types\n  PLAN_OR_REQUIREMENTS: Task 2 from docs/superpowers/plans/deployment-plan.md\n  BASE_SHA: a7981ec\n  HEAD_SHA: 3df7661\n\n[Subagent returns]:\n  Strengths: Clean architecture, real tests\n  Issues:\n    Important: Missing progress indicators\n    Minor: Magic number (100) for reporting interval\n  Assessment: Ready to proceed",
-          "replace": "[Call push-task with review prompt]\n`push-task({ prompt: \"You are a Senior Code Reviewer... [review body from code-reviewer.md, filled with BASE_SHA=a7981ec, HEAD_SHA=3df7661, DESCRIPTION=Added verifyIndex() and repairIndex() with 4 issue types, PLAN_OR_REQUIREMENTS=Task 2 from docs/superpowers/plans/deployment-plan.md]\", context: \"fresh\" })`\n\n[After /return, review output]:\n  Strengths: Clean architecture, real tests\n  Issues:\n    Important: Missing progress indicators\n    Minor: Magic number (100) for reporting interval\n  Assessment: Ready to proceed"
+          "replace": "[Call push-task with review prompt]\n`push-task({ prompt: \"You are a Senior Code Reviewer... [review body from code-reviewer.md, filled with BASE_SHA=a7981ec, HEAD_SHA=3df7661, DESCRIPTION=Added verifyIndex() and repairIndex() with 4 issue types, PLAN_OR_REQUIREMENTS=Task 2 from docs/superpowers/plans/deployment-plan.md]\", context: \"fresh\" })`\n\n[After /finish-task, review output]:\n  Strengths: Clean architecture, real tests\n  Issues:\n    Important: Missing progress indicators\n    Minor: Magic number (100) for reporting interval\n  Assessment: Ready to proceed"
         },
         {
           "op": "replace",

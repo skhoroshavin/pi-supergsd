@@ -131,13 +131,9 @@ Every step must contain the actual content an engineer needs. These are **plan f
 
 **Fresh-context plan review (optional but recommended):**
 
-**If the `push-task` tool is available:**
 1. Call `push-task({ prompt: "<content from plan-document-reviewer-prompt.md>", context: "fresh" })`
 2. Tell the user: "Run `/start-task` for a fresh-context review of the plan."
-3. After `/return`, fix any gaps before committing the plan.
-
-**Otherwise:**
-Run the Self-Review checklist inline.
+3. After `/finish-task`, fix any gaps before committing the plan.
 
 **1. Spec/roadmap coverage:** Skim each section/requirement in the spec. Can you point to a task that implements it? If working from a roadmap, confirm this plan covers the selected phase and excludes later phases. List any gaps.
 

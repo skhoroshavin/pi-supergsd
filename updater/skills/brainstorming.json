@@ -37,7 +37,7 @@
         {
           "op": "replace",
           "find": "7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)",
-          "replace": "7. **Spec self-review** — check the spec for completeness and consistency before user review\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: \"<content from spec-document-reviewer-prompt.md>\", context: \"fresh\" })`\n   The prompt must be self-contained — it cannot reference \"above\" or prior\n   conversation, because `/start-task` provides empty context.\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the spec.\"\n3. After the user runs `/return`, incorporate the review findings and fix any gaps\n   in the spec before proceeding to Step 8.\n\n**Otherwise:**\nRun the Spec Self-Review checklist inline (see below.)"
+          "replace": "7. **Spec self-review** — check the spec for completeness and consistency before user review\n\n1. Call `push-task({ prompt: \"<content from spec-document-reviewer-prompt.md>\", context: \"fresh\" })`\n   The prompt must be self-contained — it cannot reference \"above\" or prior\n   conversation, because `/start-task` provides empty context.\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the spec.\"\n3. After the user runs `/finish-task`, incorporate the review findings and fix any gaps\n   in the spec before proceeding to Step 8."
         }
       ]
     },

@@ -51,7 +51,7 @@
         {
           "op": "replace",
           "find": "## Self-Review\n\nAfter writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.",
-          "replace": "## Self-Review\n\n**Fresh-context plan review (optional but recommended):**\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: \"<content from plan-document-reviewer-prompt.md>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the plan.\"\n3. After `/return`, fix any gaps before committing the plan.\n\n**Otherwise:**\nRun the Self-Review checklist inline."
+          "replace": "## Self-Review\n\n**Fresh-context plan review (optional but recommended):**\n\n1. Call `push-task({ prompt: \"<content from plan-document-reviewer-prompt.md>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the plan.\"\n3. After `/finish-task`, fix any gaps before committing the plan."
         }
       ]
     },
