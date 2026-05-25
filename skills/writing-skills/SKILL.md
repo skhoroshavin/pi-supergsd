@@ -250,7 +250,7 @@ You: I'll search past conversations for React Router authentication patterns.
 # ✅ GOOD: Minimal example (20 words)
 Partner: "How did we handle auth errors in React Router?"
 You: Searching...
-[Dispatch subagent → synthesis]
+[Fresh context search → synthesis]
 ```
 
 **Eliminate redundancy:**

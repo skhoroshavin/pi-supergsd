@@ -40,9 +40,14 @@
           "replace": "# Fresh-Context Code Review Prompt Template\n\nUse this template as the prompt argument to `push-task` when requesting a fresh-context code review."
         },
         {
+          "op": "replace",
+          "find": "\n```\n\n**Placeholders:**",
+          "replace": "\n\n**Placeholders:**"
+        },
+        {
           "op": "delete-block",
-          "findStart": "```",
-          "findEnd": "**Reviewer returns:** Strengths, Issues (Critical / Important / Minor), Recommendations, Assessment"
+          "findStart": "**Placeholders:**",
+          "findEnd": "**Reviewer returns:**"
         },
         {
           "op": "regex-replace",
