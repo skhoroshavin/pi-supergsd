@@ -11,7 +11,7 @@ description: Use when creating new skills, editing existing skills, or verifying
 
 **Personal skills live in agent-specific directories (`~/.pi/skills` for Pi, `~/.agents/skills/` for Codex)** 
 
-You write test cases (pressure scenarios with subagents), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
+You write test cases (pressure scenarios with push-task), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
 
 **Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill teaches the right thing.
 
@@ -237,7 +237,7 @@ When searching, dispatch subagent with template...
 [20 lines of repeated instructions]
 
 # ✅ GOOD: Reference other skill
-Use the read tool to load skills when needed.
+Use push-task for fresh-context work (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.
 ```
 
 **Compress examples:**
@@ -250,7 +250,7 @@ You: I'll search past conversations for React Router authentication patterns.
 # ✅ GOOD: Minimal example (20 words)
 Partner: "How did we handle auth errors in React Router?"
 You: Searching...
-[Dispatch subagent → synthesis]
+[push-task → synthesis]
 ```
 
 **Eliminate redundancy:**
@@ -536,7 +536,7 @@ Follow the TDD cycle:
 
 ### RED: Write Failing Test (Baseline)
 
-Run pressure scenario with subagent WITHOUT the skill. Document exact behavior:
+Use the `push-task` tool to run the pressure scenario without the skill. Act on the returned task result when you get it. Document exact behavior:
 - What choices did they make?
 - What rationalizations did they use (verbatim)?
 - Which pressures triggered violations?
@@ -549,11 +549,13 @@ Write skill that addresses those specific rationalizations. Don't add extra cont
 
 Run same scenarios WITH skill. Agent should now comply.
 
+Use the `push-task` tool to run the same scenario with the skill loaded. Act on the returned task result when you get it, then confirm compliance.
+
 ### REFACTOR: Close Loopholes
 
-Agent found new rationalization? Add explicit counter. Re-test until bulletproof.
+Agent found a new rationalization? Add an explicit counter. Use the `push-task` tool to re-test with the updated scenario and skill, then act on the returned task result when you get it. Re-test until bulletproof.
 
-**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology:
+**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology (filename references a legacy term; content uses current navigator terminology):
 - How to write pressure scenarios
 - Pressure types (time, sunk cost, authority, exhaustion)
 - Plugging holes systematically

@@ -4,16 +4,46 @@
     {
       "path": "SKILL.md",
       "patches": [
-        { "op": "replace", "find": "Dispatch a code reviewer subagent to catch issues before they cascade.", "replace": "Request a code review to catch issues before they cascade." },
-        { "op": "replace", "find": "Dispatch code reviewer subagent:", "replace": "Request code review:" },
-        { "op": "replace", "find": "Use Task tool with `general-purpose` type, fill template at `code-reviewer.md`", "replace": "Use the code-reviewer.md template for your review process." }
+        {
+          "op": "replace",
+          "find": "Dispatch a code reviewer subagent to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history. This keeps the reviewer focused on the work product, not your thought process, and preserves your own context for continued work.",
+          "replace": "Request a code review to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history. This keeps the reviewer focused on the work product, not your thought process, and preserves your own context for continued work."
+        },
+        {
+          "op": "replace",
+          "find": "**Mandatory:**\n- After each task in subagent-driven development\n- After completing major feature\n- Before merge to main",
+          "replace": "**Mandatory:**\n- After completing a focused task or sub-task\n- After completing major feature\n- Before merge to main"
+        },
+        {
+          "op": "replace",
+          "find": "**2. Dispatch code reviewer subagent:**\n\nUse Task tool with `general-purpose` type, fill template at `code-reviewer.md`\n\n**Placeholders:**\n- `{DESCRIPTION}` - Brief summary of what you built\n- `{PLAN_OR_REQUIREMENTS}` - What it should do\n- `{BASE_SHA}` - Starting commit\n- `{HEAD_SHA}` - Ending commit",
+          "replace": "**2. Request code review:**\n\nUse the `push-task` tool, filling the prompt from `code-reviewer.md`.\n\n**Placeholders:**\n- `{DESCRIPTION}` - Brief summary of what you built\n- `{PLAN_OR_REQUIREMENTS}` - What it should do\n- `{BASE_SHA}` - Starting commit\n- `{HEAD_SHA}` - Ending commit"
+        },
+        {
+          "op": "replace",
+          "find": "[Dispatch code reviewer subagent]\n  DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types\n  PLAN_OR_REQUIREMENTS: Task 2 from docs/superpowers/plans/deployment-plan.md\n  BASE_SHA: a7981ec\n  HEAD_SHA: 3df7661\n\n[Subagent returns]:\n  Strengths: Clean architecture, real tests\n  Issues:\n    Important: Missing progress indicators\n    Minor: Magic number (100) for reporting interval\n  Assessment: Ready to proceed",
+          "replace": "[Use push-task tool with review prompt]\n  DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types\n  PLAN_OR_REQUIREMENTS: Task 2 from docs/superpowers/plans/deployment-plan.md\n  BASE_SHA: a7981ec\n  HEAD_SHA: 3df7661\n\n[Returned task result]:\n  Strengths: Clean architecture, real tests\n  Issues:\n    Important: Missing progress indicators\n    Minor: Magic number (100) for reporting interval\n  Assessment: Ready to proceed"
+        },
+        {
+          "op": "replace",
+          "find": "## Integration with Workflows\n\n**Subagent-Driven Development:**\n- Review after EACH task\n- Catch issues before they compound\n- Fix before moving to next task\n\n**Executing Plans:**",
+          "replace": "## Integration with Workflows\n\n**Executing Plans:**"
+        }
       ]
     },
     {
       "path": "code-reviewer.md",
       "patches": [
-        { "op": "replace", "find": "Use this template when dispatching a code reviewer subagent.", "replace": "Use this template when requesting a code review." },
-        { "op": "replace", "find": "Task tool (general-purpose):", "replace": "Review request:" }
+        {
+          "op": "replace",
+          "find": "Use this template when dispatching a code reviewer subagent.",
+          "replace": "Use this template when dispatching a code reviewer task."
+        },
+        {
+          "op": "replace",
+          "find": "Task tool (general-purpose):\n  description: \"Review code changes\"\n  prompt: |",
+          "replace": "push-task:\n  prompt: |"
+        }
       ]
     }
   ]

@@ -181,7 +181,7 @@ For each variant:
 
 ## Next Steps
 
-1. Create subagent test harness
+1. Run baseline scenario with fresh context
 2. Run NULL baseline on all 4 scenarios
 3. Test each variant on same scenarios
 4. Compare compliance rates

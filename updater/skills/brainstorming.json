@@ -33,6 +33,31 @@
           "op": "replace",
           "find": "- Invoke the writing-plans skill to create a detailed implementation plan\n- Do NOT invoke any other skill. writing-plans is the next step.",
           "replace": "- If the design is large, multi-phase, or likely to exceed one context window as a detailed plan, invoke /skill:writing-roadmaps\n- Otherwise, invoke /skill:writing-plans to create a detailed implementation plan\n- Do NOT invoke any other skill. Roadmap/planning is the next step."
+        },
+        {
+          "op": "replace",
+          "find": "7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)",
+          "replace": "7. **Spec self-review** — check the spec for completeness and consistency before user review"
+        },
+        {
+          "op": "replace",
+          "find": "**Spec Self-Review:**\nAfter writing the spec document, look at it with fresh eyes:",
+          "replace": "**Spec Self-Review:**\nAfter writing the spec document, use the `push-task` tool with `spec-document-reviewer-prompt.md` to request a fresh-context spec review. Act on the returned task result when you get it, then look at the spec with fresh eyes:"
+        }
+      ]
+    },
+    {
+      "path": "spec-document-reviewer-prompt.md",
+      "patches": [
+        {
+          "op": "replace",
+          "find": "Use this template when dispatching a spec document reviewer subagent.",
+          "replace": "Use this template when dispatching a spec document reviewer task."
+        },
+        {
+          "op": "replace",
+          "find": "Task tool (general-purpose):\n  description: \"Review spec document\"\n  prompt: |",
+          "replace": "push-task:\n  prompt: |"
         }
       ]
     }

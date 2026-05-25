@@ -1,6 +1,6 @@
 {
   "name": "pi-supergsd",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Curated, patched Superpowers skills packaged for Pi",
   "type": "module",
   "scripts": {
@@ -26,6 +26,7 @@
   },
   "license": "MIT",
   "files": [
+    "index.ts",
     "skills",
     "README.md",
     "LICENSE"
@@ -33,7 +34,14 @@
   "pi": {
     "skills": [
       "./skills"
+    ],
+    "extensions": [
+      "./index.ts"
     ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.75.5",
+    "typebox": "^1.1.38"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

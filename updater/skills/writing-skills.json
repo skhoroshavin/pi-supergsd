@@ -6,7 +6,7 @@
       "patches": [
         { "op": "replace", "find": "Personal skills live in agent-specific directories (`~/.claude/skills` for Claude Code, `~/.agents/skills/` for Codex)", "replace": "Personal skills live in agent-specific directories (`~/.pi/skills` for Pi, `~/.agents/skills/` for Codex)" },
         { "op": "replace", "find": "Pressure scenario with subagent", "replace": "Pressure scenario with agent behavior" },
-        { "op": "replace", "find": "Always use subagents (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.", "replace": "Use the read tool to load skills when needed." },
+        { "op": "replace", "find": "Always use subagents (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.", "replace": "Use push-task for fresh-context work (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow." },
         { "op": "replace", "find": "Skills help future Claude instances find", "replace": "Skills help future agent instances find" },
         { "op": "replace", "find": "## Claude Search Optimization", "replace": "## Agent Search Optimization" },
         { "op": "replace", "find": "Future Claude needs to FIND", "replace": "The agent needs to FIND" },
@@ -18,7 +18,19 @@
         { "op": "replace", "find": "How future Claude finds your skill:", "replace": "How the agent finds your skill:" },
         { "op": "replace", "find": "caused Claude to do ONE review", "replace": "caused the agent to do ONE review" },
         { "op": "replace", "find": "Claude correctly read the flowchart", "replace": "the agent correctly read the flowchart" },
-        { "op": "replace", "find": "documentation Claude skips", "replace": "documentation the agent skips" }
+        { "op": "replace", "find": "documentation Claude skips", "replace": "documentation the agent skips" },
+        { "op": "replace", "find": "You write test cases (pressure scenarios with subagents), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).", "replace": "You write test cases (pressure scenarios with push-task), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes)." },
+        { "op": "replace", "find": "### RED: Write Failing Test (Baseline)\n\nRun pressure scenario with subagent WITHOUT the skill. Document exact behavior:\n- What choices did they make?\n- What rationalizations did they use (verbatim)?\n- Which pressures triggered violations?", "replace": "### RED: Write Failing Test (Baseline)\n\nUse the `push-task` tool to run the pressure scenario without the skill. Act on the returned task result when you get it. Document exact behavior:\n- What choices did they make?\n- What rationalizations did they use (verbatim)?\n- Which pressures triggered violations?" },
+        { "op": "replace", "find": "Run same scenarios WITH skill. Agent should now comply.", "replace": "Run same scenarios WITH skill. Agent should now comply.\n\nUse the `push-task` tool to run the same scenario with the skill loaded. Act on the returned task result when you get it, then confirm compliance." },
+        { "op": "replace", "find": "### REFACTOR: Close Loopholes\n\nAgent found new rationalization? Add explicit counter. Re-test until bulletproof.", "replace": "### REFACTOR: Close Loopholes\n\nAgent found a new rationalization? Add an explicit counter. Use the `push-task` tool to re-test with the updated scenario and skill, then act on the returned task result when you get it. Re-test until bulletproof." },
+        { "op": "replace", "find": "[Dispatch subagent → synthesis]", "replace": "[push-task → synthesis]" },
+        { "op": "replace", "find": "**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology:", "replace": "**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology (filename references a legacy term; content uses current navigator terminology):" }
+      ]
+    },
+    {
+      "path": "testing-skills-with-subagents.md",
+      "patches": [
+        { "op": "replace", "find": "# Testing Skills With Subagents", "replace": "# Testing Skills With Agents" }
       ]
     },
     {
@@ -26,7 +38,8 @@
       "patches": [
         { "op": "replace", "find": "~/.claude/skills/", "replace": "~/.pi/skills/" },
         { "op": "replace", "find": "Claude might think it knows how to approach tasks", "replace": "An agent might think it knows how to approach tasks" },
-        { "op": "replace", "find": "Claude.AI Emphatic Style", "replace": "Anthropic Emphatic Style" }
+        { "op": "replace", "find": "Claude.AI Emphatic Style", "replace": "Anthropic Emphatic Style" },
+        { "op": "replace", "find": "Create subagent test harness", "replace": "Run baseline scenario with fresh context" }
       ]
     }
   ],

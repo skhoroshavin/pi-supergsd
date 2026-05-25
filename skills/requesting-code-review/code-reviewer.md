@@ -1,12 +1,11 @@
 # Code Reviewer Prompt Template
 
-Use this template when requesting a code review.
+Use this template when dispatching a code reviewer task.
 
 **Purpose:** Review completed work against requirements and code quality standards before it cascades into more work.
 
 ```
-Review request:
-  description: "Review code changes"
+push-task:
   prompt: |
     You are a Senior Code Reviewer with expertise in software architecture,
     design patterns, and best practices. Your job is to review completed work

@@ -12,7 +12,7 @@ Request a code review to catch issues before they cascade. The reviewer gets pre
 ## When to Request Review
 
 **Mandatory:**
-- After each task in subagent-driven development
+- After completing a focused task or sub-task
 - After completing major feature
 - Before merge to main
 
@@ -31,7 +31,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **2. Request code review:**
 
-Use the code-reviewer.md template for your review process.
+Use the `push-task` tool, filling the prompt from `code-reviewer.md`.
 
 **Placeholders:**
 - `{DESCRIPTION}` - Brief summary of what you built
@@ -55,13 +55,13 @@ You: Let me request code review before proceeding.
 BASE_SHA=$(git log --oneline | grep "Task 1" | head -1 | awk '{print $1}')
 HEAD_SHA=$(git rev-parse HEAD)
 
-[Dispatch code reviewer subagent]
+[Use push-task tool with review prompt]
   DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types
   PLAN_OR_REQUIREMENTS: Task 2 from docs/superpowers/plans/deployment-plan.md
   BASE_SHA: a7981ec
   HEAD_SHA: 3df7661
 
-[Subagent returns]:
+[Returned task result]:
   Strengths: Clean architecture, real tests
   Issues:
     Important: Missing progress indicators
@@ -73,11 +73,6 @@ You: [Fix progress indicators]
 ```
 
 ## Integration with Workflows
-
-**Subagent-Driven Development:**
-- Review after EACH task
-- Catch issues before they compound
-- Fix before moving to next task
 
 **Executing Plans:**
 - Review after each task or at natural checkpoints

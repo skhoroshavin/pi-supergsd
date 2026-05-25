@@ -1,14 +1,13 @@
 # Plan Document Reviewer Prompt Template
 
-Use this template when dispatching a plan document reviewer subagent.
+Use this template when dispatching a plan document reviewer task.
 
 **Purpose:** Verify the plan is complete, matches the spec, and has proper task decomposition.
 
 **Dispatch after:** The complete plan is written.
 
 ```
-Task tool (general-purpose):
-  description: "Review plan document"
+push-task:
   prompt: |
     You are a plan document reviewer. Verify this plan is complete and ready for implementation.
 
