@@ -132,8 +132,8 @@ Every step must contain the actual content an engineer needs. These are **plan f
 **Fresh-context plan review (optional but recommended):**
 
 **If the `push-task` tool is available:**
-1. Call `push-task({ prompt: "<content from plan-document-reviewer-prompt.md>" })`
-2. Tell the user: "Run `/start-fresh` for a fresh-context review of the plan."
+1. Call `push-task({ prompt: "<content from plan-document-reviewer-prompt.md>", context: "fresh" })`
+2. Tell the user: "Run `/start-task` for a fresh-context review of the plan."
 3. After `/return`, fix any gaps before committing the plan.
 
 **Otherwise:**

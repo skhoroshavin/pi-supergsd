@@ -537,8 +537,8 @@ Follow the TDD cycle:
 ### RED: Write Failing Test (Baseline)
 
 **If the `push-task` tool is available:**
-1. Call `push-task({ prompt: <pressure scenario> })`
-2. Tell the user: "Run `/start-fresh` to run the baseline scenario."
+1. Call `push-task({ prompt: <pressure scenario>, context: "branch" })`
+2. Tell the user: "Run `/start-task` to run the baseline scenario."
 3. After `/return`, document the agent's choices and rationalizations verbatim.
 
 **Otherwise:**
@@ -555,15 +555,15 @@ Write skill that addresses those specific rationalizations. Don't add extra cont
 
 Run same scenarios WITH skill. Agent should now comply.
 
-**If `push-task` is available:** Call `push-task({ prompt: "<pressure scenario with skill loaded>" })` and tell the user to run `/start-fresh`. After `/return`, confirm compliance.
+**If `push-task` is available:** Call `push-task({ prompt: "<pressure scenario with skill loaded>", context: "branch" })` and tell the user to run `/start-task`. After `/return`, confirm compliance.
 
 **Otherwise:** Run in the current session.
 
 ### REFACTOR: Close Loopholes
 
 **If the `push-task` tool is available:**
-1. Call `push-task({ prompt: <updated scenario + updated skill loaded> })`
-2. Tell the user: "Run `/start-fresh` to verify the updated skill works."
+1. Call `push-task({ prompt: <updated scenario + updated skill loaded>, context: "branch" })`
+2. Tell the user: "Run `/start-task` to verify the updated skill works."
 3. After `/return`, confirm the agent now complies and no new rationalizations appear.
 
 **Otherwise:**

@@ -32,9 +32,9 @@ HEAD_SHA=$(git rev-parse HEAD)
 **2. Request code review:**
 
 **If the `push-task` tool is available:**
-1. Call `push-task({ prompt: "<review prompt with BASE_SHA, HEAD_SHA, description>" })`
-2. Tell the user: "Run `/start-fresh` for a fresh-context code review."
-3. After `/return`, read the branch summary and act on feedback.
+1. Call `push-task({ prompt: "<review prompt with BASE_SHA, HEAD_SHA, description>", context: "fresh" })`
+2. Tell the user: "Run `/start-task` for a fresh-context code review."
+3. After `/return`, read the review output and act on feedback.
 
 **Otherwise:**
 Use the code-reviewer.md template for your review process.
@@ -56,9 +56,9 @@ BASE_SHA=$(git log --oneline | grep "Task 1" | head -1 | awk '{print $1}')
 HEAD_SHA=$(git rev-parse HEAD)
 
 [Call push-task with review prompt]
-`push-task({ prompt: "You are a Senior Code Reviewer... [review body from code-reviewer.md, filled with BASE_SHA=a7981ec, HEAD_SHA=3df7661, DESCRIPTION=Added verifyIndex() and repairIndex() with 4 issue types, PLAN_OR_REQUIREMENTS=Task 2 from docs/superpowers/plans/deployment-plan.md]" })`
+`push-task({ prompt: "You are a Senior Code Reviewer... [review body from code-reviewer.md, filled with BASE_SHA=a7981ec, HEAD_SHA=3df7661, DESCRIPTION=Added verifyIndex() and repairIndex() with 4 issue types, PLAN_OR_REQUIREMENTS=Task 2 from docs/superpowers/plans/deployment-plan.md]", context: "fresh" })`
 
-[After /return, branch summary contains]:
+[After /return, review output]:
   Strengths: Clean architecture, real tests
   Issues:
     Important: Missing progress indicators

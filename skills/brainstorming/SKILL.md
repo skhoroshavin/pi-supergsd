@@ -30,15 +30,15 @@ You MUST create a task for each of these items and complete them in order:
 7. **Spec self-review** — check the spec for completeness and consistency before user review
 
 **If the `push-task` tool is available:**
-1. Call `push-task({ prompt: "<content from spec-document-reviewer-prompt.md>" })`
+1. Call `push-task({ prompt: "<content from spec-document-reviewer-prompt.md>", context: "fresh" })`
    The prompt must be self-contained — it cannot reference "above" or prior
-   conversation, because `/start-fresh` provides empty context.
-2. Tell the user: "Run `/start-fresh` for a fresh-context review of the spec."
-3. After the user runs `/return`, incorporate the summary findings and fix any gaps
+   conversation, because `/start-task` provides empty context.
+2. Tell the user: "Run `/start-task` for a fresh-context review of the spec."
+3. After the user runs `/return`, incorporate the review findings and fix any gaps
    in the spec before proceeding to Step 8.
 
 **Otherwise:**
-Run the Spec Self-Review checklist inline (see below).
+Run the Spec Self-Review checklist inline (see below.)
 8. **User reviews written spec** — ask user to review the spec file before proceeding
 9. **Transition to planning** — invoke /skill:writing-roadmaps for large/multi-phase designs, otherwise invoke /skill:writing-plans
 
