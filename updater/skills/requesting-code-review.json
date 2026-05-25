@@ -36,18 +36,13 @@
       "patches": [
         {
           "op": "replace",
-          "find": "Use this template when dispatching a code reviewer subagent.\n\n**Purpose:** Review completed work against requirements and code quality standards before it cascades into more work.\n\n```\nTask tool (general-purpose):\n  description: \"Review code changes\"\n  prompt: |",
+          "find": "Use this template when dispatching a code reviewer subagent.",
           "replace": "Use this template as the prompt argument to `push-task` when requesting a fresh-context code review."
         },
         {
           "op": "replace",
-          "find": "\n```\n\n**Placeholders:**",
-          "replace": "\n\n**Placeholders:**"
-        },
-        {
-          "op": "regex-replace",
-          "find": "^    ",
-          "replace": ""
+          "find": "Task tool (general-purpose):\n  description: \"Review code changes\"\n  prompt: |",
+          "replace": "push-task:\n  prompt: |"
         }
       ]
     }
