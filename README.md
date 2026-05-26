@@ -107,8 +107,7 @@ Queues a task with `context` `"fresh"` (clean session) or `"branch"` (current br
 ## Credits
 
 - Skill content originates from [obra/superpowers](https://github.com/obra/superpowers).
-- The `writing-roadmaps` skill is a custom addition, not from upstream.
-- Task-automation extension inspired by context-management patterns from [gsd-build/gsd-2](https://github.com/gsd-build/gsd-2).
+- Context-management ideas were inspired by [gsd-build/gsd-2](https://github.com/gsd-build/gsd-2).
 
 ## License
 
