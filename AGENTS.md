@@ -36,6 +36,14 @@ The updater exits non-zero if any patch fails to match — intentional drift det
 
 **Commit sequence:** `fix` first to autofix what it can, then `verify` for the full gate (lint → tsc → test → updater → skill drift → pack). Never skip `fix`.
 
+## Testing policy
+
+- Prefer integration tests through public API: tools and commands
+- Don't export internals (helpers, types, constants) for testing
+- Single `makeHarness()` with blocking `waitForIdle`; use `releaseNextIdle()` to advance
+- Use harness wrappers (`runStartTask`, `runFinishTask`, etc.) to invoke commands cleanly
+- Manual session injection only for Pi-produced entries (user/assistant messages), not task state
+
 ## Adding or modifying a skill
 
 ### Upstream-derived skills
