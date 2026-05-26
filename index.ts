@@ -81,8 +81,8 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
     description: 'Store a task prompt for a user-started navigation branch.',
     promptSnippet: 'Store a focused task prompt for a user-started navigation branch.',
     promptGuidelines: [
-      'Use push-task when a skill needs the user to start a focused branch workflow with /start-task or /auto.',
-      'Use push-task by itself when the intent is to hand control to /auto, because terminate:true only takes effect when every tool in the batch also terminates.',
+      'Use push-task to hand off a self-contained task for isolated execution.',
+      'Do not batch multiple push-task calls together, and do not mix push-task with other tool calls in the same turn.',
     ],
     parameters: pushTaskParameters,
     async execute(_toolCallId, params, signal) {
