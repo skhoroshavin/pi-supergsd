@@ -18,7 +18,30 @@ This extension implements a minimal task system that tries to respect these desi
 
 This extension also bundles a subset of [Superpowers](https://github.com/obra/superpowers) skills, patched for Pi conventions (`/skill:` instead of `superpowers:`, `Pi` instead of `Claude Code`, etc) and routed through the task system rather than dispatching subagents.
 
-## Extension: task automation
+## Use cases
+
+Skills that need a fresh-context review don't branch themselves - they queue the work and tell you to run it:
+
+```
+LLM:     Spec written. Let me queue a fresh-context review.
+
+LLM:     [calls push-task({ prompt: "Review docs/superpowers/specs/
+         feature-design.md for completeness, consistency, and scope.
+         Flag anything that needs clarification.", context: "fresh" })]
+
+LLM:     Task stored. Run /start-task or /auto.
+
+You:     /auto
+
+Pi:      [runs task in fresh context, returns with findings]
+
+LLM:     [reads findings] Good catches. Let me fix the error
+         handling section first.
+```
+
+This keeps your main context clean and gives the reviewer fresh eyes.
+
+## Tools and commands reference
 
 ### The `push-task` tool
 
@@ -49,29 +72,6 @@ Discards the pending task without executing it. Useful when you queued a task wi
 ### `/auto`
 
 Automatically runs all pending tasks to completion. Starts a task, waits for the LLM to finish, calls `/finish-task`, then checks for the next pending task. Continues until there are no more tasks or the LLM's last response was aborted. Use this for hands-free batch processing of queued tasks - queue several reviews or investigations, then `/auto` to run them all without manual intervention.
-
-### How skills use task automation
-
-Skills that need a fresh-context review don't branch themselves - they queue the work and tell you to run it:
-
-```
-LLM:     Spec written. Let me queue a fresh-context review.
-
-LLM:     [calls push-task({ prompt: "Review docs/superpowers/specs/
-         feature-design.md for completeness, consistency, and scope.
-         Flag anything that needs clarification.", context: "fresh" })]
-
-LLM:     Task stored. Run /start-task or /auto.
-
-You:     /auto
-
-Pi:      [runs task in fresh context, returns with findings]
-
-LLM:     [reads findings] Good catches. Let me fix the error
-         handling section first.
-```
-
-This keeps your main context clean and gives the reviewer fresh eyes.
 
 ## Credits
 
