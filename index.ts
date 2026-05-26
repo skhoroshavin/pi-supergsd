@@ -66,7 +66,7 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
+function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
   const branch = session.getBranch();
   const last = branch[branch.length - 1];
   return last?.type === 'message'
@@ -113,7 +113,7 @@ export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export async function startTask(
+async function startTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
@@ -154,7 +154,7 @@ export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export async function discardTask(
+async function discardTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
@@ -178,7 +178,7 @@ export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export async function finishTask(
+async function finishTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
@@ -246,7 +246,7 @@ export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export async function abortTask(
+async function abortTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
@@ -266,11 +266,11 @@ export async function abortTask(
   ctx.ui.notify('Task aborted. Branch abandoned without summary.', 'info');
 }
 
-export type TaskActionResult = 'cancelled' | void;
+type TaskActionResult = 'cancelled' | void;
 
 // ── Lookup utilities ──────────────────────────────────────────────
 
-export function pendingTask(
+function pendingTask(
   session: ReadonlySessionLike,
 ): (SessionEntry & { data: TaskData }) | null {
   const branch = session.getBranch();
@@ -294,16 +294,16 @@ export function pendingTask(
   return null;
 }
 
-export const TASK_ENTRY_TYPE = 'task';
+const TASK_ENTRY_TYPE = 'task';
 
-export const TASK_DONE_ENTRY_TYPE = 'task-done';
+const TASK_DONE_ENTRY_TYPE = 'task-done';
 
-export interface TaskData {
+interface TaskData {
   prompt: string;
   context: 'fresh' | 'branch';
 }
 
-export function currentTask(
+function currentTask(
   session: ReadonlySessionLike,
 ): (SessionEntry & { data: TaskStartData }) | null {
   const branch = session.getBranch();
@@ -318,9 +318,9 @@ export function currentTask(
   return null;
 }
 
-export const TASK_START_ENTRY_TYPE = 'task-start';
+const TASK_START_ENTRY_TYPE = 'task-start';
 
-export interface TaskStartData {
+interface TaskStartData {
   returnTo: string;
 }
 
@@ -329,7 +329,7 @@ export interface TaskStartData {
  * Compatible with both ReadonlySessionManager (from ExtensionCommandContext)
  * and SessionManager (full mutable version).
  */
-export interface ReadonlySessionLike {
+interface ReadonlySessionLike {
   getEntries(): SessionEntry[];
   getLeafId(): string | null;
   getBranch(): SessionEntry[];
