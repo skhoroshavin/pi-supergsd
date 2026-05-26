@@ -435,6 +435,27 @@ describe('startTask', () => {
     assert.deepStrictEqual(sentMessages, []);
     assert.strictEqual(countCustomEntries(sm, TASK_START_ENTRY_TYPE), 1);
   });
+
+  it('starts a nested task when a newer task entry appears after an active task-start', async () => {
+    const { pi, ctx, sm, sentMessages } = makeHarness();
+
+    // Outer task already in progress
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Outer task.', context: 'branch' });
+    const returnTo = sm.getLeafId()!;
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo });
+    sm.appendMessage({ role: 'user', content: 'Outer task prompt.', timestamp: 0 });
+    sm.appendMessage(assistantMessage('Working on outer...'));
+
+    // Agent pushes a nested task inside the active branch
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Nested task.', context: 'branch' });
+
+    const result = await startTask(pi, ctx);
+
+    assert.strictEqual(result, undefined);
+    assert.deepStrictEqual(sentMessages, ['Nested task.']);
+    assert.strictEqual(countCustomEntries(sm, TASK_START_ENTRY_TYPE), 2);
+  });
 });
 
 describe('finishTask', () => {

@@ -117,8 +117,6 @@ export async function startTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
-  if (currentTask(ctx.sessionManager)) return;
-
   const activeTask = pendingTask(ctx.sessionManager);
   if (!activeTask) {
     ctx.ui.notify('No pending task. Use push-task first.', 'warning');
