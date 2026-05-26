@@ -8,6 +8,8 @@ import {
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 
+const autoState = { running: false };
+
 import { Type } from 'typebox';
 
 export default function registerTaskCommands(pi: ExtensionAPI): void {
@@ -16,6 +18,62 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
   pi.registerCommand('discard-task', createDiscardTaskCommand(pi));
   pi.registerCommand('finish-task', createFinishTaskCommand(pi));
   pi.registerCommand('abort-task', createAbortTaskCommand(pi));
+  pi.registerCommand('auto', createAutoCommand(pi));
+
+  pi.on('session_shutdown', async () => {
+    autoState.running = false;
+  });
+}
+
+export function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
+  const branch = session.getBranch();
+  const last = branch[branch.length - 1];
+  return last?.type === 'message'
+    && last.message.role === 'assistant'
+    && last.message.stopReason === 'aborted';
+}
+
+export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Automatically run pushed task branches',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      if (autoState.running) {
+        ctx.ui.notify('Auto is already running.', 'warning');
+        return;
+      }
+
+      autoState.running = true;
+      let sawTaskActivity = false;
+
+      try {
+        while (autoState.running) {
+          await ctx.waitForIdle();
+
+          if (lastAssistantWasAborted(ctx.sessionManager)) break;
+
+          if (pendingTask(ctx.sessionManager)) {
+            const result = await startTask(pi, ctx);
+            if (result === 'cancelled') break;
+            sawTaskActivity = true;
+            continue;
+          }
+
+          if (currentTask(ctx.sessionManager)) {
+            const result = await finishTask(pi, ctx);
+            if (result === 'cancelled') break;
+            sawTaskActivity = true;
+            continue;
+          }
+
+          if (sawTaskActivity && !ctx.hasPendingMessages()) {
+            break;
+          }
+        }
+      } finally {
+        autoState.running = false;
+      }
+    },
+  };
 }
 
 export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {

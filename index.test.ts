@@ -10,10 +10,12 @@ import registerTaskCommands, {
   createFinishTaskCommand,
   createAbortTaskCommand,
   createDiscardTaskCommand,
+  createAutoCommand,
   pendingTask,
   currentTask,
   startTask,
   finishTask,
+  lastAssistantWasAborted,
 } from './index.js';
 
 import {
@@ -453,6 +455,104 @@ describe('finishTask', () => {
   });
 });
 
+describe('lastAssistantWasAborted', () => {
+  it('detects an aborted assistant message only when it is the last branch entry', () => {
+    const { sm } = makeAutoHarness();
+
+    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
+    sm.appendMessage(abortedAssistantMessage('Stopped by user.'));
+
+    assert.strictEqual(lastAssistantWasAborted(sm), true);
+  });
+});
+
+describe('createAutoCommand', () => {
+  it('waits when started with no task, then starts work after a later push-task', async () => {
+    const { pi, ctx, sm, sentMessages, releaseNextIdle, flushMicrotasks } = makeAutoHarness();
+
+    const auto = createAutoCommand(pi);
+    const running = auto.handler('', ctx);
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Review spec.' });
+    await releaseNextIdle();
+
+    assert.deepStrictEqual(sentMessages, ['Review spec.']);
+
+    sm.appendMessage(assistantMessage('Done.'));
+    await releaseNextIdle();
+    await releaseNextIdle();
+    await running;
+  });
+
+  it('warns and returns when /auto is already running', async () => {
+    const { pi, ctx, notifications, releaseNextIdle, flushMicrotasks, emitSessionShutdown } = makeAutoHarness();
+    registerTaskCommands(pi);
+
+    const auto = createAutoCommand(pi);
+    const firstRun = auto.handler('', ctx);
+    await flushMicrotasks();
+
+    await auto.handler('', ctx);
+    assertLastNotification(notifications, 'warning', 'Auto is already running.');
+
+    await emitSessionShutdown();
+    await releaseNextIdle();
+    await firstRun;
+  });
+
+  it('stops instead of finishing the task when the last assistant message was aborted', async () => {
+    const { pi, ctx, sm, sentCustomMessages, releaseNextIdle, flushMicrotasks } = makeAutoHarness();
+
+    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Implement phase 1.', context: 'branch' });
+    const returnTo = sm.getLeafId()!;
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo });
+    sm.appendMessage(abortedAssistantMessage('Stopped by user.'));
+
+    const auto = createAutoCommand(pi);
+    const running = auto.handler('', ctx);
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+    await running;
+
+    assert.strictEqual(sentCustomMessages.length, 0);
+    assert.strictEqual(countCustomEntries(sm, TASK_DONE_ENTRY_TYPE), 0);
+  });
+
+  it('keeps waiting while follow-up work is pending after finishTask', async () => {
+    const { pi, ctx, sm, setPendingMessages, sentCustomMessages, releaseNextIdle, flushMicrotasks } = makeAutoHarness();
+
+    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Quick fix.', context: 'branch' });
+    const returnTo = sm.getLeafId()!;
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo });
+    sm.appendMessage(assistantMessage('Fixed the bug.'));
+
+    const auto = createAutoCommand(pi);
+    let resolved = false;
+    const running = auto.handler('', ctx).then(() => {
+      resolved = true;
+    });
+
+    await flushMicrotasks();
+    setPendingMessages(true);
+    await releaseNextIdle();
+    await releaseNextIdle();
+
+    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.strictEqual(resolved, false);
+
+    setPendingMessages(false);
+    await releaseNextIdle();
+    await running;
+    assert.strictEqual(resolved, true);
+  });
+});
+
 describe('registration', () => {
   it('registers the push-task tool and all four task commands', () => {
     const registered: Array<{ type: string; name: string; description?: string }> = [];
@@ -472,6 +572,7 @@ describe('registration', () => {
       { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
       { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
       { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
+      { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
     ]);
   });
 });
@@ -580,6 +681,8 @@ function makeHarness() {
       sentCustomMessages.push({ customType: message.customType, content: message.content, options });
       sm.appendCustomMessageEntry(message.customType, message.content as string, message.display ?? true, message.details);
     },
+    registerTool() {},
+    registerCommand() {},
   } as unknown as ExtensionAPI;
 
   const ctx = {
@@ -614,6 +717,95 @@ function makeHarness() {
   };
 }
 
+function makeAutoHarness() {
+  const sm = SessionManager.inMemory();
+  const sentMessages: string[] = [];
+  const sentCustomMessages: Array<{ customType: string; content: unknown; options?: unknown }> = [];
+  const notifications: Array<{ message: string; type?: string }> = [];
+  const navigations: Array<{ targetId: string; opts?: unknown }> = [];
+  const idleWaiters: Array<() => void> = [];
+  const sessionShutdownHandlers: Array<() => unknown> = [];
+  let cancelNextNav = false;
+  let pendingMessages = false;
+
+  const pi = {
+    appendEntry(customType: string, data?: unknown) {
+      sm.appendCustomEntry(customType, data);
+    },
+    sendUserMessage(content: string | Array<{ type: string; text: string }>) {
+      const text = typeof content === 'string' ? content : content.map((b) => b.text).join('');
+      sm.appendMessage({ role: 'user', content: text, timestamp: Date.now() });
+      sentMessages.push(text);
+    },
+    sendMessage(message: { customType: string; content: unknown; display?: boolean; details?: unknown }, options?: { triggerTurn?: boolean }) {
+      sentCustomMessages.push({ customType: message.customType, content: message.content, options });
+      sm.appendCustomMessageEntry(message.customType, message.content as string, message.display ?? true, message.details);
+    },
+    on(eventName: string, handler: () => unknown) {
+      if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
+    },
+    registerTool() {},
+    registerCommand() {},
+  } as unknown as ExtensionAPI;
+
+  const ctx = {
+    waitForIdle: async () => {
+      await new Promise<void>((resolve) => {
+        idleWaiters.push(resolve);
+      });
+    },
+    hasPendingMessages: () => pendingMessages,
+    sessionManager: sm,
+    ui: {
+      notify(message: string, type?: string) {
+        notifications.push({ message, type });
+      },
+    },
+    navigateTree: async (targetId: string, opts?: unknown) => {
+      navigations.push({ targetId, opts });
+      if (cancelNextNav) {
+        cancelNextNav = false;
+        return { cancelled: true };
+      }
+      sm.branch(targetId);
+      return { cancelled: false };
+    },
+  } as unknown as ExtensionCommandContext & { sessionManager: SessionManager };
+
+  return {
+    sm,
+    pi,
+    ctx,
+    sentMessages,
+    sentCustomMessages,
+    notifications,
+    navigations,
+    async releaseNextIdle() {
+      const next = idleWaiters.shift();
+      assert.ok(next, 'Expected /auto to be waiting for idle.');
+      next();
+      for (let i = 0; i < 10; i++) {
+        await Promise.resolve();
+      }
+    },
+    async flushMicrotasks() {
+      await Promise.resolve();
+      await Promise.resolve();
+    },
+    async emitSessionShutdown() {
+      for (const handler of sessionShutdownHandlers) {
+        await handler();
+      }
+    },
+    setPendingMessages(value: boolean) {
+      pendingMessages = value;
+    },
+    setCancelNextNav(v: boolean) {
+      cancelNextNav = v;
+    },
+  };
+}
+
 function assistantMessage(text: string): AppendMessageInput {
   return {
     role: 'assistant',
@@ -621,6 +813,17 @@ function assistantMessage(text: string): AppendMessageInput {
     timestamp: 0,
     model: 'test',
     provider: 'test',
+  } as AppendMessageInput;
+}
+
+function abortedAssistantMessage(text: string): AppendMessageInput {
+  return {
+    role: 'assistant',
+    content: [{ type: 'text', text }],
+    timestamp: 0,
+    model: 'test',
+    provider: 'test',
+    stopReason: 'aborted',
   } as AppendMessageInput;
 }
 
