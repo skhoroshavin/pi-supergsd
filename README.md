@@ -43,35 +43,17 @@ This keeps your main context clean and gives the reviewer fresh eyes.
 
 ## Tools and commands reference
 
-### The `push-task` tool
+| Command | Action |
+|---|---|
+| `/start-task` | Start pending task in a new branch |
+| `/finish-task` | Return with assistant response as result |
+| `/abort-task` | Return without result |
+| `/discard-task` | Discard pending task |
+| `/auto` | Run all pending tasks hands-free |
 
-The LLM calls `push-task({ prompt: "...", context: "fresh" })`. The `context` parameter is optional (defaults to `"fresh"`):
-- `"fresh"` - task runs in a clean context (no prior conversation)
-- `"branch"` - task runs on the current branch
+### `push-task` tool
 
-This stores a task entry in the session tree. Nothing else happens - no navigation, no branching, no context switch. The tool says "Task stored. Use `/start-task` or `/auto` to start it."
-
-When you later run `/start-task`, the command finds the nearest pending task and injects its prompt as the first message of a new branch. On `/finish-task`, the last assistant response is attached as a result and you jump back.
-
-### `/start-task`
-
-Saves a checkpoint and starts the active task. Requires a pending task from `push-task`. The task's `context` controls whether it runs fresh or on the current branch. Use `/finish-task` to return with results, or `/abort-task` to abandon the branch.
-
-### `/finish-task`
-
-Returns to the task start point and attaches the last assistant message as a branch result. If there's another pending task queued, it's still available for the next `/start-task`.
-
-### `/abort-task`
-
-Jumps back to the task start point without attaching any result. The branch is abandoned - use this when the task was a dead end or you changed direction.
-
-### `/discard-task`
-
-Discards the pending task without executing it. Useful when you queued a task with `push-task` but no longer need it.
-
-### `/auto`
-
-Automatically runs all pending tasks to completion. Starts a task, waits for the LLM to finish, calls `/finish-task`, then checks for the next pending task. Continues until there are no more tasks or the LLM's last response was aborted. Use this for hands-free batch processing of queued tasks - queue several reviews or investigations, then `/auto` to run them all without manual intervention.
+Queues a task with `context` `"fresh"` (clean session) or `"branch"` (current branch). Defaults to `"fresh"`. The task sits pending — nothing runs until you start it.
 
 ## Credits
 
