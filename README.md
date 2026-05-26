@@ -45,11 +45,11 @@ This keeps your main context clean and gives the reviewer fresh eyes.
 
 | Command | Action |
 |---|---|
-| `/start-task` | Start pending task in a new branch |
-| `/finish-task` | Return with assistant response as result |
-| `/abort-task` | Return without result |
-| `/discard-task` | Discard pending task |
-| `/auto` | Run all pending tasks hands-free |
+| `/start-task` | Saves a checkpoint and starts the pending task in a new branch |
+| `/finish-task` | Returns from task branch to saved checkpoint with the assistant response as a result |
+| `/abort-task` | Returns from task branch to saved checkpoint without attaching any result |
+| `/discard-task` | Discards a pending task without executing it |
+| `/auto` | Runs all pending tasks hands-free, including any queued during the run |
 
 ### `push-task` tool
 
