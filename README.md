@@ -12,85 +12,13 @@ If Pi is already running, restart it or run `/reload`.
 
 ## Philosophy
 
-Pi deliberately avoids subagents — Mario Zechner's design choice gives you a session tree instead, with full control over what the model sees. Subagents are a black box: invisible contexts, token burn, problematic to  inspect and steer. The session tree is transparent — use `/tree` to branch, navigate, summarize or discard, and you always know what context the model is working with.
+Pi's author, Mario Zechner, deliberately avoids subagents — zero observability, poor context transfer, painful debugging. As he puts it: "a black box within a black box." Instead, Pi has a session tree, where you can precisely control what the model sees. That said, Mario still sees value in automating new sessions for some use cases, like code review.
 
-The task system in this extension is minimal on purpose: one tool (`push-task`) plus a handful of commands. It doesn't create hidden processes or parallel agents. A task runs as a normal branch in the session tree - you can inspect it with `/tree`, intervene mid-task, or abandon it with `/abort-task`. This gives you subagent-like workflows (queue a fresh-context review, run multiple prepared tasks hands-free with `/auto`) while keeping you in full control.
+This extension implements a minimal task system that tries to respect these design decisions. It introduces one tool (`push-task`) and a few commands. There are no background processes or parallel agents. A task runs as a normal branch in the session tree, so all standard Pi tools for steering it work as expected. You can start a fresh-context review, then bring results back only after double-checking them. Or you can queue a set of prepared tasks and run them hands-free with `/auto` - still fully inspectable, with the ability to stop and reprompt mid-task if needed.
 
-On top of that, this extension bundles a subset of [Superpowers](https://github.com/obra/superpowers) skills, deterministically patched to match Pi conventions (`/skill:` instead of `superpowers:`, `Pi` instead of `Claude Code`, etc) and to use this task system for context control instead of subagent dispatch.
-
-## Skills
-
-### `/skill:brainstorming`
-
-You MUST use this before any creative work - features, components, functionality, or behavior changes. Explores user intent, requirements, and design before implementation.
-
-The skill walks through understanding the current project context, asking questions one at a time, presenting a design, and getting user approval. It enforces a hard gate: no code, no scaffolding, no implementation until the design is approved. A "simple" feature still gets a design - it can be short, but the gate always applies.
-
-After approval, transitions to the right next planning step: `/skill:writing-roadmaps` for multi-phase designs, or `/skill:writing-plans` for single-phase work. Includes a `spec-document-reviewer-prompt.md` for fresh-context spec review via `push-task`.
-
-### `/skill:executing-plans`
-
-Use when you have a written implementation plan to execute with review checkpoints. Loads the plan, reviews it critically, executes all tasks, and reports when complete.
-
-The skill raises concerns before starting (not during), works through tasks methodically, and pauses at review checkpoints. It assumes the plan was written for an engineer with zero context, so every task includes file paths, code patterns, and testing instructions.
-
-### `/skill:finishing-a-development-branch`
-
-Use when implementation is complete, all tests pass, and you need to decide how to integrate the work. Presents structured options for merge, PR, or cleanup.
-
-Verifies tests pass first, detects the environment (GitHub, local), then presents the appropriate workflow. Handles branch cleanup after integration. No premature celebration - verification before presentation.
-
-### `/skill:receiving-code-review`
-
-Use when receiving code review feedback, before implementing suggestions - especially if feedback seems unclear or technically questionable. Requires technical rigor and verification, not performative agreement or blind implementation.
-
-Read the feedback completely, understand the requirement, verify the claim independently, and only then implement (or push back with evidence). The core principle: verify before implementing, ask before assuming.
-
-### `/skill:requesting-code-review`
-
-Use when completing tasks, implementing major features, or before merging. Crafts a precise review request with structured context - the reviewer sees the work product, not your session history.
-
-Includes the `code-reviewer.md` prompt template for fresh-context review via `push-task`. The reviewer evaluates the diff cold, without anchoring to decisions made during implementation.
-
-### `/skill:systematic-debugging`
-
-Use when encountering any bug, test failure, or unexpected behavior - before proposing fixes. Enforces root-cause investigation before any code change.
-
-The iron law: **no fixes without root cause investigation first**. Random fixes waste time and create new bugs. Includes supporting files for condition-based waiting, defense-in-depth strategies, root-cause tracing, and pressure-test scenarios.
-
-### `/skill:test-driven-development`
-
-Use when implementing any feature or bugfix - before writing implementation code. Write the test first, watch it fail, write minimal code to pass.
-
-Core principle: if you didn't watch the test fail, you don't know if it tests the right thing. Includes `testing-anti-patterns.md` documenting common pitfalls.
-
-### `/skill:verification-before-completion`
-
-Use when about to claim work is complete, fixed, or passing - before committing or creating PRs. Requires running verification commands and confirming output before making any success claims.
-
-The iron law: **no completion claims without fresh verification evidence**. Evidence before assertions, always.
-
-### `/skill:writing-plans`
-
-Use when you have a spec, requirements, or selected roadmap phase - before touching code. Writes comprehensive implementation plans assuming the engineer has zero context.
-
-Every plan includes: which files to touch, code patterns, testing strategy, docs to reference, and how to verify. Tasks are bite-sized and ordered. Includes `plan-document-reviewer-prompt.md` for fresh-context plan review via `push-task`.
-
-### `/skill:writing-roadmaps`
-
-Use when an approved design is too large for one implementation plan, needs ordered phases, or may exceed a single context window.
-
-Creates a coarse, phase-level roadmap between brainstorming and detailed planning. Each phase is independently plannable and leaves the project in a sensible intermediate state (tests green, no half-migrations). This is a custom skill - it doesn't exist in upstream Superpowers and lives entirely in this repo.
-
-### `/skill:writing-skills`
-
-Use when creating new skills, editing existing skills, or verifying skills work before deployment. Applies TDD to process documentation: write test cases, watch them fail, write the skill, watch tests pass.
-
-Includes supporting files for Anthropic best practices, persuasion principles, Graphviz conventions, and testing skills with subagents.
+This extension also bundles a subset of [Superpowers](https://github.com/obra/superpowers) skills, patched for Pi conventions (`/skill:` instead of `superpowers:`, `Pi` instead of `Claude Code`, etc) and routed through the task system rather than dispatching subagents.
 
 ## Extension: task automation
-
-The skills above work on their own. But several of them (brainstorming, requesting-code-review, writing-plans, writing-skills) reference `push-task` for fresh-context review patterns. The extension bundled in this package provides the plumbing.
 
 ### The `push-task` tool
 
