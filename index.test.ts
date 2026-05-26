@@ -12,6 +12,8 @@ import registerTaskCommands, {
   createDiscardTaskCommand,
   pendingTask,
   currentTask,
+  startTask,
+  finishTask,
 } from './index.js';
 
 import {
@@ -402,6 +404,55 @@ describe('currentTask', () => {
   });
 });
 
+describe('startTask', () => {
+  it('returns cancelled when fresh navigation is cancelled', async () => {
+    const { pi, ctx, sm, setCancelNextNav, sentMessages } = makeHarness();
+    setCancelNextNav(true);
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Review spec.' });
+
+    const result = await startTask(pi, ctx);
+
+    assert.strictEqual(result, 'cancelled');
+    assert.deepStrictEqual(sentMessages, []);
+    assertNoTaskStart(ctx.sessionManager);
+  });
+
+  it('returns without duplicating task-start when a task is already in progress', async () => {
+    const { pi, ctx, sm, sentMessages } = makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Review spec.', context: 'branch' });
+    const returnTo = sm.getLeafId()!;
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo });
+
+    const result = await startTask(pi, ctx);
+
+    assert.strictEqual(result, undefined);
+    assert.deepStrictEqual(sentMessages, []);
+    assert.strictEqual(countCustomEntries(sm, TASK_START_ENTRY_TYPE), 1);
+  });
+});
+
+describe('finishTask', () => {
+  it('returns cancelled when navigation back to the return point is cancelled', async () => {
+    const { pi, ctx, sm, setCancelNextNav, sentCustomMessages } = makeHarness();
+    setCancelNextNav(true);
+
+    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
+    const rootId = sm.getLeafId()!;
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Implement phase 1.' });
+    sm.branch(sm.getLeafId()!);
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: rootId });
+
+    const result = await finishTask(pi, ctx);
+
+    assert.strictEqual(result, 'cancelled');
+    assert.strictEqual(sentCustomMessages.length, 0);
+  });
+});
+
 describe('registration', () => {
   it('registers the push-task tool and all four task commands', () => {
     const registered: Array<{ type: string; name: string; description?: string }> = [];
@@ -603,6 +654,13 @@ function assertActiveTask(sm: SessionManager): TaskData {
   const task = getActiveTask(sm);
   assert.ok(task, 'Expected active task, found none.');
   return task;
+}
+
+function countCustomEntries(sm: SessionManager, customType: string): number {
+  return sm
+    .getEntries()
+    .filter((entry) => entry.type === 'custom' && entry.customType === customType)
+    .length;
 }
 
 function assertNoActiveTask(sm: SessionManager): void {

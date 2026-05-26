@@ -45,38 +45,141 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
   });
 }
 
+export type TaskActionResult = 'cancelled' | void;
+
+export async function startTask(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+): Promise<TaskActionResult> {
+  if (currentTask(ctx.sessionManager)) return;
+
+  const activeTask = pendingTask(ctx.sessionManager);
+  if (!activeTask) {
+    ctx.ui.notify('No pending task. Use push-task first.', 'warning');
+    return;
+  }
+
+  const taskContext = activeTask.data.context ?? 'fresh';
+
+  if (taskContext === 'fresh') {
+    const departureLeafId = ctx.sessionManager.getLeafId()!;
+    const freshTargetId = findFreshTargetId(ctx.sessionManager);
+    if (!freshTargetId) {
+      ctx.ui.notify('No starting point found on current branch.', 'warning');
+      return;
+    }
+
+    const result = await ctx.navigateTree(freshTargetId, { summarize: false });
+    if (result.cancelled) return 'cancelled';
+
+    pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: departureLeafId });
+  } else {
+    pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: ctx.sessionManager.getLeafId()! });
+  }
+
+  pi.sendUserMessage(activeTask.data.prompt);
+}
+
+export async function discardTask(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+): Promise<TaskActionResult> {
+  const activeTask = pendingTask(ctx.sessionManager);
+  if (!activeTask) {
+    ctx.ui.notify('No pending task.', 'warning');
+    return;
+  }
+
+  pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
+  ctx.ui.notify('Task discarded.', 'info');
+}
+
+export async function finishTask(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+): Promise<TaskActionResult> {
+  const taskStart = currentTask(ctx.sessionManager);
+  if (!taskStart) {
+    ctx.ui.notify('No task start point.', 'warning');
+    return;
+  }
+
+  // Capture last assistant message content before navigation
+  let lastAssistantContent: unknown;
+  let lastAssistantId: string | undefined;
+  const branch = ctx.sessionManager.getBranch();
+  for (let i = branch.length - 1; i >= 0; i--) {
+    const entry = branch[i];
+    if (isAssistantMessageEntry(entry)) {
+      const rawContent = entry.message.content;
+      // Filter to only text blocks — thinking and toolCall blocks are not
+      // valid for custom_message content and cause provider errors (e.g.,
+      // DeepSeek rejects unrecognized content block variants).
+      if (Array.isArray(rawContent)) {
+        lastAssistantContent = rawContent.filter(
+          (block): block is { type: 'text'; text: string } =>
+            typeof block === 'object' && block !== null && 'type' in block && block.type === 'text',
+        );
+      } else {
+        lastAssistantContent = rawContent;
+      }
+      lastAssistantId = entry.id;
+      break;
+    }
+  }
+
+  const result = await ctx.navigateTree(taskStart.data.returnTo, {
+    summarize: false,
+  });
+  if (result.cancelled) return 'cancelled';
+
+  // Inject last assistant message after navigation
+  if (lastAssistantId) {
+    pi.sendMessage({
+      customType: 'branch-result',
+      // Content is filtered to only TextContent blocks (or original string)
+      content: lastAssistantContent as unknown as string,
+      display: true,
+      details: { sourceEntryId: lastAssistantId },
+    }, { triggerTurn: true });
+  }
+
+  if (pendingTask(ctx.sessionManager)) {
+    pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
+  }
+
+  const label = lastAssistantId ? 'Last response attached.' : 'No last response to attach.';
+  ctx.ui.notify(`Task finished. ${label}`, 'info');
+}
+
+export async function abortTask(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+): Promise<TaskActionResult> {
+  const taskStart = currentTask(ctx.sessionManager);
+  if (!taskStart) {
+    ctx.ui.notify('No task start point.', 'warning');
+    return;
+  }
+
+  const result = await ctx.navigateTree(taskStart.data.returnTo, { summarize: false });
+  if (result.cancelled) return 'cancelled';
+
+  if (pendingTask(ctx.sessionManager)) {
+    pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
+  }
+
+  ctx.ui.notify('Task aborted. Branch abandoned without summary.', 'info');
+}
+
+// ── Thin command wrappers ───────────────────────────────────────
+
 export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
   return {
     description: 'Navigate to a fresh context and inject the active task prompt',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
-
-      const activeTask = pendingTask(ctx.sessionManager);
-      if (!activeTask) {
-        ctx.ui.notify('No pending task. Use push-task first.', 'warning');
-        return;
-      }
-
-      const taskContext = activeTask.data.context ?? 'fresh';
-
-      if (taskContext === 'fresh') {
-        const departureLeafId = ctx.sessionManager.getLeafId()!;
-        const freshTargetId = findFreshTargetId(ctx.sessionManager);
-        if (!freshTargetId) {
-          ctx.ui.notify('No starting point found on current branch.', 'warning');
-          return;
-        }
-
-        const result = await ctx.navigateTree(freshTargetId, { summarize: false });
-        if (result.cancelled) return;
-
-        pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: departureLeafId });
-      } else {
-        // Branch context — same as /start-branch
-        pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: ctx.sessionManager.getLeafId()! });
-      }
-
-      pi.sendUserMessage(activeTask.data.prompt);
+      await startTask(pi, ctx);
     },
   };
 }
@@ -86,16 +189,7 @@ export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
     description: 'Discard the active task without executing it',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
-
-      const activeTask = pendingTask(ctx.sessionManager);
-      if (!activeTask) {
-        ctx.ui.notify('No pending task.', 'warning');
-        return;
-      }
-
-      pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
-
-      ctx.ui.notify('Task discarded.', 'info');
+      await discardTask(pi, ctx);
     },
   };
 }
@@ -105,59 +199,7 @@ export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
     description: 'Finish the current task and return to the task start point',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
-
-      const taskStart = currentTask(ctx.sessionManager);
-      if (!taskStart) {
-        ctx.ui.notify('No task start point.', 'warning');
-        return;
-      }
-
-      // Capture last assistant message content before navigation
-      let lastAssistantContent: unknown;
-      let lastAssistantId: string | undefined;
-      const branch = ctx.sessionManager.getBranch();
-      for (let i = branch.length - 1; i >= 0; i--) {
-        const entry = branch[i];
-        if (isAssistantMessageEntry(entry)) {
-          const rawContent = entry.message.content;
-          // Filter to only text blocks — thinking and toolCall blocks are not
-          // valid for custom_message content and cause provider errors (e.g.,
-          // DeepSeek rejects unrecognized content block variants).
-          if (Array.isArray(rawContent)) {
-            lastAssistantContent = rawContent.filter(
-              (block): block is { type: 'text'; text: string } =>
-                typeof block === 'object' && block !== null && 'type' in block && block.type === 'text',
-            );
-          } else {
-            lastAssistantContent = rawContent;
-          }
-          lastAssistantId = entry.id;
-          break;
-        }
-      }
-
-      const result = await ctx.navigateTree(taskStart.data.returnTo, {
-        summarize: false,
-      });
-      if (result.cancelled) return;
-
-      // Inject last assistant message after navigation
-      if (lastAssistantId) {
-        pi.sendMessage({
-          customType: 'branch-result',
-          // Content is filtered to only TextContent blocks (or original string)
-          content: lastAssistantContent as unknown as string,
-          display: true,
-          details: { sourceEntryId: lastAssistantId },
-        }, { triggerTurn: true });
-      }
-
-      if (pendingTask(ctx.sessionManager)) {
-        pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
-      }
-
-      const label = lastAssistantId ? 'Last response attached.' : 'No last response to attach.';
-      ctx.ui.notify(`Task finished. ${label}`, 'info');
+      await finishTask(pi, ctx);
     },
   };
 }
@@ -167,22 +209,7 @@ export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
     description: 'Abort the current task without finishing',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
-
-      const taskStart = currentTask(ctx.sessionManager);
-
-      if (!taskStart) {
-        ctx.ui.notify('No task start point.', 'warning');
-        return;
-      }
-
-      const result = await ctx.navigateTree(taskStart.data.returnTo, { summarize: false });
-      if (result.cancelled) return;
-
-      if (pendingTask(ctx.sessionManager)) {
-        pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
-      }
-
-      ctx.ui.notify('Task aborted. Branch abandoned without summary.', 'info');
+      await abortTask(pi, ctx);
     },
   };
 }
