@@ -264,14 +264,17 @@ describe('createAutoCommand', () => {
 
 
   it('keeps waiting while follow-up work is pending after finishTask', async () => {
-    const { sm, sentCustomMessages, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, getLastHint, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
-
+    appendUserMessage('start');
     await runPushTask('Quick fix.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
     await runStartTask();
-    sm.appendMessage(assistantMessage('Fixed the bug.'));
+    assert.strictEqual(getLastHint(), undefined);
+
+    appendAssistantMessage('Fixed the bug.');
 
     let resolved = false;
     const running = runAuto().then(() => {
@@ -282,8 +285,7 @@ describe('createAutoCommand', () => {
     setPendingMessages(true);
     await releaseNextIdle();
     await releaseNextIdle();
-
-    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.ok(isLlmTriggered());
     assert.strictEqual(resolved, false);
 
     setPendingMessages(false);
