@@ -299,6 +299,7 @@ function makeHarness() {
   const idleWaiters: Array<() => void> = [];
   const sessionShutdownHandlers: Array<() => unknown> = [];
   const triggeredCustomMessages = new Set<string>();
+  let hints: Array<{ text: string }> = [];
   let cancelNextNav = false;
   let pendingMessages = false;
 
@@ -346,6 +347,7 @@ function makeHarness() {
     ui: {
       notify(message: string, type?: string) {
         notifications.push({ message, type });
+        hints.push({ text: message });
       },
     },
     navigateTree: async (targetId: string, opts?: unknown) => {
@@ -369,6 +371,13 @@ function makeHarness() {
     if (last.type === 'message' && last.message.role === 'assistant') return false;
     if (last.type === 'custom_message') return triggeredCustomMessages.has(last.id);
     return false;
+  }
+
+  function getLastHint(): string | undefined {
+    if (hints.length === 0) return undefined;
+    const last = hints[hints.length - 1];
+    hints = [];
+    return last.text;
   }
 
   function getLlmHistory(): string[] {
@@ -459,6 +468,7 @@ function makeHarness() {
     navigations,
     getLlmHistory,
     isLlmTriggered,
+    getLastHint,
     releaseNextIdle,
     flushMicrotasks,
     emitSessionShutdown,
