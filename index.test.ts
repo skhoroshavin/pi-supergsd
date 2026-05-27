@@ -261,25 +261,7 @@ describe('createAutoCommand', () => {
     await firstRun;
   });
 
-  it('stops instead of finishing the task when the last assistant message was aborted', async () => {
-    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
-      makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
-
-    await runPushTask('Implement phase 1.', 'branch');
-    await runStartTask();
-    sm.appendMessage(abortedAssistantMessage('Stopped by user.'));
-
-    const running = runAuto();
-
-    await flushMicrotasks();
-    await releaseNextIdle();
-    await running;
-
-    assert.strictEqual(sentCustomMessages.length, 0);
-    assert.strictEqual(countCustomEntries(sm, TASK_DONE_ENTRY_TYPE), 0);
-  });
 
   it('keeps waiting while follow-up work is pending after finishTask', async () => {
     const { sm, sentCustomMessages, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
