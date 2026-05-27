@@ -164,22 +164,22 @@ describe('integration: /auto branch context', () => {
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
-    const { sm, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
-    setCancelNextNav(true);
 
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-
+    appendUserMessage('main work');
     await runPushTask('Analyze performance.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    setCancelNextNav(true);
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
     await running;
-
-    assert.strictEqual(countCustomEntries(sm, TASK_DONE_ENTRY_TYPE), 0);
-    assert.ok(getActiveTask(sm), 'Expected an active task to remain.');
+    assert.ok(!isLlmTriggered());
+    assert.deepStrictEqual(getLlmHistory(), ['main work']);
   });
 });
 
