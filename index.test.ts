@@ -139,28 +139,28 @@ function assertNoActiveTask(sm: SessionManager): void {
 
 describe('integration: /auto branch context', () => {
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('working...'));
-
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
     await runPushTask('Quick fix.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
 
-    sm.appendMessage(assistantMessage('Fixed the bug.'));
+    appendAssistantMessage('Fixed the bug.');
+
     await releaseNextIdle();
     await releaseNextIdle();
     await running;
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-    const content = sentCustomMessages[0].content as Array<{ text: string }>;
-    assert.strictEqual(content[0].text, 'Fixed the bug.');
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+    assert.ok(isLlmTriggered());
+    assert.ok(getLastHint()?.includes('Task finished'));
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
