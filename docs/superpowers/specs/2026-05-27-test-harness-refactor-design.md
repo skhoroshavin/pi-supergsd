@@ -207,7 +207,6 @@ assert.ok(isLlmTriggered());
 assert.strictEqual(getLastHint(), undefined);
 
 appendAssistantMessage('Partial work...');
-assert.strictEqual(getLastHint(), undefined);
 
 await runAbortTask();
 assert.strictEqual(getLastHint(), 'Task aborted. Branch abandoned without summary.');
@@ -230,7 +229,6 @@ assert.ok(isLlmTriggered());
 assert.strictEqual(getLastHint(), undefined);
 
 appendAssistantMessage('Found 3 bottlenecks: ...');
-assert.strictEqual(getLastHint(), undefined);
 
 await runFinishTask();
 // Navigated back + branch result injected
@@ -258,7 +256,6 @@ assert.ok(isLlmTriggered());
 assert.strictEqual(getLastHint(), undefined);
 
 appendAssistantMessage('Fixed the bug.');
-assert.strictEqual(getLastHint(), undefined);
 
 await runFinishTask();
 // Navigated back + branch result injected
