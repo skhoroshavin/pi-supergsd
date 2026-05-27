@@ -23,15 +23,17 @@ import registerTaskCommands, {
 
 describe('integration: /start-task fresh context', () => {
   it('completes /start-task → work → /finish-task with last-response injection', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runFinishTask } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working on main...');
     await runPushTask('Analyze performance.');
+    assert.strictEqual(getStatus(), 'pending task: analyze-performance');
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: analyze-performance');
     // Fresh context branches from the first visible entry, so 'main work' is included
     assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
     assert.ok(isLlmTriggered());
@@ -40,6 +42,7 @@ describe('integration: /start-task fresh context', () => {
     appendAssistantMessage('Found 3 bottlenecks: ...');
 
     await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
     assert.deepStrictEqual(getLlmHistory(), [
       'main work',
       'working on main...',
@@ -52,15 +55,17 @@ describe('integration: /start-task fresh context', () => {
 
 describe('integration: /start-task branch context', () => {
   it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runFinishTask } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
     await runPushTask('Quick fix.', true);
+    assert.strictEqual(getStatus(), 'pending task: quick-fix');
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: quick-fix');
     assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
     assert.ok(isLlmTriggered());
     assert.strictEqual(getLastHint(), undefined);
@@ -68,6 +73,7 @@ describe('integration: /start-task branch context', () => {
     appendAssistantMessage('Fixed the bug.');
 
     await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
     assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
     assert.ok(isLlmTriggered());
     assert.ok(getLastHint()?.includes('Task finished'));
@@ -78,12 +84,13 @@ describe('integration: /start-task branch context', () => {
 
 describe('integration: /auto fresh context', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working on main...');
     await runPushTask('Analyze performance.');
+    assert.strictEqual(getStatus(), 'pending task: analyze-performance');
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     const running = runAuto();
@@ -109,12 +116,13 @@ describe('integration: /auto fresh context', () => {
 
 describe('integration: /auto branch context', () => {
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
     await runPushTask('Quick fix.', true);
+    assert.strictEqual(getStatus(), 'pending task: quick-fix');
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     const running = runAuto();
@@ -183,7 +191,7 @@ describe('registration', () => {
 
 describe('discardTask', () => {
   it('discards a pending task without triggering the LLM', async () => {
-    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runDiscardTask } =
+    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, runPushTask, runDiscardTask } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -191,6 +199,7 @@ describe('discardTask', () => {
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     await runDiscardTask();
+    assert.strictEqual(getStatus(), undefined);
     assert.strictEqual(getLastHint(), 'Task discarded.');
     assert.ok(!isLlmTriggered());
     assert.deepStrictEqual(getLlmHistory(), ['main work']);
@@ -201,7 +210,7 @@ describe('discardTask', () => {
 
 describe('abortTask', () => {
   it('aborts an in-progress task and returns to the original branch', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runAbortTask } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, runPushTask, runStartTask, runAbortTask } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -217,6 +226,7 @@ describe('abortTask', () => {
     appendAssistantMessage('Partial work...');
 
     await runAbortTask();
+    assert.strictEqual(getStatus(), undefined);
     assert.strictEqual(getLastHint(), 'Task aborted. Branch abandoned without summary.');
     assert.ok(!isLlmTriggered());
     assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...']);
