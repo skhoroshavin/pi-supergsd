@@ -171,6 +171,7 @@ describe('registration', () => {
         registered.push({ type: 'tool', name: tool.name, description: tool.description }),
       registerCommand: (name: string, opts: { description: string }) =>
         registered.push({ type: 'command', name, description: opts.description }),
+      registerMessageRenderer: () => {},
       on: () => {},
     } as unknown as ExtensionAPI;
 
@@ -369,6 +370,7 @@ function makeHarness() {
     on(eventName: string, handler: () => unknown) {
       if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
     },
+    registerMessageRenderer() {},
     registerTool() {},
     registerCommand() {},
   } as unknown as ExtensionAPI;

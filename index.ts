@@ -8,7 +8,7 @@ import {
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 
-import { Text } from '@earendil-works/pi-tui';
+import { Box, Text } from '@earendil-works/pi-tui';
 
 import { Type } from 'typebox';
 
@@ -19,6 +19,16 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
   pi.registerCommand('finish-task', createFinishTaskCommand(pi));
   pi.registerCommand('abort-task', createAbortTaskCommand(pi));
   pi.registerCommand('auto', createAutoCommand(pi));
+
+  pi.registerMessageRenderer('task-result', (message, { expanded: _expanded }, theme) => {
+    const details = message.details as { slug?: string; sourceEntryId?: string } | undefined;
+    const label = details?.slug
+      ? theme.fg('customMessageLabel', `${details.slug} result:`)
+      : theme.fg('customMessageLabel', 'result:');
+    const box = new Box(1, 1, (t: string) => theme.bg('customMessageBg', t));
+    box.addChild(new Text(`${label}\n${message.content}`, 0, 0));
+    return box;
+  });
 
   pi.on('session_shutdown', async () => {
     autoState.running = false;
@@ -270,6 +280,23 @@ async function finishTask(
     }
   }
 
+  // Compute slug from the task that started this branch
+  let slug: string | undefined;
+  const preNavBranch = ctx.sessionManager.getBranch();
+  let lookingForTask = false;
+  // Walk backward from the end (or from task-start's position) to find the task entry
+  for (let i = preNavBranch.length - 1; i >= 0; i--) {
+    const entry = preNavBranch[i];
+    if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
+      lookingForTask = true;
+      continue;
+    }
+    if (lookingForTask && entry.type === 'custom' && entry.customType === TASK_ENTRY_TYPE) {
+      slug = makeSlug((entry.data as TaskData).prompt);
+      break;
+    }
+  }
+
   const result = await ctx.navigateTree(taskStart.data.returnTo, {
     summarize: false,
   });
@@ -278,11 +305,11 @@ async function finishTask(
   // Inject last assistant message after navigation
   if (lastAssistantId) {
     pi.sendMessage({
-      customType: 'branch-result',
+      customType: 'task-result',
       // Content is filtered to only TextContent blocks (or original string)
       content: lastAssistantContent as unknown as string,
       display: true,
-      details: { sourceEntryId: lastAssistantId },
+      details: { sourceEntryId: lastAssistantId, slug },
     }, { triggerTurn: true });
   }
 
