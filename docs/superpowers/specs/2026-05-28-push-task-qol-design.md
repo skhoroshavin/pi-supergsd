@@ -115,18 +115,18 @@ Status is recomputed on: `session_start`, `turn_end`, `session_tree`, and immedi
 
 ## 6. Branch-result message label
 
-When `/finish-task` completes, it injects the last assistant response as a `branch-result` custom message. Currently the label displays as `[branch-result]`. Replace with a slug-based label.
+When `/finish-task` completes, it injects the last assistant response as a custom message. Change the `customType` from `'branch-result'` to `'task-result'` and render the label as a slug-based label (no brackets).
 
 **Implementation:**
 
 1. In `finishTask()`, after navigating back to `returnTo`, find the original task entry (walk backward from `task-start` to the matching `TASK_ENTRY_TYPE` entry) and compute a slug from its prompt.
 2. Pass the slug in `details` alongside the existing `sourceEntryId`.
-3. Register a message renderer for `'branch-result'` via `pi.registerMessageRenderer()`:
+3. Register a message renderer for `'task-result'` via `pi.registerMessageRenderer()`:
    - Label: `"<slug> result:"` in the same styling used for custom message labels (no brackets).
    - Content: unchanged — the assistant's response text.
 
 ```typescript
-pi.registerMessageRenderer('branch-result', (message, { expanded }, theme) => {
+pi.registerMessageRenderer('task-result', (message, { expanded }, theme) => {
   const details = message.details as { slug?: string };
   const label = details.slug
     ? theme.fg("customMessageLabel", `${details.slug} result:`)
@@ -155,6 +155,6 @@ All existing call sites that pass a `context` argument update to `inherit_contex
 
 | File | Changes |
 |------|---------|
-| `index.ts` | Parameter schema, `TaskData`, `execute()`, `startTask()`, `renderCall`, `renderResult`, `makeSlug`, status hooks, post-push-task status trigger, `registerMessageRenderer` for branch-result, slug in `finishTask()` details |
+| `index.ts` | Parameter schema, `TaskData`, `execute()`, `startTask()`, `renderCall`, `renderResult`, `makeSlug`, status hooks, post-push-task status trigger, `registerMessageRenderer` for task-result, slug in `finishTask()` details |
 | `index.test.ts` | `runPushTask` signature update, `getStatus()` helper, status assertions, `context` → `inherit_context` references |
 | `README.md` | Parameter description, usage example |
