@@ -30,7 +30,7 @@ This extension also bundles a subset of [Superpowers](https://github.com/obra/su
 
 ### `push-task` tool
 
-Queues a task with `context` `"fresh"` (clean session) or `"branch"` (current branch). Defaults to `"fresh"`. The task sits pending — nothing runs until you start it.
+Queues a task with `inherit_context` defaulting to `false` (fresh session). Set `inherit_context: true` to continue on the current branch. The task sits pending — nothing runs until you start it.
 
 ## Use cases
 
@@ -43,7 +43,7 @@ LLM:     Implementation done. Let me queue a fresh review.
 
 LLM:     [calls push-task({ prompt: "Review the implementation
          against the plan. Check correctness, edge cases,
-         and test coverage.", context: "fresh" })]
+         and test coverage.", inherit_context: true })]
 
 LLM:     Task stored. Run /start-task to review.
 
