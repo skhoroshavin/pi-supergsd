@@ -6,6 +6,7 @@ import {
   SessionManager,
   type ExtensionAPI,
   type ExtensionCommandContext,
+  buildSessionContext,
 } from '@earendil-works/pi-coding-agent';
 
 import registerTaskCommands, {
