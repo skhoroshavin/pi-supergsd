@@ -21,6 +21,18 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
   pi.on('session_shutdown', async () => {
     autoState.running = false;
   });
+
+  pi.on('session_start', async (_event, ctx) => {
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+  });
+
+  pi.on('turn_end', async (_event, ctx) => {
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+  });
+
+  pi.on('session_tree', async (_event, ctx) => {
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+  });
 }
 
 export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
@@ -85,12 +97,16 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
       'Do not batch multiple push-task calls together, and do not mix push-task with other tool calls in the same turn.',
     ],
     parameters: pushTaskParameters,
-    async execute(_toolCallId, params, signal) {
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) {
         throw new Error('Task storage aborted.');
       }
 
       pi.appendEntry(TASK_ENTRY_TYPE, { prompt: params.prompt, inherit_context: params.inherit_context ?? false });
+
+      if (ctx.hasUI) {
+        updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+      }
 
       return {
         content: [{ type: 'text', text: 'Task stored. Use `/start-task` or `/auto` to start it.' }],
@@ -142,6 +158,10 @@ async function startTask(
   }
 
   pi.sendUserMessage(activeTask.data.prompt);
+
+  if (ctx.hasUI) {
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+  }
 }
 
 export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
@@ -166,6 +186,10 @@ async function discardTask(
 
   pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
   ctx.ui.notify('Task discarded.', 'info');
+
+  if (ctx.hasUI) {
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+  }
 }
 
 export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
@@ -234,6 +258,10 @@ async function finishTask(
 
   const label = lastAssistantId ? 'Last response attached.' : 'No last response to attach.';
   ctx.ui.notify(`Task finished. ${label}`, 'info');
+
+  if (ctx.hasUI) {
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+  }
 }
 
 export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
@@ -264,6 +292,10 @@ async function abortTask(
   }
 
   ctx.ui.notify('Task aborted. Branch abandoned without summary.', 'info');
+
+  if (ctx.hasUI) {
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+  }
 }
 
 type TaskActionResult = 'cancelled' | void;
@@ -401,3 +433,74 @@ const pushTaskParameters = Type.Object({
     description: 'Whether to inherit the current branch context instead of starting fresh.',
   })),
 });
+
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
+  'should', 'may', 'might', 'must', 'can', 'could', 'i', 'you', 'he',
+  'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my',
+  'your', 'his', 'its', 'our', 'their', 'this', 'that', 'these', 'those',
+  'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
+  'into', 'through', 'during', 'before', 'after', 'above', 'below',
+  'between', 'under', 'and', 'but', 'or', 'nor', 'not', 'so', 'if',
+  'than', 'too', 'very', 'just', 'now', 'then', 'also', 'here', 'there',
+  'when', 'where', 'why', 'how', 'all', 'both', 'each', 'few', 'more',
+  'most', 'other', 'some', 'such', 'no', 'only', 'own', 'same', 'up',
+  'out', 'about', 'over', 'again', 'while',
+]);
+
+function makeSlug(prompt: string): string {
+  const words = prompt.split(/\s+/)
+    .filter(w => !STOPWORDS.has(w.toLowerCase()))
+    .map(w => w.toLowerCase().replace(/[^\w\d]+$/, ''));
+  if (words.length === 0) return '<no description>';
+
+  let result = words[0]!;
+  for (let i = 1; i < Math.min(words.length, 7); i++) {
+    const next = `-${words[i]}`;
+    if ((result + next).length <= 40 || result.length <= 40 - next.length) {
+      result += next;
+    } else {
+      break;
+    }
+  }
+  return result;
+}
+
+function updateTaskStatus(
+  session: ReadonlySessionLike,
+  setStatus: (key: string, value: string | undefined) => void,
+  theme: { fg: (key: string, text: string) => string },
+): void {
+  const pending = pendingTask(session);
+  if (pending) {
+    const slug = makeSlug(pending.data.prompt);
+    setStatus('task', theme.fg('dim', `pending task: ${slug}`));
+    return;
+  }
+
+  const current = currentTask(session);
+  if (current) {
+    // Walk forward from task-start to find the next user message
+    const branch = session.getBranch();
+    let found = false;
+    for (const entry of branch) {
+      if (found && entry.type === 'message' && entry.message.role === 'user') {
+        const prompt = typeof entry.message.content === 'string'
+          ? entry.message.content
+          : Array.isArray(entry.message.content)
+            ? entry.message.content.find((b: { type: string }) => b.type === 'text')?.text ?? ''
+            : '';
+        const slug = makeSlug(prompt);
+        setStatus('task', theme.fg('dim', `current task: ${slug}`));
+        return;
+      }
+      if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
+        found = true;
+      }
+    }
+    return;
+  }
+
+  setStatus('task', undefined);
+}
