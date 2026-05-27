@@ -87,9 +87,10 @@ A helper function `makeSlug(prompt: string): string`:
 
 1. Split the prompt into words on whitespace.
 2. Filter out stopwords (case-insensitive): a, an, the, is, are, was, were, be, been, being, have, has, had, do, does, did, will, would, shall, should, may, might, must, can, could, i, you, he, she, it, we, they, me, him, her, us, them, my, your, his, its, our, their, this, that, these, those, to, of, in, for, on, with, at, by, from, as, into, through, during, before, after, above, below, between, under, and, but, or, nor, not, so, if, than, too, very, just, now, then, also, here, there, when, where, why, how, all, both, each, few, more, most, other, some, such, no, only, own, same, up, out, about, over, again, while.
-3. Take the first 7 remaining words.
-4. Join with spaces.
-5. Truncate to 40 characters, appending `...` if truncated.
+3. If no words remain after filtering, fall back to `"<no description>"`.
+4. Take the first 7 remaining words.
+5. Join with spaces.
+6. Truncate to 40 characters, appending `...` if truncated.
 
 ## 4. Status line — pending task
 
