@@ -106,11 +106,6 @@ describe('integration: /auto fresh context', () => {
   });
 });
 
-function assertNoActiveTask(sm: SessionManager): void {
-  const task = getActiveTask(sm);
-  assert.strictEqual(task, null, `Expected no active task, but found: ${JSON.stringify(task)}`);
-}
-
 describe('integration: /auto branch context', () => {
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
     const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
@@ -156,25 +151,6 @@ describe('integration: /auto branch context', () => {
     assert.deepStrictEqual(getLlmHistory(), ['main work']);
   });
 });
-
-function getActiveTask(sm: SessionManager): TaskShape | null {
-  const branch = sm.getBranch();
-  let skip = 0;
-  for (let i = branch.length - 1; i >= 0; i--) {
-    const e = branch[i];
-    if (e.type === 'custom' && e.customType === TASK_DONE_ENTRY_TYPE) {
-      skip++;
-    } else if (e.type === 'custom' && e.customType === 'task') {
-      if (skip === 0) return e.data as TaskShape;
-      skip--;
-    }
-  }
-  return null;
-}
-
-// ── Assertion helpers ───────────────────────────────────────────
-
-interface TaskShape { prompt: string; context?: string }
 
 // ── discardTask ──────────────────────────────────────────────────
 
@@ -294,16 +270,10 @@ describe('createAutoCommand', () => {
   });
 });
 
-const TASK_DONE_ENTRY_TYPE = 'task-done';
-
 // ── Test harness ─────────────────────────────────────────────────
 
 function makeHarness() {
   const sm = SessionManager.inMemory();
-  const sentMessages: string[] = [];
-  const sentCustomMessages: Array<{ customType: string; content: unknown; options?: unknown }> = [];
-  const notifications: Array<{ message: string; type?: string }> = [];
-  const navigations: Array<{ targetId: string; opts?: unknown }> = [];
   const idleWaiters: Array<() => void> = [];
   const sessionShutdownHandlers: Array<() => unknown> = [];
   const triggeredCustomMessages = new Set<string>();
@@ -319,7 +289,6 @@ function makeHarness() {
     sendUserMessage(content: string | Array<{ type: string; text: string }>) {
       const text = typeof content === 'string' ? content : content.map((b) => b.text).join('');
       sm.appendMessage({ role: 'user', content: text, timestamp: Date.now() });
-      sentMessages.push(text);
       const branch = sm.getBranch();
       const last = branch[branch.length - 1];
       if (last) triggeredUserMessages.add(last.id);
@@ -328,7 +297,6 @@ function makeHarness() {
       message: { customType: string; content: unknown; display?: boolean; details?: unknown },
       options?: { triggerTurn?: boolean },
     ) {
-      sentCustomMessages.push({ customType: message.customType, content: message.content, options });
       sm.appendCustomMessageEntry(
         message.customType,
         message.content as string,
@@ -357,13 +325,11 @@ function makeHarness() {
     hasPendingMessages: () => pendingMessages,
     sessionManager: sm,
     ui: {
-      notify(message: string, type?: string) {
-        notifications.push({ message, type });
+      notify(message: string) {
         hints.push({ text: message });
       },
     },
-    navigateTree: async (targetId: string, opts?: unknown) => {
-      navigations.push({ targetId, opts });
+    navigateTree: async (targetId: string) => {
       if (cancelNextNav) {
         cancelNextNav = false;
         return { cancelled: true };
@@ -401,7 +367,7 @@ function makeHarness() {
       timestamp: 0,
       model: 'test',
       provider: 'test',
-    });
+    } as Parameters<typeof sm.appendMessage>[0]);
   }
 
   function getLastHint(): string | undefined {
@@ -414,13 +380,14 @@ function makeHarness() {
   function getLlmHistory(): string[] {
     const ctx = buildSessionContext(sm.getEntries(), sm.getLeafId());
     return ctx.messages.map(m => {
-      if (typeof m.content === 'string') return m.content;
-      if (!Array.isArray(m.content)) return '';
-      return m.content
+      const msg = m as { content?: string | Array<{ type: string; text?: string }> };
+      if (typeof msg.content === 'string') return msg.content;
+      if (!Array.isArray(msg.content)) return '';
+      return msg.content
         .filter((b): b is { type: 'text'; text: string } =>
           typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
         )
-        .map(b => b.text)
+        .map(b => b.text ?? '')
         .join('');
     });
   }
@@ -500,10 +467,6 @@ function makeHarness() {
   }
 
   return {
-    sentMessages,
-    sentCustomMessages,
-    notifications,
-    navigations,
     getLlmHistory,
     isLlmTriggered,
     getLastHint,
@@ -523,64 +486,3 @@ function makeHarness() {
   };
 }
 
-function assistantMessage(text: string): AppendMessageInput {
-  return {
-    role: 'assistant',
-    content: [{ type: 'text', text }],
-    timestamp: 0,
-    model: 'test',
-    provider: 'test',
-  } as AppendMessageInput;
-}
-
-function abortedAssistantMessage(text: string): AppendMessageInput {
-  return {
-    role: 'assistant',
-    content: [{ type: 'text', text }],
-    timestamp: 0,
-    model: 'test',
-    provider: 'test',
-    stopReason: 'aborted',
-  } as AppendMessageInput;
-}
-
-// ── Assistant message builders ───────────────────────────────────
-
-type AppendMessageInput = Parameters<SessionManager['appendMessage']>[0];
-
-function countCustomEntries(sm: SessionManager, customType: string): number {
-  return sm
-    .getEntries()
-    .filter((entry) => entry.type === 'custom' && entry.customType === customType)
-    .length;
-}
-
-function assertLastNotification(
-  notifications: Notification[],
-  type?: string,
-  expectedMessage?: string,
-): Notification {
-  const n = getLastNotification(notifications, type);
-  assert.ok(n, `Expected notification${type ? ` of type '${type}'` : ''}, found none.`);
-  if (expectedMessage !== undefined) {
-    assert.strictEqual(n.message, expectedMessage);
-  }
-  return n;
-}
-
-function getLastNotification(
-  notifications: Notification[],
-  type?: string,
-): Notification | null {
-  for (let i = notifications.length - 1; i >= 0; i--) {
-    if (type === undefined || notifications[i].type === type) {
-      return notifications[i];
-    }
-  }
-  return null;
-}
-
-interface Notification {
-  message: string;
-  type?: string;
-}
