@@ -108,7 +108,7 @@ git commit -m "test: rename context→inherit_context, add getStatus() harness h
 In `'completes /start-task → work → /finish-task with last-response injection'`, after `await runPushTask('Analyze performance.');`:
 
 ```typescript
-assert.strictEqual(getStatus(), 'pending task: Analyze-performance');
+assert.strictEqual(getStatus(), 'pending task: analyze-performance');
 ```
 
 - [ ] **Step 2: Add status assertion after start-task**
@@ -116,7 +116,7 @@ assert.strictEqual(getStatus(), 'pending task: Analyze-performance');
 In the same test, after `await runStartTask();`:
 
 ```typescript
-assert.strictEqual(getStatus(), 'current task: Analyze-performance');
+assert.strictEqual(getStatus(), 'current task: analyze-performance');
 ```
 
 - [ ] **Step 3: Add status assertion after finish-task**
@@ -133,12 +133,12 @@ In `'completes /start-task branch → work → /finish-task with last-response i
 
 After `await runPushTask('Quick fix.', true);`:
 ```typescript
-assert.strictEqual(getStatus(), 'pending task: Quick-fix');
+assert.strictEqual(getStatus(), 'pending task: quick-fix');
 ```
 
 After `await runStartTask();`:
 ```typescript
-assert.strictEqual(getStatus(), 'current task: Quick-fix');
+assert.strictEqual(getStatus(), 'current task: quick-fix');
 ```
 
 After `await runFinishTask();`:
@@ -150,12 +150,12 @@ assert.strictEqual(getStatus(), undefined);
 
 In `'completes push-task -> /auto -> finish-task...'`, after `await runPushTask('Analyze performance.');`:
 ```typescript
-assert.strictEqual(getStatus(), 'pending task: Analyze-performance');
+assert.strictEqual(getStatus(), 'pending task: analyze-performance');
 ```
 
 In `'returns the branch result to the original leaf...'`, after `await runPushTask('Quick fix.', true);`:
 ```typescript
-assert.strictEqual(getStatus(), 'pending task: Quick-fix');
+assert.strictEqual(getStatus(), 'pending task: quick-fix');
 ```
 
 - [ ] **Step 6: Add status assertion to discard test**
@@ -317,7 +317,9 @@ const STOPWORDS = new Set([
 ]);
 
 function makeSlug(prompt: string): string {
-  const words = prompt.split(/\s+/).filter(w => !STOPWORDS.has(w.toLowerCase()));
+  const words = prompt.split(/\s+/)
+    .filter(w => !STOPWORDS.has(w.toLowerCase()))
+    .map(w => w.toLowerCase());
   if (words.length === 0) return '<no description>';
 
   let result = words[0]!;
