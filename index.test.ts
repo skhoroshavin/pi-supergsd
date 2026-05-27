@@ -77,25 +77,25 @@ describe('integration: /start-task fresh context', () => {
 
 describe('integration: /start-task branch context', () => {
   it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
-    const { sm, sentMessages, sentCustomMessages, runPushTask, runStartTask, runFinishTask } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('working...'));
-
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
     await runPushTask('Quick fix.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
     await runStartTask();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+    assert.ok(isLlmTriggered());
+    assert.strictEqual(getLastHint(), undefined);
 
-    assert.deepStrictEqual(sentMessages, ['Quick fix.']);
-
-    sm.appendMessage(assistantMessage('Fixed the bug.'));
+    appendAssistantMessage('Fixed the bug.');
 
     await runFinishTask();
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-    const content = sentCustomMessages[0].content as Array<{ text: string }>;
-    assert.strictEqual(content[0].text, 'Fixed the bug.');
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+    assert.ok(isLlmTriggered());
+    assert.ok(getLastHint()?.includes('Task finished'));
   });
 });
 
