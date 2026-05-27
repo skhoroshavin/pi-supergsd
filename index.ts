@@ -5,6 +5,7 @@ import {
   type RegisteredCommand,
   type SessionEntry,
   type SessionMessageEntry,
+  Theme,
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 
@@ -20,7 +21,7 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
   pi.registerCommand('abort-task', createAbortTaskCommand(pi));
   pi.registerCommand('auto', createAutoCommand(pi));
 
-  pi.registerMessageRenderer('task-result', (message, { expanded: _expanded }, theme) => {
+  pi.registerMessageRenderer('task-result', (message, _options, theme) => {
     const details = message.details as { slug?: string; sourceEntryId?: string } | undefined;
     const label = details?.slug
       ? theme.fg('customMessageLabel', `${details.slug} result:`)
@@ -90,14 +91,6 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
-  const branch = session.getBranch();
-  const last = branch[branch.length - 1];
-  return last?.type === 'message'
-    && last.message.role === 'assistant'
-    && last.message.stopReason === 'aborted';
-}
-
 export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
   return defineTool({
     name: 'push-task',
@@ -124,7 +117,7 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
 
       return new Text([header, ...displayLines].join('\n'), 0, 0);
     },
-    renderResult(result, { expanded }, theme, _context) {
+    renderResult(result, { expanded }, theme) {
       const details = result.details as { prompt: string; inherit_context: boolean };
 
       const header = theme.fg('toolTitle', theme.bold('push-task'))
@@ -173,6 +166,46 @@ export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
+export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Discard the active task without executing it',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await discardTask(pi, ctx);
+    },
+  };
+}
+
+export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Finish the current task and return to the task start point',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await finishTask(pi, ctx);
+    },
+  };
+}
+
+export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Abort the current task without finishing',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await abortTask(pi, ctx);
+    },
+  };
+}
+
+type CommandOptions = Omit<RegisteredCommand, 'name' | 'sourceInfo'>;
+
+function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
+  const branch = session.getBranch();
+  const last = branch[branch.length - 1];
+  return last?.type === 'message'
+    && last.message.role === 'assistant'
+    && last.message.stopReason === 'aborted';
+}
+
 async function startTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
@@ -208,16 +241,6 @@ async function startTask(
   }
 }
 
-export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Discard the active task without executing it',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await discardTask(pi, ctx);
-    },
-  };
-}
-
 async function discardTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
@@ -234,16 +257,6 @@ async function discardTask(
   if (ctx.hasUI) {
     updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
   }
-}
-
-export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Finish the current task and return to the task start point',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await finishTask(pi, ctx);
-    },
-  };
 }
 
 async function finishTask(
@@ -325,16 +338,6 @@ async function finishTask(
   }
 }
 
-export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Abort the current task without finishing',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await abortTask(pi, ctx);
-    },
-  };
-}
-
 async function abortTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
@@ -360,6 +363,99 @@ async function abortTask(
 }
 
 type TaskActionResult = 'cancelled' | void;
+
+/** Type guard: is the entry an assistant message with content? */
+function isAssistantMessageEntry(entry: SessionEntry): entry is SessionMessageEntry & { message: { role: 'assistant' } } {
+  return entry.type === 'message' && entry.message.role === 'assistant';
+}
+
+/**
+ * Find the target ID for navigating to a fresh context.
+ * Returns the parent of the first model-visible entry, or the branch root as fallback.
+ * Returns null if no valid target is found.
+ */
+function findFreshTargetId(session: ReadonlySessionLike): string | null {
+  const branch = session.getBranch();
+  if (branch.length === 0) return null;
+
+  const firstVisible = findPreConversationEntry(session);
+  if (firstVisible) {
+    return firstVisible.parentId ?? firstVisible.id;
+  }
+
+  // Fallback: use branch root's parent (or the root itself if no parent)
+  return branch[0].parentId ?? branch[0].id;
+}
+
+/**
+ * Find the first model-visible entry on the current branch (closest to root).
+ *
+ * "Model-visible" means the entry participates in LLM context via buildSessionContext:
+ * messages (user/assistant), compaction summaries, branch summaries, and custom messages.
+ * Entries like thinking_level_change, model_change, custom (data-only), label, and
+ * session_info are NOT visible — Pi may insert them before the conversation begins.
+ *
+ * Returns null if the branch has no model-visible entries (e.g., only non-visible setup
+ * entries) or if there is no leaf.
+ */
+function findPreConversationEntry(
+  session: ReadonlySessionLike,
+): SessionEntry | null {
+  const leafId = session.getLeafId();
+  if (!leafId) return null;
+
+  const branch = session.getBranch();
+  for (const entry of branch) {
+    if (
+      entry.type === 'message' ||
+      entry.type === 'compaction' ||
+      entry.type === 'branch_summary' ||
+      entry.type === 'custom_message'
+    ) {
+      return entry;
+    }
+  }
+
+  return null;
+}
+
+function updateTaskStatus(
+  session: ReadonlySessionLike,
+  setStatus: (key: string, value: string | undefined) => void,
+  theme: Theme,
+): void {
+  const pending = pendingTask(session);
+  if (pending) {
+    const slug = makeSlug(pending.data.prompt);
+    setStatus('task', theme.fg('dim', `pending task: ${slug}`));
+    return;
+  }
+
+  const current = currentTask(session);
+  if (current) {
+    // Walk forward from task-start to find the next user message
+    const branch = session.getBranch();
+    let found = false;
+    for (const entry of branch) {
+      if (found && entry.type === 'message' && entry.message.role === 'user') {
+        const prompt = typeof entry.message.content === 'string'
+          ? entry.message.content
+          : Array.isArray(entry.message.content)
+            ? entry.message.content.find((b): b is { type: 'text'; text: string } => b.type === 'text')?.text ?? ''
+            : '';
+        const slug = makeSlug(prompt);
+        setStatus('task', theme.fg('dim', `current task: ${slug}`));
+        return;
+      }
+      if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
+        found = true;
+      }
+    }
+    return;
+  }
+
+  setStatus('task', undefined);
+}
 
 // ── Lookup utilities ──────────────────────────────────────────────
 
@@ -428,88 +524,6 @@ interface ReadonlySessionLike {
   getBranch(): SessionEntry[];
 }
 
-type CommandOptions = Omit<RegisteredCommand, 'name' | 'sourceInfo'>;
-
-/** Type guard: is the entry an assistant message with content? */
-function isAssistantMessageEntry(entry: SessionEntry): entry is SessionMessageEntry & { message: { role: 'assistant' } } {
-  return entry.type === 'message' && entry.message.role === 'assistant';
-}
-
-/**
- * Find the target ID for navigating to a fresh context.
- * Returns the parent of the first model-visible entry, or the branch root as fallback.
- * Returns null if no valid target is found.
- */
-function findFreshTargetId(session: ReadonlySessionLike): string | null {
-  const branch = session.getBranch();
-  if (branch.length === 0) return null;
-
-  const firstVisible = findPreConversationEntry(session);
-  if (firstVisible) {
-    return firstVisible.parentId ?? firstVisible.id;
-  }
-
-  // Fallback: use branch root's parent (or the root itself if no parent)
-  return branch[0].parentId ?? branch[0].id;
-}
-
-/**
- * Find the first model-visible entry on the current branch (closest to root).
- *
- * "Model-visible" means the entry participates in LLM context via buildSessionContext:
- * messages (user/assistant), compaction summaries, branch summaries, and custom messages.
- * Entries like thinking_level_change, model_change, custom (data-only), label, and
- * session_info are NOT visible — Pi may insert them before the conversation begins.
- *
- * Returns null if the branch has no model-visible entries (e.g., only non-visible setup
- * entries) or if there is no leaf.
- */
-function findPreConversationEntry(
-  session: ReadonlySessionLike,
-): SessionEntry | null {
-  const leafId = session.getLeafId();
-  if (!leafId) return null;
-
-  const branch = session.getBranch();
-  for (const entry of branch) {
-    if (
-      entry.type === 'message' ||
-      entry.type === 'compaction' ||
-      entry.type === 'branch_summary' ||
-      entry.type === 'custom_message'
-    ) {
-      return entry;
-    }
-  }
-
-  return null;
-}
-
-const autoState = { running: false };
-
-const pushTaskParameters = Type.Object({
-  prompt: Type.String({ description: 'Full prompt for the task, including all context and instructions.' }),
-  inherit_context: Type.Optional(Type.Boolean({
-    default: false,
-    description: 'Whether to inherit the current branch context instead of starting fresh.',
-  })),
-});
-
-const STOPWORDS = new Set([
-  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-  'should', 'may', 'might', 'must', 'can', 'could', 'i', 'you', 'he',
-  'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my',
-  'your', 'his', 'its', 'our', 'their', 'this', 'that', 'these', 'those',
-  'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
-  'into', 'through', 'during', 'before', 'after', 'above', 'below',
-  'between', 'under', 'and', 'but', 'or', 'nor', 'not', 'so', 'if',
-  'than', 'too', 'very', 'just', 'now', 'then', 'also', 'here', 'there',
-  'when', 'where', 'why', 'how', 'all', 'both', 'each', 'few', 'more',
-  'most', 'other', 'some', 'such', 'no', 'only', 'own', 'same', 'up',
-  'out', 'about', 'over', 'again', 'while',
-]);
-
 function makeSlug(prompt: string): string {
   const words = prompt.split(/\s+/)
     .filter(w => !STOPWORDS.has(w.toLowerCase()))
@@ -528,40 +542,27 @@ function makeSlug(prompt: string): string {
   return result;
 }
 
-function updateTaskStatus(
-  session: ReadonlySessionLike,
-  setStatus: (key: string, value: string | undefined) => void,
-  theme: { fg: (key: string, text: string) => string },
-): void {
-  const pending = pendingTask(session);
-  if (pending) {
-    const slug = makeSlug(pending.data.prompt);
-    setStatus('task', theme.fg('dim', `pending task: ${slug}`));
-    return;
-  }
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
+  'should', 'may', 'might', 'must', 'can', 'could', 'i', 'you', 'he',
+  'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my',
+  'your', 'his', 'its', 'our', 'their', 'this', 'that', 'these', 'those',
+  'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
+  'into', 'through', 'during', 'before', 'after', 'above', 'below',
+  'between', 'under', 'and', 'but', 'or', 'nor', 'not', 'so', 'if',
+  'than', 'too', 'very', 'just', 'now', 'then', 'also', 'here', 'there',
+  'when', 'where', 'why', 'how', 'all', 'both', 'each', 'few', 'more',
+  'most', 'other', 'some', 'such', 'no', 'only', 'own', 'same', 'up',
+  'out', 'about', 'over', 'again', 'while',
+]);
 
-  const current = currentTask(session);
-  if (current) {
-    // Walk forward from task-start to find the next user message
-    const branch = session.getBranch();
-    let found = false;
-    for (const entry of branch) {
-      if (found && entry.type === 'message' && entry.message.role === 'user') {
-        const prompt = typeof entry.message.content === 'string'
-          ? entry.message.content
-          : Array.isArray(entry.message.content)
-            ? entry.message.content.find((b: { type: string }) => b.type === 'text')?.text ?? ''
-            : '';
-        const slug = makeSlug(prompt);
-        setStatus('task', theme.fg('dim', `current task: ${slug}`));
-        return;
-      }
-      if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
-        found = true;
-      }
-    }
-    return;
-  }
+const autoState = { running: false };
 
-  setStatus('task', undefined);
-}
+const pushTaskParameters = Type.Object({
+  prompt: Type.String({ description: 'Full prompt for the task, including all context and instructions.' }),
+  inherit_context: Type.Optional(Type.Boolean({
+    default: false,
+    description: 'Whether to inherit the current branch context instead of starting fresh.',
+  })),
+});
