@@ -355,6 +355,20 @@ function makeHarness() {
 
   // ── Plumbing helpers ──────────────────────────────────────────
 
+  function getLlmHistory(): string[] {
+    const ctx = buildSessionContext(sm.getEntries(), sm.getLeafId());
+    return ctx.messages.map(m => {
+      if (typeof m.content === 'string') return m.content;
+      if (!Array.isArray(m.content)) return '';
+      return m.content
+        .filter((b): b is { type: 'text'; text: string } =>
+          typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
+        )
+        .map(b => b.text)
+        .join('');
+    });
+  }
+
   async function releaseNextIdle() {
     const next = idleWaiters.shift();
     assert.ok(next, 'Expected a pending waitForIdle call.');
@@ -427,6 +441,7 @@ function makeHarness() {
     sentCustomMessages,
     notifications,
     navigations,
+    getLlmHistory,
     releaseNextIdle,
     flushMicrotasks,
     emitSessionShutdown,
