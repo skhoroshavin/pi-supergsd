@@ -246,7 +246,7 @@ describe('createAutoCommand', () => {
   });
 
   it('warns and returns when /auto is already running', async () => {
-    const { pi, notifications, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
+    const { pi, getLastHint, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
       makeHarness();
     registerTaskCommands(pi);
 
@@ -254,7 +254,7 @@ describe('createAutoCommand', () => {
     await flushMicrotasks();
 
     await runAuto();
-    assertLastNotification(notifications, 'warning', 'Auto is already running.');
+    assert.strictEqual(getLastHint(), 'Auto is already running.');
 
     await emitSessionShutdown();
     await releaseNextIdle();
