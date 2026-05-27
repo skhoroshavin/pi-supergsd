@@ -2,7 +2,7 @@
 
 ## Goal
 
-Rewrite the `push-task` extension test harness and tests to use a "user perspective" API: tests verify the full LLM-visible message history, whether the last entry would trigger the LLM, and notifications from commands. Internal message-sending mechanics (`sentMessages`, `sentCustomMessages`) are no longer asserted.
+Rewrite the `push-task` extension test harness and tests to use a "user perspective" API: tests verify the full LLM-visible message history, whether the last entry would trigger the LLM, and user-visible hints (notifications + tool outputs). Internal message-sending mechanics (`sentMessages`, `sentCustomMessages`) are no longer asserted.
 
 ## Removals
 
@@ -37,8 +37,8 @@ appendAssistantMessage(text: string): void
 getLlmHistory(): string[]       // buildSessionContext at current leaf, text blocks only
 isLlmTriggered(): boolean       // would the last entry on the branch trigger the LLM?
 
-// Notifications (consume-on-read: returns most recent since last call, clears on read)
-getLastNotification(): string | undefined
+// User-visible hints (notifications + tool outputs — both LLM-invisible)
+getLastHint(): string | undefined  // most recent hint since last call, consume-on-read
 ```
 
 ## Implementation details
@@ -132,42 +132,47 @@ function isLlmTriggered(): boolean {
 | Custom message (without `triggerTurn`) | `false` |
 | Custom entry, compaction, etc. | `false` |
 
-### `getLastNotification()`
+### `getLastHint()`
 
-Consume-on-read: returns the most recent `ctx.ui.notify()` message since the last call, then clears the internal buffer. Returns `undefined` if no notification since last read.
+Consume-on-read: returns the most recent hint since the last call, then clears. Hints come from two sources:
+
+1. **Notifications** — `ctx.ui.notify(message, _type)` calls
+2. **Tool outputs** — tool `execute()` return text (captured by `runPushTask` wrapper)
+
+Both are user-visible but LLM-invisible. The function returns whichever is most recent, or `undefined` if none since last read.
 
 ```ts
-let pendingNotifications: string[] = [];
+interface Hint { text: string; sequence: number }
+let hints: Hint[] = [];
+let hintSeq = 0;
 
 ctx.ui.notify = (message, _type) => {
-  pendingNotifications.push(message);
+  hints.push({ text: message, sequence: hintSeq++ });
 };
 
-function getLastNotification(): string | undefined {
-  const last = pendingNotifications[pendingNotifications.length - 1];
-  pendingNotifications = [];
-  return last;
+async function runPushTask(prompt: string, context?: 'fresh' | 'branch') {
+  const tool = createPushTaskTool(pi);
+  const result = await tool.execute('call-1', { prompt, context }, undefined, undefined, ctx);
+  // Capture tool output as a hint
+  const text = typeof result.content === 'string'
+    ? result.content
+    : (result.content as Array<{ text: string }>)[0]?.text ?? '';
+  if (text) hints.push({ text, sequence: hintSeq++ });
+}
+
+function getLastHint(): string | undefined {
+  if (hints.length === 0) return undefined;
+  const last = hints[hints.length - 1];
+  hints = [];
+  return last.text;
 }
 ```
 
-Only the most recent notification is returned (not all accumulated ones). This way each `getLastNotification()` call returns what the most recent command/tool emitted, then resets for the next phase.
+Only the most recent hint is returned (not all accumulated). Each `getLastHint()` call drains the buffer.
 
-## Production change: push-task notification
+## Production code
 
-`createPushTaskTool` in `index.ts` must be updated to accept and use the `ctx` parameter, and call `ctx.ui.notify()`:
-
-```ts
-async execute(_toolCallId, params, signal, _update, ctx) {
-  if (signal?.aborted) throw new Error('Task storage aborted.');
-  pi.appendEntry(TASK_ENTRY_TYPE, { prompt: params.prompt, context: params.context ?? 'fresh' });
-  ctx.ui.notify('Task pushed, use /start-task or /auto to execute it');
-  return {
-    content: [{ type: 'text', text: 'Task stored. Use `/start-task` or `/auto` to start it.' }],
-    details: {},
-    terminate: true,
-  };
-},
-```
+No changes to `index.ts`. The push-task tool result is captured by the harness `runPushTask` wrapper — the real tool already returns content that appears in the UI.
 
 ## Test formatting convention
 
@@ -180,10 +185,10 @@ Empty lines separate test phases where a pause/waitForIdle boundary occurs. Asse
 ```ts
 appendUserMessage('main work');
 await runPushTask('Quick fix.');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 await runDiscardTask();
-assert.strictEqual(getLastNotification(), 'Task discarded.');
+assert.strictEqual(getLastHint(), 'Task discarded.');
 assert.ok(!isLlmTriggered());
 assert.deepStrictEqual(getLlmHistory(), ['main work']);
 ```
@@ -194,17 +199,18 @@ assert.deepStrictEqual(getLlmHistory(), ['main work']);
 appendUserMessage('main work');
 appendAssistantMessage('working...');
 await runPushTask('Quick fix.', 'branch');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 await runStartTask();
 assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
 assert.ok(isLlmTriggered());
-assert.strictEqual(getLastNotification(), undefined);
+assert.strictEqual(getLastHint(), undefined);
 
 appendAssistantMessage('Partial work...');
+assert.strictEqual(getLastHint(), undefined);
 
 await runAbortTask();
-assert.strictEqual(getLastNotification(), 'Task aborted. Branch abandoned without summary.');
+assert.strictEqual(getLastHint(), 'Task aborted. Branch abandoned without summary.');
 assert.ok(!isLlmTriggered());
 assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...']);
 ```
@@ -215,16 +221,16 @@ assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...']);
 appendUserMessage('main work');
 appendAssistantMessage('working on main...');
 await runPushTask('Analyze performance.');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 await runStartTask();
 // Fresh context: navigated to new root, only the task prompt is visible
 assert.deepStrictEqual(getLlmHistory(), ['Analyze performance.']);
 assert.ok(isLlmTriggered());
-assert.strictEqual(getLastNotification(), undefined);
+assert.strictEqual(getLastHint(), undefined);
 
 appendAssistantMessage('Found 3 bottlenecks: ...');
-assert.strictEqual(getLastNotification(), undefined);
+assert.strictEqual(getLastHint(), undefined);
 
 await runFinishTask();
 // Navigated back + branch result injected
@@ -234,7 +240,7 @@ assert.deepStrictEqual(getLlmHistory(), [
   'Found 3 bottlenecks: ...',
 ]);
 assert.ok(isLlmTriggered());
-assert.ok(getLastNotification()?.includes('Task finished'));
+assert.ok(getLastHint()?.includes('Task finished'));
 ```
 
 ### `integration: /start-task branch context` — completes start → work → finish
@@ -243,22 +249,22 @@ assert.ok(getLastNotification()?.includes('Task finished'));
 appendUserMessage('main work');
 appendAssistantMessage('working...');
 await runPushTask('Quick fix.', 'branch');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 await runStartTask();
 // Branch context: stays on current branch, history includes prior messages
 assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
 assert.ok(isLlmTriggered());
-assert.strictEqual(getLastNotification(), undefined);
+assert.strictEqual(getLastHint(), undefined);
 
 appendAssistantMessage('Fixed the bug.');
-assert.strictEqual(getLastNotification(), undefined);
+assert.strictEqual(getLastHint(), undefined);
 
 await runFinishTask();
 // Navigated back + branch result injected
 assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
 assert.ok(isLlmTriggered());
-assert.ok(getLastNotification()?.includes('Task finished'));
+assert.ok(getLastHint()?.includes('Task finished'));
 ```
 
 ### `integration: /auto fresh context` — completes push-task → auto → finish
@@ -267,7 +273,7 @@ assert.ok(getLastNotification()?.includes('Task finished'));
 appendUserMessage('main work');
 appendAssistantMessage('working on main...');
 await runPushTask('Analyze performance.');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 const running = runAuto();
 
@@ -288,7 +294,7 @@ assert.deepStrictEqual(getLlmHistory(), [
   'Found 3 bottlenecks: ...',
 ]);
 assert.ok(isLlmTriggered());
-assert.ok(getLastNotification()?.includes('Task finished'));
+assert.ok(getLastHint()?.includes('Task finished'));
 ```
 
 ### `integration: /auto branch context` — returns branch result to original leaf
@@ -297,7 +303,7 @@ assert.ok(getLastNotification()?.includes('Task finished'));
 appendUserMessage('main work');
 appendAssistantMessage('working...');
 await runPushTask('Quick fix.', 'branch');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 const running = runAuto();
 
@@ -312,7 +318,7 @@ await releaseNextIdle();
 await running;
 assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
 assert.ok(isLlmTriggered());
-assert.ok(getLastNotification()?.includes('Task finished'));
+assert.ok(getLastHint()?.includes('Task finished'));
 ```
 
 ### `integration: /auto branch context` — stops when navigation is cancelled
@@ -320,7 +326,7 @@ assert.ok(getLastNotification()?.includes('Task finished'));
 ```ts
 appendUserMessage('main work');
 await runPushTask('Analyze performance.');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 setCancelNextNav(true);
 
@@ -344,7 +350,7 @@ await releaseNextIdle();
 // Auto is waiting — no task yet
 
 await runPushTask('Review spec.');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 await releaseNextIdle();
 // Auto picked up the task, sent user message
@@ -365,7 +371,7 @@ const firstRun = runAuto();
 await flushMicrotasks();
 
 await runAuto();
-assert.strictEqual(getLastNotification(), 'Auto is already running.');
+assert.strictEqual(getLastHint(), 'Auto is already running.');
 
 await emitSessionShutdown();
 await releaseNextIdle();
@@ -377,10 +383,10 @@ await firstRun;
 ```ts
 appendUserMessage('start');
 await runPushTask('Quick fix.', 'branch');
-assert.strictEqual(getLastNotification(), 'Task pushed, use /start-task or /auto to execute it');
+assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
 await runStartTask();
-assert.strictEqual(getLastNotification(), undefined);
+assert.strictEqual(getLastHint(), undefined);
 
 appendAssistantMessage('Fixed the bug.');
 
@@ -403,10 +409,10 @@ assert.strictEqual(resolved, true);
 
 ## Files changed
 
-- `index.ts` — `createPushTaskTool` updated to accept `ctx` parameter and call `ctx.ui.notify()`
 - `index.test.ts` — harness rewrite + all tests rewritten + 2 new tests (discardTask, abortTask)
+- `index.ts` — no changes
 
 ## Things intentionally not covered
 
 - `lastAssistantWasAborted` logic untested after test removal (low-value edge case)
-- Notification type (`info`/`warning`) not distinguished — message text alone suffices
+- Hint type (`info`/`warning`, notification vs tool output) not distinguished — text alone suffices
