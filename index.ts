@@ -26,8 +26,9 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
     const label = details?.slug
       ? theme.fg('customMessageLabel', `${details.slug} result:`)
       : theme.fg('customMessageLabel', 'result:');
+    const text = extractTextContent(message.content);
     const box = new Box(1, 1, (t: string) => theme.bg('customMessageBg', t));
-    box.addChild(new Text(`${label}\n${message.content}`, 0, 0));
+    box.addChild(new Text(`${label}\n${text}`, 0, 0));
     return box;
   });
 
@@ -112,28 +113,15 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
         .map(l => theme.fg('dim', l.trimEnd() || ' '));
 
       if (!context.expanded && promptLines.length > 7) {
-        displayLines.push(theme.fg('muted', '...'));
+        displayLines.push(theme.fg('muted', '...'), theme.fg('dim', 'Ctrl+O to expand'));
       }
 
       return new Text([header, ...displayLines].join('\n'), 0, 0);
     },
-    renderResult(result, { expanded }, theme) {
-      const details = (result.details as { prompt?: string; inherit_context?: boolean } | undefined) ?? {};
-      if (!details.prompt) return new Text(theme.fg('toolTitle', theme.bold('push-task')), 0, 0);
-
-      const header = theme.fg('toolTitle', theme.bold('push-task'))
-        + (details.inherit_context ? ' ' + theme.fg('warning', '[inherit]') : '');
-
-      const promptLines = details.prompt.split('\n');
-      const maxLines = expanded ? promptLines.length : 7;
-      const displayLines = promptLines.slice(0, maxLines)
-        .map(l => theme.fg('dim', l.trimEnd() || ' '));
-
-      if (!expanded && promptLines.length > 7) {
-        displayLines.push(theme.fg('muted', '...'));
-      }
-
-      return new Text([header, ...displayLines].join('\n'), 0, 0);
+    renderResult(_result, _options, theme) {
+      const header = theme.fg('toolTitle', theme.bold('push-task'));
+      const label = theme.fg('dim', 'Stored. Use /start-task or /auto to execute.');
+      return new Text(`${header}\n${label}`, 0, 0);
     },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) {
@@ -549,6 +537,20 @@ function makeSlug(prompt: string): string {
     }
   }
   return result;
+}
+
+/** Extract a plain text string from content that may be a string or an array of text blocks. */
+function extractTextContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((b): b is { type: 'text'; text: string } =>
+        typeof b === 'object' && b !== null && 'type' in b && b.type === 'text',
+      )
+      .map(b => b.text)
+      .join('\n');
+  }
+  return String(content ?? '');
 }
 
 const STOPWORDS = new Set([
