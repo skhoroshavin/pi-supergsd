@@ -92,7 +92,7 @@ describe('integration: /start-task branch context', () => {
 
 describe('integration: /auto fresh context', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, getLastTaskResultDetails, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -119,12 +119,16 @@ describe('integration: /auto fresh context', () => {
     ]);
     assert.ok(isLlmTriggered());
     assert.ok(getLastHint()?.includes('Task finished'));
+
+    const details = getLastTaskResultDetails();
+    assert.ok(details, 'Expected task-result details');
+    assert.strictEqual(details?.slug, 'analyze-performance', 'task-result label should include slug for auto fresh context');
   });
 });
 
 describe('integration: /auto branch context', () => {
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, getLastTaskResultDetails, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -147,6 +151,10 @@ describe('integration: /auto branch context', () => {
     assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
     assert.ok(isLlmTriggered());
     assert.ok(getLastHint()?.includes('Task finished'));
+
+    const details = getLastTaskResultDetails();
+    assert.ok(details, 'Expected task-result details');
+    assert.strictEqual(details?.slug, 'quick-fix', 'task-result label should include slug for auto branch context');
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
