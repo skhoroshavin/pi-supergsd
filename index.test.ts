@@ -619,9 +619,11 @@ function makeHarness() {
 
   return {
     assertBranchHistory,
+    getLlmHistory,
     isLlmTriggered,
     getLastHint,
     getStatus,
+    getLastTaskResultDetails,
     appendUserMessage,
     appendAssistantMessage,
     releaseNextIdle,
