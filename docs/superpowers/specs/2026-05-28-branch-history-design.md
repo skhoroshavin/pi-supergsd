@@ -69,18 +69,26 @@ const notification = (text: string) => ({
 
 ### Custom Assertion
 
-`assertBranchHistory(expected)` fetches the current branch history and compares. Structural comparison ignoring session-internal fields (`id`, `parentId`, `timestamp`). For notifications, ignores `afterEntryId` unless explicitly set in expected.
+`assertBranchHistory(expected)` walks `sm.getBranch()`, filters internal entries, interleaves tracked notifications, and compares. Structural comparison ignoring session-internal fields (`id`, `parentId`, `timestamp`).
 
 ```ts
 // Returned from makeHarness(), bound to internal state
 function assertBranchHistory(expected: Partial<BranchEntry>[]) {
-  const actual = getBranchHistory();
+  const entries = sm.getBranch();
+  const actual: BranchEntry[] = [];
+  
+  for (const entry of entries) {
+    if (entry.type === 'custom' && entry.customType === 'task-done') continue;
+    actual.push(entry);
+    // Insert tracked hints with matching afterEntryId
+  }
+  
   // Compare structure, ignoring id/parentId/timestamp
-  // For notification entries, ignore afterEntryId unless specified
+  assert.deepStrictEqual(stripIds(actual), stripIds(expected));
 }
 ```
 
-`getBranchHistory()` is internal only — not exported from harness.
+No separate `getBranchHistory()` — assertion handles everything.
 
 ### Notification Tracking (Option C)
 
@@ -169,6 +177,7 @@ assertBranchHistory([
 - `getLlmHistory()` — replaced by `assertBranchHistory()`
 - `getLastTaskResultDetails()` — replaced by `assertBranchHistory()`
 - `getLastHint()` — replaced by `assertBranchHistory()`
+- `getBranchHistory()` — not needed, inline in assertion
 
 ## Migration
 
