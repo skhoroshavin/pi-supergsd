@@ -18,9 +18,9 @@ import registerTaskCommands, {
   createAutoCommand,
 } from './index.js';
 
-// ── Integration: manual execution ─────────────────────────────────────
+// ── Integration: manual workflow ─────────────────────────────────
 
-describe('integration: /start-task fresh context', () => {
+describe('manual workflow', () => {
   it('completes /start-task → work → /finish-task with last-response injection', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
@@ -56,9 +56,7 @@ describe('integration: /start-task fresh context', () => {
     );
     assert.ok(isLlmTriggered());
   });
-});
 
-describe('integration: /start-task branch context', () => {
   it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
@@ -98,9 +96,7 @@ describe('integration: /start-task branch context', () => {
     );
     assert.ok(isLlmTriggered());
   });
-});
 
-describe('discardTask', () => {
   it('discards a pending task without triggering the LLM', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runDiscardTask } =
         makeHarness();
@@ -120,9 +116,7 @@ describe('discardTask', () => {
         notification('Task discarded.'),
     );
   });
-});
 
-describe('abortTask', () => {
   it('aborts an in-progress task and returns to the original branch, while keeping task available to be executed again', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runAbortTask } =
         makeHarness();
@@ -160,9 +154,9 @@ describe('abortTask', () => {
   });
 });
 
-// ── Integration: /auto ───────────────────────────────────────────
+// ── Integration: automated workflow ──────────────────────────────
 
-describe('integration: /auto fresh context', () => {
+describe('automated workflow', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
@@ -201,9 +195,7 @@ describe('integration: /auto fresh context', () => {
     );
     assert.ok(isLlmTriggered());
   });
-});
 
-describe('integration: /auto branch context', () => {
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
@@ -268,43 +260,7 @@ describe('integration: /auto branch context', () => {
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
     );
   });
-});
 
-// ── Registration ─────────────────────────────────────────────────
-
-describe('registration', () => {
-  it('registers the push-task tool and all five task commands', () => {
-    const registered: Array<{ type: string; name: string; description?: string }> = [];
-    const pi = {
-      registerTool: (tool: { name: string; label: string; description: string }) =>
-        registered.push({ type: 'tool', name: tool.name, description: tool.description }),
-      registerCommand: (name: string, opts: { description: string }) =>
-        registered.push({ type: 'command', name, description: opts.description }),
-      registerMessageRenderer: () => {},
-      on: () => {},
-    } as unknown as ExtensionAPI;
-
-    registerTaskCommands(pi);
-
-    assert.deepStrictEqual(registered, [
-      { type: 'tool', name: 'push-task', description: 'Store a task prompt for a user-started navigation branch.' },
-      { type: 'command', name: 'start-task', description: 'Navigate to a fresh context and inject the active task prompt' },
-      { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
-      { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
-      { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
-      { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
-    ]);
-  });
-});
-
-const assistant = (content: string) => ({
-  type: 'message' as const,
-  message: { role: 'assistant' as const, content: [{ type: 'text' as const, text: content }] }
-}) as unknown as Partial<BranchEntry>;
-
-// ── createAutoCommand ────────────────────────────────────────────
-
-describe('createAutoCommand', () => {
   it('waits when started with no task, then starts work after a later push-task', async () => {
     const { appendAssistantMessage, assertBranchHistory, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
@@ -392,6 +348,38 @@ describe('createAutoCommand', () => {
     assert.strictEqual(resolved, true);
   });
 });
+
+// ── Registration ─────────────────────────────────────────────────
+
+describe('registration', () => {
+  it('registers the push-task tool and all five task commands', () => {
+    const registered: Array<{ type: string; name: string; description?: string }> = [];
+    const pi = {
+      registerTool: (tool: { name: string; label: string; description: string }) =>
+        registered.push({ type: 'tool', name: tool.name, description: tool.description }),
+      registerCommand: (name: string, opts: { description: string }) =>
+        registered.push({ type: 'command', name, description: opts.description }),
+      registerMessageRenderer: () => {},
+      on: () => {},
+    } as unknown as ExtensionAPI;
+
+    registerTaskCommands(pi);
+
+    assert.deepStrictEqual(registered, [
+      { type: 'tool', name: 'push-task', description: 'Store a task prompt for a user-started navigation branch.' },
+      { type: 'command', name: 'start-task', description: 'Navigate to a fresh context and inject the active task prompt' },
+      { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
+      { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
+      { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
+      { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
+    ]);
+  });
+});
+
+const assistant = (content: string) => ({
+  type: 'message' as const,
+  message: { role: 'assistant' as const, content: [{ type: 'text' as const, text: content }] }
+}) as unknown as Partial<BranchEntry>;
 
 const user = (content: string) => ({
   type: 'message' as const,
