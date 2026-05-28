@@ -118,7 +118,8 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
       return new Text([header, ...displayLines].join('\n'), 0, 0);
     },
     renderResult(result, { expanded }, theme) {
-      const details = result.details as { prompt: string; inherit_context: boolean };
+      const details = (result.details as { prompt?: string; inherit_context?: boolean } | undefined) ?? {};
+      if (!details.prompt) return new Text(theme.fg('toolTitle', theme.bold('push-task')), 0, 0);
 
       const header = theme.fg('toolTitle', theme.bold('push-task'))
         + (details.inherit_context ? ' ' + theme.fg('warning', '[inherit]') : '');
