@@ -146,37 +146,44 @@ describe('integration: /start-task branch context', () => {
 
 describe('integration: /auto fresh context', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, getLastTaskResultDetails, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working on main...');
     await runPushTask('Analyze performance.');
     assert.strictEqual(getStatus(), 'pending task: analyze-performance');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+    assertBranchHistory(
+      user('main work'),
+      assistant('working on main...'),
+      task('Analyze performance.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
+    // Auto started the task (fresh context)
+    assertBranchHistory(
+      user('main work'),
+      { type: 'custom', customType: 'task-start' },
+      user('Analyze performance.'),
+    );
 
     appendAssistantMessage('Found 3 bottlenecks: ...');
 
     await releaseNextIdle();
     await releaseNextIdle();
     await running;
-    assert.deepStrictEqual(getLlmHistory(), [
-      'main work',
-      'working on main...',
-      'Found 3 bottlenecks: ...',
-    ]);
+    assertBranchHistory(
+      user('main work'),
+      assistant('working on main...'),
+      task('Analyze performance.'),
+      { type: 'custom_message', customType: 'task-result', details: { slug: 'analyze-performance' } },
+      notification('Task finished. Last response attached.'),
+    );
     assert.ok(isLlmTriggered());
-    assert.ok(getLastHint()?.includes('Task finished'));
-
-    const details = getLastTaskResultDetails();
-    assert.ok(details, 'Expected task-result details');
-    assert.strictEqual(details?.slug, 'analyze-performance', 'task-result label should include slug for auto fresh context');
   });
 });
 
