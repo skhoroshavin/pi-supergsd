@@ -53,7 +53,7 @@ describe('integration: /start-task fresh context', () => {
       user('main work'),
       assistant('working on main...'),
       task('Analyze performance.'),
-      { type: 'custom_message', customType: 'task-result', details: { slug: 'analyze-performance' } },
+      taskResult('analyze-performance'),
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
@@ -96,7 +96,7 @@ describe('integration: /start-task branch context', () => {
       user('main work'),
       assistant('working...'),
       task('Quick fix.', true),
-      { type: 'custom_message', customType: 'task-result', details: { slug: 'quick-fix' } },
+      taskResult('quick-fix'),
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
@@ -141,7 +141,7 @@ describe('integration: /auto fresh context', () => {
       user('main work'),
       assistant('working on main...'),
       task('Analyze performance.'),
-      { type: 'custom_message', customType: 'task-result', details: { slug: 'analyze-performance' } },
+      taskResult('analyze-performance'),
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
@@ -186,7 +186,7 @@ describe('integration: /auto branch context', () => {
       user('main work'),
       assistant('working...'),
       task('Quick fix.', true),
-      { type: 'custom_message', customType: 'task-result', details: { slug: 'quick-fix' } },
+      taskResult('quick-fix'),
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
@@ -330,14 +330,14 @@ describe('createAutoCommand', () => {
   });
 
   it('warns and returns when /auto is already running', async () => {
-    const { getLastHint, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
+    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
       makeHarness();
 
     const firstRun = runAuto();
     await flushMicrotasks();
 
     await runAuto();
-    assert.strictEqual(getLastHint(), 'Auto is already running.');
+    assertBranchHistory(notification('Auto is already running.'));
 
     await emitSessionShutdown();
     await releaseNextIdle();
@@ -404,6 +404,12 @@ const task = (prompt: string, inherit_context = false) => ({
   data: { prompt, inherit_context }
 }) as unknown as Partial<BranchEntry>;
 
+const taskResult = (slug: string) => ({
+  type: 'custom_message' as const,
+  customType: 'task-result',
+  details: { slug }
+}) as unknown as Partial<BranchEntry>;
+
 // ── Test harness ─────────────────────────────────────────────────
 
 function makeHarness() {
@@ -412,7 +418,7 @@ function makeHarness() {
   const sessionShutdownHandlers: Array<() => unknown> = [];
   const triggeredCustomMessages = new Set<string>();
   const triggeredUserMessages = new Set<string>();
-  const hints: Array<{ text: string }> = [];
+
   const trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
   let cancelNextNav = false;
   let pendingMessages = false;
@@ -466,7 +472,6 @@ function makeHarness() {
     sessionManager: sm,
     ui: {
       notify(message: string) {
-        hints.push({ text: message });
         trackedHints.push({ text: message, afterEntryId: sm.getLeafId() });
       },
       setStatus(key: string, value: string | undefined) {
@@ -518,13 +523,6 @@ function makeHarness() {
       provider: 'test',
       ...(stopReason ? { stopReason } : {}),
     } as Parameters<typeof sm.appendMessage>[0]);
-  }
-
-  function getLastHint(): string | undefined {
-    if (hints.length === 0) return undefined;
-    const last = hints[hints.length - 1];
-    hints.length = 0;
-    return last.text;
   }
 
   function assertBranchHistory(...expected: Partial<BranchEntry>[]) {
@@ -661,12 +659,9 @@ function makeHarness() {
     return taskStatus;
   }
 
-
-
   return {
     assertBranchHistory,
     isLlmTriggered,
-    getLastHint,
     getStatus,
     appendUserMessage,
     appendAssistantMessage,
@@ -683,6 +678,7 @@ function makeHarness() {
     runAuto,
   };
 }
+
 
 const notification = (text: string) => ({
   type: 'notification' as const,
