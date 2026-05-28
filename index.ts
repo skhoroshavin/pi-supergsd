@@ -118,8 +118,8 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
 
       return new Text([header, ...displayLines].join('\n'), 0, 0);
     },
-    renderResult(_result, _options, theme) {
-      return new Text(theme.fg('dim', 'Stored. Use /start-task or /auto to execute.'), 0, 0);
+    renderResult() {
+      return new Text('', 0, 0);
     },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) {
@@ -130,10 +130,11 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
 
       if (ctx.hasUI) {
         updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+        ctx.ui.notify('Task stored. Use `/start-task` or `/auto` to start it.', 'info');
       }
 
       return {
-        content: [{ type: 'text', text: 'Task stored. Use `/start-task` or `/auto` to start it.' }],
+        content: [{ type: 'text', text: 'Task stored. Use /start-task or /auto to start it.' }],
         details: { prompt: params.prompt, inherit_context: params.inherit_context ?? false },
         terminate: true,
       };
@@ -522,7 +523,8 @@ interface ReadonlySessionLike {
 function makeSlug(prompt: string): string {
   const words = prompt.split(/\s+/)
     .filter(w => !STOPWORDS.has(w.toLowerCase()))
-    .map(w => w.toLowerCase().replace(/[^\w]+$/, ''));
+    .map(w => w.toLowerCase().replace(/^[^\w]+|[^\w]+$/g, ''))
+    .filter(w => w.length > 0);
   if (words.length === 0) return '<no description>';
 
   let result = words[0]!;

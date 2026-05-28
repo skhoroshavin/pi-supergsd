@@ -494,17 +494,7 @@ function makeHarness() {
 
   async function runPushTask(prompt: string, inherit_context?: boolean) {
     const tool = createPushTaskTool(pi);
-    const result = await tool.execute('call-1', { prompt, inherit_context }, undefined, undefined, ctx);
-    const content = result.content;
-    let text: string;
-    if (typeof content === 'string') {
-      text = content;
-    } else if (Array.isArray(content)) {
-      text = (content[0] as { text: string })?.text ?? '';
-    } else {
-      text = '';
-    }
-    if (text) hints.push({ text });
+    await tool.execute('call-1', { prompt, inherit_context }, undefined, undefined, ctx);
   }
 
   async function runTaskCommand(command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }) {
