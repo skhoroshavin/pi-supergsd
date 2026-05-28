@@ -134,7 +134,7 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
       }
 
       return {
-        content: [{ type: 'text', text: 'Task stored. Use /start-task or /auto to start it.' }],
+        content: [],
         details: { prompt: params.prompt, inherit_context: params.inherit_context ?? false },
         terminate: true,
       };
