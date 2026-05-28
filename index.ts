@@ -18,7 +18,7 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
   pi.registerCommand('start-task', createStartTaskCommand(pi));
   pi.registerCommand('discard-task', createDiscardTaskCommand(pi));
   pi.registerCommand('finish-task', createFinishTaskCommand(pi));
-  pi.registerCommand('abort-task', createAbortTaskCommand(pi));
+  pi.registerCommand('abort-task', createAbortTaskCommand());
   pi.registerCommand('auto', createAutoCommand(pi));
 
   pi.registerMessageRenderer('task-result', (message, _options, theme) => {
@@ -174,12 +174,12 @@ export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
+export function createAbortTaskCommand(): CommandOptions {
   return {
     description: 'Abort the current task without finishing',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
-      await abortTask(pi, ctx);
+      await abortTask(ctx);
     },
   };
 }
@@ -314,7 +314,6 @@ async function finishTask(
 }
 
 async function abortTask(
-  pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
   const taskStart = currentTask(ctx.sessionManager);

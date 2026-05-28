@@ -657,7 +657,7 @@ function makeHarness() {
   const runStartTask = () => runTaskCommand(createStartTaskCommand(pi));
   const runFinishTask = () => runTaskCommand(createFinishTaskCommand(pi));
   const runDiscardTask = () => runTaskCommand(createDiscardTaskCommand(pi));
-  const runAbortTask = () => runTaskCommand(createAbortTaskCommand(pi));
+  const runAbortTask = () => runTaskCommand(createAbortTaskCommand());
 
   // Auto-register commands so the shutdown handler is set up
   registerTaskCommands(pi);
