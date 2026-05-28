@@ -23,7 +23,7 @@ import registerTaskCommands, {
 
 describe('integration: /start-task fresh context', () => {
   it('completes /start-task → work → /finish-task with last-response injection', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, runPushTask, runStartTask, runFinishTask } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, getLastTaskResultDetails, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -50,12 +50,16 @@ describe('integration: /start-task fresh context', () => {
     ]);
     assert.ok(isLlmTriggered());
     assert.ok(getLastHint()?.includes('Task finished'));
+
+    const details = getLastTaskResultDetails();
+    assert.ok(details, 'Expected task-result details');
+    assert.strictEqual(details?.slug, 'analyze-performance', 'task-result label should include slug');
   });
 });
 
 describe('integration: /start-task branch context', () => {
   it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, runPushTask, runStartTask, runFinishTask } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, getLastTaskResultDetails, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -77,6 +81,10 @@ describe('integration: /start-task branch context', () => {
     assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
     assert.ok(isLlmTriggered());
     assert.ok(getLastHint()?.includes('Task finished'));
+
+    const details = getLastTaskResultDetails();
+    assert.ok(details, 'Expected task-result details');
+    assert.strictEqual(details?.slug, 'quick-fix', 'task-result label should include slug for branch-context tasks');
   });
 });
 
@@ -339,6 +347,7 @@ function makeHarness() {
   let cancelNextNav = false;
   let pendingMessages = false;
   let taskStatus: string | undefined;
+  let lastTaskResultDetails: { slug?: string; sourceEntryId?: string } | undefined;
 
   const pi = {
     appendEntry(customType: string, data?: unknown) {
@@ -361,6 +370,9 @@ function makeHarness() {
         message.display ?? true,
         message.details,
       );
+      if (message.customType === 'task-result') {
+        lastTaskResultDetails = message.details as { slug?: string; sourceEntryId?: string } | undefined;
+      }
       if (options?.triggerTurn) {
         const branch = sm.getBranch();
         const last = branch[branch.length - 1];
@@ -519,11 +531,16 @@ function makeHarness() {
     return taskStatus;
   }
 
+  function getLastTaskResultDetails() {
+    return lastTaskResultDetails;
+  }
+
   return {
     getLlmHistory,
     isLlmTriggered,
     getLastHint,
     getStatus,
+    getLastTaskResultDetails,
     appendUserMessage,
     appendAssistantMessage,
     releaseNextIdle,
