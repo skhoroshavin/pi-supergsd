@@ -101,32 +101,44 @@ describe('integration: /start-task fresh context', () => {
 
 describe('integration: /start-task branch context', () => {
   it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, getLastTaskResultDetails, runPushTask, runStartTask, runFinishTask } =
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
     await runPushTask('Quick fix.', true);
     assert.strictEqual(getStatus(), 'pending task: quick-fix');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
 
     await runStartTask();
     assert.strictEqual(getStatus(), 'current task: quick-fix');
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+    // Branch context preserves the full chain before the task
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      { type: 'custom', customType: 'task-start' },
+      user('Quick fix.'),
+    );
     assert.ok(isLlmTriggered());
-    assert.strictEqual(getLastHint(), undefined);
 
     appendAssistantMessage('Fixed the bug.');
 
     await runFinishTask();
     assert.strictEqual(getStatus(), undefined);
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      { type: 'custom_message', customType: 'task-result', details: { slug: 'quick-fix' } },
+      notification('Task finished. Last response attached.'),
+    );
     assert.ok(isLlmTriggered());
-    assert.ok(getLastHint()?.includes('Task finished'));
-
-    const details = getLastTaskResultDetails();
-    assert.ok(details, 'Expected task-result details');
-    assert.strictEqual(details?.slug, 'quick-fix', 'task-result label should include slug for branch-context tasks');
   });
 });
 
