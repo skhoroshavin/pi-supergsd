@@ -51,7 +51,7 @@ describe('integration: /start-task fresh context', () => {
       user('main work'),
       assistant('working on main...'),
       task('Analyze performance.'),
-      taskResult('analyze-performance'),
+      taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
@@ -93,7 +93,7 @@ describe('integration: /start-task branch context', () => {
       user('main work'),
       assistant('working...'),
       task('Quick fix.', true),
-      taskResult('quick-fix'),
+      taskResult('quick-fix', 'Fixed the bug.'),
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
@@ -136,7 +136,7 @@ describe('integration: /auto fresh context', () => {
       user('main work'),
       assistant('working on main...'),
       task('Analyze performance.'),
-      taskResult('analyze-performance'),
+      taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
@@ -180,7 +180,7 @@ describe('integration: /auto branch context', () => {
       user('main work'),
       assistant('working...'),
       task('Quick fix.', true),
-      taskResult('quick-fix'),
+      taskResult('quick-fix', 'Fixed the bug.'),
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
@@ -386,7 +386,7 @@ describe('createAutoCommand', () => {
 
 const user = (content: string) => ({
   type: 'message' as const,
-  message: { role: 'user' as const, content }
+  message: { role: 'user' as const, content: [{ type: 'text', text: content }] }
 }) as unknown as Partial<BranchEntry>;
 
 const task = (prompt: string, inherit_context = false) => ({
@@ -395,10 +395,11 @@ const task = (prompt: string, inherit_context = false) => ({
   data: { prompt, inherit_context }
 }) as unknown as Partial<BranchEntry>;
 
-const taskResult = (slug: string) => ({
+const taskResult = (slug: string, content?: string) => ({
   type: 'custom_message' as const,
   customType: 'task-result',
-  details: { slug }
+  details: { slug },
+  ...(content !== undefined ? { content: [{ type: 'text' as const, text: content }] } : {}),
 }) as unknown as Partial<BranchEntry>;
 
 // ── Test harness ─────────────────────────────────────────────────
@@ -425,7 +426,7 @@ function makeHarness() {
     },
     sendUserMessage(content: string | Array<{ type: string; text: string }>) {
       const text = typeof content === 'string' ? content : content.map((b) => b.text).join('');
-      sm.appendMessage({ role: 'user', content: text, timestamp: Date.now() });
+      sm.appendMessage({ role: 'user', content: [{ type: 'text', text }], timestamp: Date.now() });
       const branch = sm.getBranch();
       const last = branch[branch.length - 1];
       if (last) triggeredUserMessages.add(last.id);
@@ -505,7 +506,7 @@ function makeHarness() {
   }
 
   function appendUserMessage(text: string): void {
-    sm.appendMessage({ role: 'user', content: text, timestamp: 0 });
+    sm.appendMessage({ role: 'user', content: [{ type: 'text', text }], timestamp: 0 });
   }
 
   function appendAssistantMessage(text: string, stopReason?: string): void {
@@ -533,7 +534,7 @@ function makeHarness() {
 
       if (!isSkipped) {
         // Strip IDs, internal fields, display, and content for comparison
-        const { id: _id, parentId: _pid, timestamp: _ts, display: _dp, content: _ct, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
+        const { id: _id, parentId: _pid, timestamp: _ts, display: _dp, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
 
         // Build stripped version excluding fields we always strip
         const stripped: Record<string, unknown> = { ...restEntry };
