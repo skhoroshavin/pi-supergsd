@@ -114,6 +114,7 @@ describe('discardTask', () => {
     assert.strictEqual(getStatus(), undefined);
     assertBranchHistory(
         user('main work'),
+        assistant('working...'),
         task('Quick fix.'),
         notification('Task stored. Use `/start-task` or `/auto` to start it.'),
         notification('Task discarded.'),
@@ -122,7 +123,7 @@ describe('discardTask', () => {
 });
 
 describe('abortTask', () => {
-  it('aborts an in-progress task and returns to the original branch', async () => {
+  it('aborts an in-progress task and returns to the original branch, while keeping task available to be executed again', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runAbortTask } =
         makeHarness();
 
