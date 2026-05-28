@@ -32,68 +32,70 @@ type BranchEntry = import('@earendil-works/pi-coding-agent').SessionEntry | Noti
 const user = (content: string) => ({
   type: 'message' as const,
   message: { role: 'user' as const, content }
-});
+}) as unknown as Partial<BranchEntry>;
 
 const assistant = (content: string) => ({
   type: 'message' as const,
   message: { role: 'assistant' as const, content: [{ type: 'text' as const, text: content }] }
-});
+}) as unknown as Partial<BranchEntry>;
 
 const task = (prompt: string, inherit_context = false) => ({
   type: 'custom' as const,
   customType: 'task',
   data: { prompt, inherit_context }
-});
+}) as unknown as Partial<BranchEntry>;
 
-const taskResult = (slug: string, content = '') => ({
+const taskResult = (slug: string) => ({
   type: 'custom_message' as const,
   customType: 'task-result',
-  content,
-  details: { slug },
-  display: true
-});
+  details: { slug }
+}) as unknown as Partial<BranchEntry>;
 
 const notification = (text: string) => ({
   type: 'notification' as const,
   text,
   afterEntryId: null as string | null
-});
+}) as unknown as Partial<BranchEntry>;
 
 // ── Integration: /start-task ─────────────────────────────────────
 
 describe('integration: /start-task fresh context', () => {
   it('completes /start-task → work → /finish-task with last-response injection', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, getLastTaskResultDetails, runPushTask, runStartTask, runFinishTask } =
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working on main...');
     await runPushTask('Analyze performance.');
     assert.strictEqual(getStatus(), 'pending task: analyze-performance');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+    assertBranchHistory(
+      user('main work'),
+      assistant('working on main...'),
+      task('Analyze performance.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
 
     await runStartTask();
     assert.strictEqual(getStatus(), 'current task: analyze-performance');
-    // Fresh context branches from the first visible entry, so 'main work' is included
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
+    assertBranchHistory(
+      user('main work'),
+      { type: 'custom', customType: 'task-start' },
+      user('Analyze performance.'),
+    );
     assert.ok(isLlmTriggered());
-    assert.strictEqual(getLastHint(), undefined);
 
     appendAssistantMessage('Found 3 bottlenecks: ...');
 
     await runFinishTask();
     assert.strictEqual(getStatus(), undefined);
-    assert.deepStrictEqual(getLlmHistory(), [
-      'main work',
-      'working on main...',
-      'Found 3 bottlenecks: ...',
-    ]);
+    assertBranchHistory(
+      user('main work'),
+      assistant('working on main...'),
+      task('Analyze performance.'),
+      { type: 'custom_message', customType: 'task-result', details: { slug: 'analyze-performance' } },
+      notification('Task finished. Last response attached.'),
+    );
     assert.ok(isLlmTriggered());
-    assert.ok(getLastHint()?.includes('Task finished'));
-
-    const details = getLastTaskResultDetails();
-    assert.ok(details, 'Expected task-result details');
-    assert.strictEqual(details?.slug, 'analyze-performance', 'task-result label should include slug');
   });
 });
 
@@ -514,14 +516,47 @@ function makeHarness() {
     const consumedHints = new Set<number>();
 
     for (const entry of entries) {
-      // Skip internal bookkeeping
-      if (entry.type === 'custom' && entry.customType === 'task-done') continue;
+      const isSkipped = entry.type === 'custom' && entry.customType === 'task-done';
 
-      // Strip IDs for comparison
-      const { id, parentId, timestamp, ...rest } = entry as unknown as Record<string, unknown>;
-      actual.push(rest as Partial<BranchEntry>);
+      if (!isSkipped) {
+        // Strip IDs, internal fields, display, and content for comparison
+        const { id, parentId, timestamp, display, content, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
 
-      // Insert tracked hints with matching afterEntryId
+        // Build stripped version excluding fields we always strip
+        const stripped: Record<string, unknown> = { ...restEntry };
+
+        // Clean nested message fields
+        if (stripped.message && typeof stripped.message === 'object') {
+          const { timestamp: _mt, model: _mp, provider: _pp, ...msgRest } = stripped.message as Record<string, unknown>;
+          stripped.message = msgRest;
+        }
+
+        // Process data: only include non-dynamic keys
+        if (rawData && typeof rawData === 'object') {
+          const cleaned: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(rawData as Record<string, unknown>)) {
+            if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
+              cleaned[k] = v;
+            }
+          }
+          if (Object.keys(cleaned).length > 0) stripped.data = cleaned;
+        }
+
+        // Process details: only include non-dynamic keys
+        if (rawDetails && typeof rawDetails === 'object') {
+          const cleaned: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(rawDetails as Record<string, unknown>)) {
+            if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
+              cleaned[k] = v;
+            }
+          }
+          if (Object.keys(cleaned).length > 0) stripped.details = cleaned;
+        }
+
+        actual.push(stripped as Partial<BranchEntry>);
+      }
+
+      // Insert tracked hints with matching afterEntryId after the entry
       for (let i = 0; i < trackedHints.length; i++) {
         if (trackedHints[i].afterEntryId === entry.id) {
           actual.push(notification(trackedHints[i].text));
@@ -534,8 +569,17 @@ function makeHarness() {
     for (let i = 0; i < trackedHints.length; i++) {
       if (!consumedHints.has(i) && trackedHints[i].afterEntryId === null) {
         actual.unshift(notification(trackedHints[i].text));
+        consumedHints.add(i);
       }
     }
+
+    // Remove consumed hints so they don't leak across calls
+    const remaining: Array<{ text: string; afterEntryId: string | null }> = [];
+    for (let i = 0; i < trackedHints.length; i++) {
+      if (!consumedHints.has(i)) remaining.push(trackedHints[i]);
+    }
+    trackedHints.length = 0;
+    trackedHints.push(...remaining);
 
     assert.deepStrictEqual(actual, expected);
   }
