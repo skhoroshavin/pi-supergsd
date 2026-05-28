@@ -69,14 +69,18 @@ const notification = (text: string) => ({
 
 ### Custom Assertion
 
-`assertBranchHistory(actual, expected)` does structural comparison ignoring session-internal fields (`id`, `parentId`, `timestamp`). For notifications, ignores `afterEntryId` unless explicitly set in expected.
+`assertBranchHistory(expected)` fetches the current branch history and compares. Structural comparison ignoring session-internal fields (`id`, `parentId`, `timestamp`). For notifications, ignores `afterEntryId` unless explicitly set in expected.
 
 ```ts
-function assertBranchHistory(actual: BranchEntry[], expected: Partial<BranchEntry>[]) {
+// Returned from makeHarness(), bound to internal state
+function assertBranchHistory(expected: Partial<BranchEntry>[]) {
+  const actual = getBranchHistory();
   // Compare structure, ignoring id/parentId/timestamp
   // For notification entries, ignore afterEntryId unless specified
 }
 ```
+
+`getBranchHistory()` is internal only — not exported from harness.
 
 ### Notification Tracking (Option C)
 
@@ -130,14 +134,14 @@ function getBranchHistory(): BranchEntry[] {
 ### Example Test Usage
 
 ```ts
-const { appendUserMessage, appendAssistantMessage, getBranchHistory, assertBranchHistory, runPushTask, runStartTask, runFinishTask } = makeHarness();
+const { appendUserMessage, appendAssistantMessage, assertBranchHistory, runPushTask, runStartTask, runFinishTask } = makeHarness();
 
 appendUserMessage('main work');
 appendAssistantMessage('working on main...');
 await runPushTask('Analyze performance.');
 
 // Before branching - see full timeline including pending task
-assertBranchHistory(getBranchHistory(), [
+assertBranchHistory([
   user('main work'),
   assistant('working on main...'),
   task('Analyze performance.'),
@@ -147,7 +151,7 @@ assertBranchHistory(getBranchHistory(), [
 await runStartTask();
 
 // After branching - new branch from task entry
-assertBranchHistory(getBranchHistory(), [
+assertBranchHistory([
   user('main work'),
   task('Analyze performance.'),
 ]);
@@ -162,9 +166,9 @@ assertBranchHistory(getBranchHistory(), [
 
 ### What Goes
 
-- `getLlmHistory()` — replaced by `getBranchHistory()`
-- `getLastTaskResultDetails()` — replaced by `getBranchHistory()`
-- `getLastHint()` — replaced by `getBranchHistory()`
+- `getLlmHistory()` — replaced by `assertBranchHistory()`
+- `getLastTaskResultDetails()` — replaced by `assertBranchHistory()`
+- `getLastHint()` — replaced by `assertBranchHistory()`
 
 ## Migration
 
