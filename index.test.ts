@@ -189,42 +189,54 @@ describe('integration: /auto fresh context', () => {
 
 describe('integration: /auto branch context', () => {
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, getStatus, getLastTaskResultDetails, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
     await runPushTask('Quick fix.', true);
     assert.strictEqual(getStatus(), 'pending task: quick-fix');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+    // Auto started the task (branch context, inherit_context=true)
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      { type: 'custom', customType: 'task-start' },
+      user('Quick fix.'),
+    );
 
     appendAssistantMessage('Fixed the bug.');
 
     await releaseNextIdle();
     await releaseNextIdle();
     await running;
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      { type: 'custom_message', customType: 'task-result', details: { slug: 'quick-fix' } },
+      notification('Task finished. Last response attached.'),
+    );
     assert.ok(isLlmTriggered());
-    assert.ok(getLastHint()?.includes('Task finished'));
-
-    const details = getLastTaskResultDetails();
-    assert.ok(details, 'Expected task-result details');
-    assert.strictEqual(details?.slug, 'quick-fix', 'task-result label should include slug for auto branch context');
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
-    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, assertBranchHistory, isLlmTriggered, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
     await runPushTask('Analyze performance.');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     setCancelNextNav(true);
 
@@ -234,7 +246,12 @@ describe('integration: /auto branch context', () => {
     await releaseNextIdle();
     await running;
     assert.ok(!isLlmTriggered());
-    assert.deepStrictEqual(getLlmHistory(), ['main work']);
+    // Navigation was cancelled, so no task-start was added
+    assertBranchHistory(
+      user('main work'),
+      task('Analyze performance.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
   });
 });
 
