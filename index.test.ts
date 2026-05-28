@@ -337,6 +337,80 @@ describe('manual workflow', () => {
       notification('Task finished. Last response attached.'),
     );
   });
+
+  it('handles multiple stacked tasks — inherited then fresh context', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
+        makeHarness();
+
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+
+    await runPushTask('Task one.', true);
+    assert.strictEqual(getStatus(), 'pending task: task-one');
+
+    await runPushTask('Task two.');
+    assert.strictEqual(getStatus(), 'pending task: task-two');
+
+    // Both tasks stacked — task two (fresh) is LIFO, starts first
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Task one.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      task('Task two.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // Start task two (LIFO, fresh context)
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: task-two');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Task two.'),
+    );
+
+    appendAssistantMessage('Task two done.');
+
+    await runFinishTask();
+    assert.strictEqual(getStatus(), 'pending task: task-one');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Task one.', true),
+      task('Task two.'),
+      taskResult('task-two', 'Task two done.'),
+      notification('Task finished. Last response attached.'),
+    );
+
+    // Start task one (inherited context — preserves prior context including results)
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: task-one');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Task one.', true),
+      task('Task two.'),
+      taskResult('task-two', 'Task two done.'),
+      user('Task one.'),
+    );
+
+    appendAssistantMessage('Task one done.');
+
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Task one.', true),
+      task('Task two.'),
+      taskResult('task-two', 'Task two done.'),
+      taskResult('task-one', 'Task one done.'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
 });
 
 describe('automated workflow', () => {
