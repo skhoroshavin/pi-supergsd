@@ -39,7 +39,6 @@ describe('integration: /start-task fresh context', () => {
     await runStartTask();
     assert.strictEqual(getStatus(), 'current task: analyze-performance');
     assertBranchHistory(
-      user('main work'),
       user('Analyze performance.'),
     );
     assert.ok(isLlmTriggered());
@@ -125,7 +124,6 @@ describe('integration: /auto fresh context', () => {
     await releaseNextIdle();
     // Auto started the task (fresh context)
     assertBranchHistory(
-      user('main work'),
       user('Analyze performance.'),
     );
 
@@ -310,10 +308,8 @@ describe('createAutoCommand', () => {
     await runPushTask('Review spec.');
 
     await releaseNextIdle();
-    // Auto started the task (fresh context, only entry is the task)
+    // Auto started the task (fresh context — task entry on sibling branch not visible)
     assertBranchHistory(
-      task('Review spec.'),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
       user('Review spec.'),
     );
 
@@ -409,6 +405,9 @@ const taskResult = (slug: string) => ({
 
 function makeHarness() {
   const sm = SessionManager.inMemory();
+  // Seed a non-visible root entry so findFreshTargetId can escape past user messages.
+  // Pi always inserts thinking_level_change at session creation (main.js:471).
+  sm.appendThinkingLevelChange('off');
   const idleWaiters: Array<() => void> = [];
   const sessionShutdownHandlers: Array<() => unknown> = [];
   const triggeredCustomMessages = new Set<string>();
@@ -526,7 +525,11 @@ function makeHarness() {
     const consumedHints = new Set<number>();
 
     for (const entry of entries) {
-      const isSkipped = entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start');
+      // Skip entries invisible to both the user and LLM context.
+      const HIDDEN_TYPES = new Set(['thinking_level_change', 'model_change', 'session_info', 'label']);
+      const isSkipped =
+        HIDDEN_TYPES.has(entry.type) ||
+        (entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start'));
 
       if (!isSkipped) {
         // Strip IDs, internal fields, display, and content for comparison
@@ -583,10 +586,13 @@ function makeHarness() {
       }
     }
 
-    // Remove consumed hints so they don't leak across calls
+    // Remove consumed hints so they don't leak across calls.
+    // Also discard orphaned hints (non-null afterEntryId from a different branch).
     const remaining: Array<{ text: string; afterEntryId: string | null }> = [];
     for (let i = 0; i < trackedHints.length; i++) {
-      if (!consumedHints.has(i)) remaining.push(trackedHints[i]);
+      if (!consumedHints.has(i) && trackedHints[i].afterEntryId === null) {
+        remaining.push(trackedHints[i]);
+      }
     }
     trackedHints.length = 0;
     trackedHints.push(...remaining);
