@@ -73,7 +73,7 @@ const notification = (text: string) => ({
 
 ```ts
 // Returned from makeHarness(), bound to internal state
-function assertBranchHistory(expected: Partial<BranchEntry>[]) {
+function assertBranchHistory(...expected: Partial<BranchEntry>[]) {
   const entries = sm.getBranch();
   const actual: BranchEntry[] = [];
   
@@ -149,20 +149,20 @@ appendAssistantMessage('working on main...');
 await runPushTask('Analyze performance.');
 
 // Before branching - see full timeline including pending task
-assertBranchHistory([
+assertBranchHistory(
   user('main work'),
   assistant('working on main...'),
   task('Analyze performance.'),
   notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-]);
+);
 
 await runStartTask();
 
 // After branching - new branch from task entry
-assertBranchHistory([
+assertBranchHistory(
   user('main work'),
   task('Analyze performance.'),
-]);
+);
 ```
 
 ### What Stays
