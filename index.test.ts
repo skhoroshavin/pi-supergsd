@@ -25,37 +25,37 @@ pathSuite('manual workflow', (path) =>
             h.appendUserMessage('main work');
             h.appendAssistantMessage('working...');
         },
-        path('push-task', async (h) => {
-                await h.runPushTask('Some task.');
-                assert.strictEqual(h.getStatus(), 'pending task: task');
+        path('push AAA', async (h) => {
+                await h.runPushTask('Task AAA');
+                assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
                 assert.ok(!h.isLlmTriggered());
                 h.assertBranchHistory(
                     user('main work'),
                     assistant('working...'),
-                    task('Some task.'),
+                    task('Task AAA'),
                     notification('Task stored. Use `/start-task` or `/auto` to start it.'),
                 );
             },
-            path('discard-task', async (h) => {
+            path('discard AAA', async (h) => {
                 await h.runDiscardTask();
                 assert.strictEqual(h.getStatus(), undefined);
                 assert.ok(!h.isLlmTriggered());
                 h.assertBranchHistory(
                     user('main work'),
                     assistant('working...'),
-                    task('Some task.'),
+                    task('Task AAA'),
                     notification('Task discarded.'),
                 );
             }),
-            path('start-task', async (h) => {
+            path('start AAA', async (h) => {
                     await h.runStartTask();
-                    assert.strictEqual(h.getStatus(), 'current task: task');
+                    assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                     assert.ok(h.isLlmTriggered());
                     h.assertBranchHistory(
-                        user('Some task.'),
+                        user('Task AAA'),
                     );
                 },
-                path('finish-task', async (h) => {
+                path('finish AAA', async (h) => {
                     h.appendAssistantMessage('Done.');
                     await h.runFinishTask();
                     assert.strictEqual(h.getStatus(), undefined);
@@ -63,32 +63,32 @@ pathSuite('manual workflow', (path) =>
                     h.assertBranchHistory(
                         user('main work'),
                         assistant('working...'),
-                        task('Some task.'),
-                        taskResult('task', 'Done.'),
+                        task('Task AAA'),
+                        taskResult('task-aaa', 'Done.'),
                         notification('Task finished. Last response attached.'),
                     );
                 }),
-                path('abort-task', async (h) => {
+                path('abort AAA', async (h) => {
                         h.appendAssistantMessage('Partial...');
                         await h.runAbortTask();
-                        assert.strictEqual(h.getStatus(), 'pending task: task');
+                        assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
                         assert.ok(!h.isLlmTriggered());
                         h.assertBranchHistory(
                             user('main work'),
                             assistant('working...'),
-                            task('Some task.'),
+                            task('Task AAA'),
                             notification('Task aborted. Branch abandoned without summary.'),
                         );
                     },
-                    path('start-task', async (h) => {
+                    path('start AAA', async (h) => {
                             await h.runStartTask();
-                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                             assert.ok(h.isLlmTriggered());
                             h.assertBranchHistory(
-                                user('Some task.'),
+                                user('Task AAA'),
                             );
                         },
-                        path('finish-task', async (h) => {
+                        path('finish AAA', async (h) => {
                             h.appendAssistantMessage('Done.');
                             await h.runFinishTask();
                             assert.strictEqual(h.getStatus(), undefined);
@@ -96,8 +96,8 @@ pathSuite('manual workflow', (path) =>
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.'),
-                                taskResult('task', 'Done.'),
+                                task('Task AAA'),
+                                taskResult('task-aaa', 'Done.'),
                                 notification('Task finished. Last response attached.'),
                             );
                         }),
@@ -107,17 +107,17 @@ pathSuite('manual workflow', (path) =>
                         await h.runPushTask('Task BBB');
                         assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
                         h.assertBranchHistory(
-                            user('Some task.'),
+                            user('Task AAA'),
                             task('Task BBB'),
                             notification('Task stored. Use `/start-task` or `/auto` to start it.'),
                         );
                     },
                     path('discard BBB', async (h) => {
                             await h.runDiscardTask();
-                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                             assert.ok(h.isLlmTriggered());
                             h.assertBranchHistory(
-                                user('Some task.'),
+                                user('Task AAA'),
                                 task('Task BBB'),
                                 notification('Task discarded.'),
                             );
@@ -130,8 +130,8 @@ pathSuite('manual workflow', (path) =>
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.'),
-                                taskResult('task', 'Done.'),
+                                task('Task AAA'),
+                                taskResult('task-aaa', 'Done.'),
                                 notification('Task finished. Last response attached.'),
                             );
                         }),
@@ -147,10 +147,10 @@ pathSuite('manual workflow', (path) =>
                         path('finish BBB', async (h) => {
                                 h.appendAssistantMessage('inner done');
                                 await h.runFinishTask();
-                                assert.strictEqual(h.getStatus(), 'current task: task');
+                                assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                                 assert.ok(h.isLlmTriggered());
                                 h.assertBranchHistory(
-                                    user('Some task.'),
+                                    user('Task AAA'),
                                     task('Task BBB'),
                                     taskResult('task-bbb', 'inner done'),
                                     notification('Task finished. Last response attached.'),
@@ -164,8 +164,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.'),
-                                    taskResult('task', 'Done.'),
+                                    task('Task AAA'),
+                                    taskResult('task-aaa', 'Done.'),
                                     notification('Task finished. Last response attached.'),
                                 );
                             }),
@@ -176,7 +176,7 @@ pathSuite('manual workflow', (path) =>
                                 assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
                                 assert.ok(h.isLlmTriggered());
                                 h.assertBranchHistory(
-                                    user('Some task.'),
+                                    user('Task AAA'),
                                     task('Task BBB'),
                                     notification('Task aborted. Branch abandoned without summary.'),
                                 );
@@ -189,8 +189,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.'),
-                                    taskResult('task', 'Done.'),
+                                    task('Task AAA'),
+                                    taskResult('task-aaa', 'Done.'),
                                     notification('Task finished. Last response attached.'),
                                 );
                             }),
@@ -201,17 +201,17 @@ pathSuite('manual workflow', (path) =>
                         await h.runPushTask('Task BBB', true);
                         assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
                         h.assertBranchHistory(
-                            user('Some task.'),
+                            user('Task AAA'),
                             task('Task BBB', true),
                             notification('Task stored. Use `/start-task` or `/auto` to start it.'),
                         );
                     },
                     path('discard BBB [inherit]', async (h) => {
                             await h.runDiscardTask();
-                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                             assert.ok(h.isLlmTriggered());
                             h.assertBranchHistory(
-                                user('Some task.'),
+                                user('Task AAA'),
                                 task('Task BBB', true),
                                 notification('Task discarded.'),
                             );
@@ -224,8 +224,8 @@ pathSuite('manual workflow', (path) =>
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.'),
-                                taskResult('task', 'Done.'),
+                                task('Task AAA'),
+                                taskResult('task-aaa', 'Done.'),
                                 notification('Task finished. Last response attached.'),
                             );
                         }),
@@ -235,7 +235,7 @@ pathSuite('manual workflow', (path) =>
                             assert.strictEqual(h.getStatus(), 'current task: task-bbb');
                             assert.ok(h.isLlmTriggered());
                             h.assertBranchHistory(
-                                user('Some task.'),
+                                user('Task AAA'),
                                 task('Task BBB', true),
                                 user('Task BBB'),
                             );
@@ -243,10 +243,10 @@ pathSuite('manual workflow', (path) =>
                         path('finish BBB [inherit]', async (h) => {
                                 h.appendAssistantMessage('inner done');
                                 await h.runFinishTask();
-                                assert.strictEqual(h.getStatus(), 'current task: task');
+                                assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                                 assert.ok(h.isLlmTriggered());
                                 h.assertBranchHistory(
-                                    user('Some task.'),
+                                    user('Task AAA'),
                                     task('Task BBB', true),
                                     taskResult('task-bbb', 'inner done'),
                                     notification('Task finished. Last response attached.'),
@@ -260,8 +260,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.'),
-                                    taskResult('task', 'Done.'),
+                                    task('Task AAA'),
+                                    taskResult('task-aaa', 'Done.'),
                                     notification('Task finished. Last response attached.'),
                                 );
                             }),
@@ -272,7 +272,7 @@ pathSuite('manual workflow', (path) =>
                                 assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
                                 assert.ok(h.isLlmTriggered());
                                 h.assertBranchHistory(
-                                    user('Some task.'),
+                                    user('Task AAA'),
                                     task('Task BBB', true),
                                     notification('Task aborted. Branch abandoned without summary.'),
                                 );
@@ -285,8 +285,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.'),
-                                    taskResult('task', 'Done.'),
+                                    task('Task AAA'),
+                                    taskResult('task-aaa', 'Done.'),
                                     notification('Task finished. Last response attached.'),
                                 );
                             }),
@@ -295,40 +295,40 @@ pathSuite('manual workflow', (path) =>
                 ),
             ),
         ),
-        path('push-task [inherited]', async (h) => {
-                await h.runPushTask('Some task.', true);
-                assert.strictEqual(h.getStatus(), 'pending task: task');
+        path('push AAA [inherit]', async (h) => {
+                await h.runPushTask('Task AAA', true);
+                assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
                 assert.ok(!h.isLlmTriggered());
                 h.assertBranchHistory(
                     user('main work'),
                     assistant('working...'),
-                    task('Some task.', true),
+                    task('Task AAA', true),
                     notification('Task stored. Use `/start-task` or `/auto` to start it.'),
                 );
             },
-            path('discard-task', async (h) => {
+            path('discard AAA', async (h) => {
                 await h.runDiscardTask();
                 assert.strictEqual(h.getStatus(), undefined);
                 assert.ok(!h.isLlmTriggered());
                 h.assertBranchHistory(
                     user('main work'),
                     assistant('working...'),
-                    task('Some task.', true),
+                    task('Task AAA', true),
                     notification('Task discarded.'),
                 );
             }),
-            path('start-task', async (h) => {
+            path('start AAA', async (h) => {
                     await h.runStartTask();
-                    assert.strictEqual(h.getStatus(), 'current task: task');
+                    assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                     assert.ok(h.isLlmTriggered());
                     h.assertBranchHistory(
                         user('main work'),
                         assistant('working...'),
-                        task('Some task.', true),
-                        user('Some task.'),
+                        task('Task AAA', true),
+                        user('Task AAA'),
                     );
                 },
-                path('finish-task', async (h) => {
+                path('finish AAA', async (h) => {
                     h.appendAssistantMessage('Done.');
                     await h.runFinishTask();
                     assert.strictEqual(h.getStatus(), undefined);
@@ -336,35 +336,35 @@ pathSuite('manual workflow', (path) =>
                     h.assertBranchHistory(
                         user('main work'),
                         assistant('working...'),
-                        task('Some task.', true),
-                        taskResult('task', 'Done.'),
+                        task('Task AAA', true),
+                        taskResult('task-aaa', 'Done.'),
                         notification('Task finished. Last response attached.'),
                     );
                 }),
-                path('abort-task', async (h) => {
+                path('abort AAA', async (h) => {
                         h.appendAssistantMessage('Partial...');
                         await h.runAbortTask();
-                        assert.strictEqual(h.getStatus(), 'pending task: task');
+                        assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
                         assert.ok(!h.isLlmTriggered());
                         h.assertBranchHistory(
                             user('main work'),
                             assistant('working...'),
-                            task('Some task.', true),
+                            task('Task AAA', true),
                             notification('Task aborted. Branch abandoned without summary.'),
                         );
                     },
-                    path('start-task', async (h) => {
+                    path('start AAA', async (h) => {
                             await h.runStartTask();
-                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                             assert.ok(h.isLlmTriggered());
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.', true),
-                                user('Some task.'),
+                                task('Task AAA', true),
+                                user('Task AAA'),
                             );
                         },
-                        path('finish-task', async (h) => {
+                        path('finish AAA', async (h) => {
                             h.appendAssistantMessage('Done.');
                             await h.runFinishTask();
                             assert.strictEqual(h.getStatus(), undefined);
@@ -372,8 +372,8 @@ pathSuite('manual workflow', (path) =>
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.', true),
-                                taskResult('task', 'Done.'),
+                                task('Task AAA', true),
+                                taskResult('task-aaa', 'Done.'),
                                 notification('Task finished. Last response attached.'),
                             );
                         }),
@@ -385,21 +385,21 @@ pathSuite('manual workflow', (path) =>
                         h.assertBranchHistory(
                             user('main work'),
                             assistant('working...'),
-                            task('Some task.', true),
-                            user('Some task.'),
+                            task('Task AAA', true),
+                            user('Task AAA'),
                             task('Task BBB'),
                             notification('Task stored. Use `/start-task` or `/auto` to start it.'),
                         );
                     },
                     path('discard BBB', async (h) => {
                             await h.runDiscardTask();
-                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                             assert.ok(h.isLlmTriggered());
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.', true),
-                                user('Some task.'),
+                                task('Task AAA', true),
+                                user('Task AAA'),
                                 task('Task BBB'),
                                 notification('Task discarded.'),
                             );
@@ -412,8 +412,8 @@ pathSuite('manual workflow', (path) =>
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.', true),
-                                taskResult('task', 'Done.'),
+                                task('Task AAA', true),
+                                taskResult('task-aaa', 'Done.'),
                                 notification('Task finished. Last response attached.'),
                             );
                         }),
@@ -429,13 +429,13 @@ pathSuite('manual workflow', (path) =>
                         path('finish BBB', async (h) => {
                                 h.appendAssistantMessage('inner done');
                                 await h.runFinishTask();
-                                assert.strictEqual(h.getStatus(), 'current task: task');
+                                assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                                 assert.ok(h.isLlmTriggered());
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.', true),
-                                    user('Some task.'),
+                                    task('Task AAA', true),
+                                    user('Task AAA'),
                                     task('Task BBB'),
                                     taskResult('task-bbb', 'inner done'),
                                     notification('Task finished. Last response attached.'),
@@ -449,8 +449,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.', true),
-                                    taskResult('task', 'Done.'),
+                                    task('Task AAA', true),
+                                    taskResult('task-aaa', 'Done.'),
                                     notification('Task finished. Last response attached.'),
                                 );
                             }),
@@ -463,8 +463,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.', true),
-                                    user('Some task.'),
+                                    task('Task AAA', true),
+                                    user('Task AAA'),
                                     task('Task BBB'),
                                     notification('Task aborted. Branch abandoned without summary.'),
                                 );
@@ -477,8 +477,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.', true),
-                                    taskResult('task', 'Done.'),
+                                    task('Task AAA', true),
+                                    taskResult('task-aaa', 'Done.'),
                                     notification('Task finished. Last response attached.'),
                                 );
                             }),
@@ -491,21 +491,21 @@ pathSuite('manual workflow', (path) =>
                         h.assertBranchHistory(
                             user('main work'),
                             assistant('working...'),
-                            task('Some task.', true),
-                            user('Some task.'),
+                            task('Task AAA', true),
+                            user('Task AAA'),
                             task('Task BBB', true),
                             notification('Task stored. Use `/start-task` or `/auto` to start it.'),
                         );
                     },
                     path('discard BBB [inherit]', async (h) => {
                             await h.runDiscardTask();
-                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                             assert.ok(h.isLlmTriggered());
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.', true),
-                                user('Some task.'),
+                                task('Task AAA', true),
+                                user('Task AAA'),
                                 task('Task BBB', true),
                                 notification('Task discarded.'),
                             );
@@ -518,8 +518,8 @@ pathSuite('manual workflow', (path) =>
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.', true),
-                                taskResult('task', 'Done.'),
+                                task('Task AAA', true),
+                                taskResult('task-aaa', 'Done.'),
                                 notification('Task finished. Last response attached.'),
                             );
                         }),
@@ -531,8 +531,8 @@ pathSuite('manual workflow', (path) =>
                             h.assertBranchHistory(
                                 user('main work'),
                                 assistant('working...'),
-                                task('Some task.', true),
-                                user('Some task.'),
+                                task('Task AAA', true),
+                                user('Task AAA'),
                                 task('Task BBB', true),
                                 user('Task BBB'),
                             );
@@ -540,13 +540,13 @@ pathSuite('manual workflow', (path) =>
                         path('finish BBB [inherit]', async (h) => {
                                 h.appendAssistantMessage('inner done');
                                 await h.runFinishTask();
-                                assert.strictEqual(h.getStatus(), 'current task: task');
+                                assert.strictEqual(h.getStatus(), 'current task: task-aaa');
                                 assert.ok(h.isLlmTriggered());
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.', true),
-                                    user('Some task.'),
+                                    task('Task AAA', true),
+                                    user('Task AAA'),
                                     task('Task BBB', true),
                                     taskResult('task-bbb', 'inner done'),
                                     notification('Task finished. Last response attached.'),
@@ -560,8 +560,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.', true),
-                                    taskResult('task', 'Done.'),
+                                    task('Task AAA', true),
+                                    taskResult('task-aaa', 'Done.'),
                                     notification('Task finished. Last response attached.'),
                                 );
                             }),
@@ -574,8 +574,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.', true),
-                                    user('Some task.'),
+                                    task('Task AAA', true),
+                                    user('Task AAA'),
                                     task('Task BBB', true),
                                     notification('Task aborted. Branch abandoned without summary.'),
                                 );
@@ -588,8 +588,8 @@ pathSuite('manual workflow', (path) =>
                                 h.assertBranchHistory(
                                     user('main work'),
                                     assistant('working...'),
-                                    task('Some task.', true),
-                                    taskResult('task', 'Done.'),
+                                    task('Task AAA', true),
+                                    taskResult('task-aaa', 'Done.'),
                                     notification('Task finished. Last response attached.'),
                                 );
                             }),
