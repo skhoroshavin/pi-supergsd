@@ -237,7 +237,7 @@ async function discardTask(
 ): Promise<TaskActionResult> {
   const activeTask = pendingTask(ctx.sessionManager);
   if (!activeTask) {
-    ctx.ui.notify('No pending task.', 'warning');
+    ctx.ui.notify('No pending task to discard.', 'warning');
     return;
   }
 
