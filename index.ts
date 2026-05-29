@@ -255,7 +255,7 @@ async function finishTask(
 ): Promise<TaskActionResult> {
   const taskStart = currentTask(ctx.sessionManager);
   if (!taskStart) {
-    ctx.ui.notify('No task start point.', 'warning');
+    ctx.ui.notify('Not inside task, nothing to finish.', 'warning');
     return;
   }
 
@@ -320,7 +320,7 @@ async function abortTask(
 ): Promise<TaskActionResult> {
   const taskStart = currentTask(ctx.sessionManager);
   if (!taskStart) {
-    ctx.ui.notify('No task start point.', 'warning');
+    ctx.ui.notify('Not inside task, nothing to abort.', 'warning');
     return;
   }
 
