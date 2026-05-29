@@ -20,22 +20,24 @@ import registerTaskCommands, {
 
 const path: PathFn = (name, fn, ...children) => ({ name, fn, children });
 
-pathSuite('manual workflow', (path) =>
-    path('root', async (h) => {
-            h.appendUserMessage('main work');
-            h.appendAssistantMessage('working...');
+function setup(h: ReturnType<typeof makeHarness>): void {
+    h.appendUserMessage('main work');
+    h.appendAssistantMessage('working...');
+}
+
+pathSuite('manual workflow', (path) => {
+    const nonInherited = path('push AAA', async (h) => {
+            setup(h);
+            await h.runPushTask('Task AAA');
+            assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
+            assert.ok(!h.isLlmTriggered());
+            h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Task AAA'),
+                notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+            );
         },
-        path('push AAA', async (h) => {
-                await h.runPushTask('Task AAA');
-                assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
-                assert.ok(!h.isLlmTriggered());
-                h.assertBranchHistory(
-                    user('main work'),
-                    assistant('working...'),
-                    task('Task AAA'),
-                    notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-                );
-            },
             path('discard AAA', async (h) => {
                 await h.runDiscardTask();
                 assert.strictEqual(h.getStatus(), undefined);
@@ -307,9 +309,11 @@ pathSuite('manual workflow', (path) =>
                     ),
                 ),
             ),
-        ),
-        path('push AAA [inherit]', async (h) => {
-                await h.runPushTask('Task AAA', true);
+        );
+
+    const inherited = path('push AAA [inherit]', async (h) => {
+            setup(h);
+            await h.runPushTask('Task AAA', true);
                 assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
                 assert.ok(!h.isLlmTriggered());
                 h.assertBranchHistory(
@@ -318,7 +322,7 @@ pathSuite('manual workflow', (path) =>
                     task('Task AAA', true),
                     notification('Task stored. Use `/start-task` or `/auto` to start it.'),
                 );
-            },
+        },
             path('discard AAA', async (h) => {
                 await h.runDiscardTask();
                 assert.strictEqual(h.getStatus(), undefined);
@@ -623,9 +627,10 @@ pathSuite('manual workflow', (path) =>
                     ),
                 ),
             ),
-        ),
-    ),
-);
+        );
+
+    return [nonInherited, inherited];
+});
 
 describe('automated workflow', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
