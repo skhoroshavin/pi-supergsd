@@ -112,8 +112,10 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
       const displayLines = promptLines.slice(0, maxLines)
         .map(l => theme.fg('dim', l.trimEnd() || ' '));
 
-      if (!context.expanded && promptLines.length > 7) {
-        displayLines.push(theme.fg('muted', '...'), theme.fg('dim', 'Ctrl+O to expand'));
+      if (!context.expanded && promptLines.length > maxLines) {
+        const totalLines = promptLines.length;
+        const moreLines = totalLines - maxLines;
+        displayLines.push(theme.fg('muted', `... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`));
       }
 
       return new Text([header, ...displayLines].join('\n'), 0, 0);
