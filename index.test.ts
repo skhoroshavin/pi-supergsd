@@ -6,7 +6,7 @@ import {
   SessionManager,
   type ExtensionAPI,
   type ExtensionCommandContext,
-  buildSessionContext,
+  type Theme,
 } from '@earendil-works/pi-coding-agent';
 
 import registerTaskCommands, {
@@ -18,127 +18,677 @@ import registerTaskCommands, {
   createAutoCommand,
 } from './index.js';
 
-// ── Integration: /start-task ─────────────────────────────────────
+const path: PathFn = (name, fn, ...children) => ({ name, fn, children });
 
-describe('integration: /start-task fresh context', () => {
-  it('completes /start-task → work → /finish-task with last-response injection', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runFinishTask } =
-      makeHarness();
+pathSuite('manual workflow', (path) =>
+    path('root', async (h) => {
+            h.appendUserMessage('main work');
+            h.appendAssistantMessage('working...');
+        },
+        path('push-task', async (h) => {
+                await h.runPushTask('Some task.');
+                assert.strictEqual(h.getStatus(), 'pending task: task');
+                assert.ok(!h.isLlmTriggered());
+                h.assertBranchHistory(
+                    user('main work'),
+                    assistant('working...'),
+                    task('Some task.'),
+                    notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+                );
+            },
+            path('discard-task', async (h) => {
+                await h.runDiscardTask();
+                assert.strictEqual(h.getStatus(), undefined);
+                assert.ok(!h.isLlmTriggered());
+                h.assertBranchHistory(
+                    user('main work'),
+                    assistant('working...'),
+                    task('Some task.'),
+                    notification('Task discarded.'),
+                );
+            }),
+            path('start-task', async (h) => {
+                    await h.runStartTask();
+                    assert.strictEqual(h.getStatus(), 'current task: task');
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('Some task.'),
+                    );
+                },
+                path('finish-task', async (h) => {
+                    h.appendAssistantMessage('Done.');
+                    await h.runFinishTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Some task.'),
+                        taskResult('task', 'Done.'),
+                        notification('Task finished. Last response attached.'),
+                    );
+                }),
+                path('abort-task', async (h) => {
+                        h.appendAssistantMessage('Partial...');
+                        await h.runAbortTask();
+                        assert.strictEqual(h.getStatus(), 'pending task: task');
+                        assert.ok(!h.isLlmTriggered());
+                        h.assertBranchHistory(
+                            user('main work'),
+                            assistant('working...'),
+                            task('Some task.'),
+                            notification('Task aborted. Branch abandoned without summary.'),
+                        );
+                    },
+                    path('start-task', async (h) => {
+                            await h.runStartTask();
+                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('Some task.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                            h.appendAssistantMessage('Done.');
+                            await h.runFinishTask();
+                            assert.strictEqual(h.getStatus(), undefined);
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.'),
+                                taskResult('task', 'Done.'),
+                                notification('Task finished. Last response attached.'),
+                            );
+                        }),
+                    ),
+                ),
+                path('push-task', async (h) => {
+                        await h.runPushTask('Another task.');
+                        assert.strictEqual(h.getStatus(), 'pending task: another-task');
+                        h.assertBranchHistory(
+                            user('Some task.'),
+                            task('Another task.'),
+                            notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+                        );
+                    },
+                    path('discard-task', async (h) => {
+                            await h.runDiscardTask();
+                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('Some task.'),
+                                task('Another task.'),
+                                notification('Task discarded.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                            h.appendAssistantMessage('Done.');
+                            await h.runFinishTask();
+                            assert.strictEqual(h.getStatus(), undefined);
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.'),
+                                taskResult('task', 'Done.'),
+                                notification('Task finished. Last response attached.'),
+                            );
+                        }),
+                    ),
+                    path('start-task', async (h) => {
+                            await h.runStartTask();
+                            assert.strictEqual(h.getStatus(), 'current task: another-task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('Another task.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                                h.appendAssistantMessage('inner done');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), 'current task: task');
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('Some task.'),
+                                    task('Another task.'),
+                                    taskResult('another-task', 'inner done'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            },
+                            path('finish-task', async (h) => {
+                                h.appendAssistantMessage('Done.');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), undefined);
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.'),
+                                    taskResult('task', 'Done.'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            }),
+                        ),
+                        path('abort-task', async (h) => {
+                                h.appendAssistantMessage('partial inner');
+                                await h.runAbortTask();
+                                assert.strictEqual(h.getStatus(), 'pending task: another-task');
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('Some task.'),
+                                    task('Another task.'),
+                                    notification('Task aborted. Branch abandoned without summary.'),
+                                );
+                            },
+                            path('finish-task', async (h) => {
+                                h.appendAssistantMessage('Done.');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), undefined);
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.'),
+                                    taskResult('task', 'Done.'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            }),
+                        ),
+                    ),
+                ),
+                path('push-task [inherited]', async (h) => {
+                        await h.runPushTask('Another task.', true);
+                        assert.strictEqual(h.getStatus(), 'pending task: another-task');
+                        h.assertBranchHistory(
+                            user('Some task.'),
+                            task('Another task.', true),
+                            notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+                        );
+                    },
+                    path('discard-task', async (h) => {
+                            await h.runDiscardTask();
+                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('Some task.'),
+                                task('Another task.', true),
+                                notification('Task discarded.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                            h.appendAssistantMessage('Done.');
+                            await h.runFinishTask();
+                            assert.strictEqual(h.getStatus(), undefined);
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.'),
+                                taskResult('task', 'Done.'),
+                                notification('Task finished. Last response attached.'),
+                            );
+                        }),
+                    ),
+                    path('start-task', async (h) => {
+                            await h.runStartTask();
+                            assert.strictEqual(h.getStatus(), 'current task: another-task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('Some task.'),
+                                task('Another task.', true),
+                                user('Another task.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                                h.appendAssistantMessage('inner done');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), 'current task: task');
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('Some task.'),
+                                    task('Another task.', true),
+                                    taskResult('another-task', 'inner done'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            },
+                            path('finish-task', async (h) => {
+                                h.appendAssistantMessage('Done.');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), undefined);
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.'),
+                                    taskResult('task', 'Done.'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            }),
+                        ),
+                        path('abort-task', async (h) => {
+                                h.appendAssistantMessage('partial inner');
+                                await h.runAbortTask();
+                                assert.strictEqual(h.getStatus(), 'pending task: another-task');
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('Some task.'),
+                                    task('Another task.', true),
+                                    notification('Task aborted. Branch abandoned without summary.'),
+                                );
+                            },
+                            path('finish-task', async (h) => {
+                                h.appendAssistantMessage('Done.');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), undefined);
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.'),
+                                    taskResult('task', 'Done.'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            }),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        path('push-task [inherited]', async (h) => {
+                await h.runPushTask('Some task.', true);
+                assert.strictEqual(h.getStatus(), 'pending task: task');
+                assert.ok(!h.isLlmTriggered());
+                h.assertBranchHistory(
+                    user('main work'),
+                    assistant('working...'),
+                    task('Some task.', true),
+                    notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+                );
+            },
+            path('discard-task', async (h) => {
+                await h.runDiscardTask();
+                assert.strictEqual(h.getStatus(), undefined);
+                assert.ok(!h.isLlmTriggered());
+                h.assertBranchHistory(
+                    user('main work'),
+                    assistant('working...'),
+                    task('Some task.', true),
+                    notification('Task discarded.'),
+                );
+            }),
+            path('start-task', async (h) => {
+                    await h.runStartTask();
+                    assert.strictEqual(h.getStatus(), 'current task: task');
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Some task.', true),
+                        user('Some task.'),
+                    );
+                },
+                path('finish-task', async (h) => {
+                    h.appendAssistantMessage('Done.');
+                    await h.runFinishTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Some task.', true),
+                        taskResult('task', 'Done.'),
+                        notification('Task finished. Last response attached.'),
+                    );
+                }),
+                path('abort-task', async (h) => {
+                        h.appendAssistantMessage('Partial...');
+                        await h.runAbortTask();
+                        assert.strictEqual(h.getStatus(), 'pending task: task');
+                        assert.ok(!h.isLlmTriggered());
+                        h.assertBranchHistory(
+                            user('main work'),
+                            assistant('working...'),
+                            task('Some task.', true),
+                            notification('Task aborted. Branch abandoned without summary.'),
+                        );
+                    },
+                    path('start-task', async (h) => {
+                            await h.runStartTask();
+                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.', true),
+                                user('Some task.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                            h.appendAssistantMessage('Done.');
+                            await h.runFinishTask();
+                            assert.strictEqual(h.getStatus(), undefined);
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.', true),
+                                taskResult('task', 'Done.'),
+                                notification('Task finished. Last response attached.'),
+                            );
+                        }),
+                    ),
+                ),
+                path('push-task', async (h) => {
+                        await h.runPushTask('Another task.');
+                        assert.strictEqual(h.getStatus(), 'pending task: another-task');
+                        h.assertBranchHistory(
+                            user('main work'),
+                            assistant('working...'),
+                            task('Some task.', true),
+                            user('Some task.'),
+                            task('Another task.'),
+                            notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+                        );
+                    },
+                    path('discard-task', async (h) => {
+                            await h.runDiscardTask();
+                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.', true),
+                                user('Some task.'),
+                                task('Another task.'),
+                                notification('Task discarded.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                            h.appendAssistantMessage('Done.');
+                            await h.runFinishTask();
+                            assert.strictEqual(h.getStatus(), undefined);
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.', true),
+                                taskResult('task', 'Done.'),
+                                notification('Task finished. Last response attached.'),
+                            );
+                        }),
+                    ),
+                    path('start-task', async (h) => {
+                            await h.runStartTask();
+                            assert.strictEqual(h.getStatus(), 'current task: another-task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('Another task.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                                h.appendAssistantMessage('inner done');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), 'current task: task');
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.', true),
+                                    user('Some task.'),
+                                    task('Another task.'),
+                                    taskResult('another-task', 'inner done'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            },
+                            path('finish-task', async (h) => {
+                                h.appendAssistantMessage('Done.');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), undefined);
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.', true),
+                                    taskResult('task', 'Done.'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            }),
+                        ),
+                        path('abort-task', async (h) => {
+                                h.appendAssistantMessage('partial inner');
+                                await h.runAbortTask();
+                                assert.strictEqual(h.getStatus(), 'pending task: another-task');
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.', true),
+                                    user('Some task.'),
+                                    task('Another task.'),
+                                    notification('Task aborted. Branch abandoned without summary.'),
+                                );
+                            },
+                            path('finish-task', async (h) => {
+                                h.appendAssistantMessage('Done.');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), undefined);
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.', true),
+                                    taskResult('task', 'Done.'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            }),
+                        ),
+                    ),
+                ),
+                path('push-task [inherited]', async (h) => {
+                        await h.runPushTask('Another task.', true);
+                        assert.strictEqual(h.getStatus(), 'pending task: another-task');
+                        h.assertBranchHistory(
+                            user('main work'),
+                            assistant('working...'),
+                            task('Some task.', true),
+                            user('Some task.'),
+                            task('Another task.', true),
+                            notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+                        );
+                    },
+                    path('discard-task', async (h) => {
+                            await h.runDiscardTask();
+                            assert.strictEqual(h.getStatus(), 'current task: task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.', true),
+                                user('Some task.'),
+                                task('Another task.', true),
+                                notification('Task discarded.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                            h.appendAssistantMessage('Done.');
+                            await h.runFinishTask();
+                            assert.strictEqual(h.getStatus(), undefined);
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.', true),
+                                taskResult('task', 'Done.'),
+                                notification('Task finished. Last response attached.'),
+                            );
+                        }),
+                    ),
+                    path('start-task', async (h) => {
+                            await h.runStartTask();
+                            assert.strictEqual(h.getStatus(), 'current task: another-task');
+                            assert.ok(h.isLlmTriggered());
+                            h.assertBranchHistory(
+                                user('main work'),
+                                assistant('working...'),
+                                task('Some task.', true),
+                                user('Some task.'),
+                                task('Another task.', true),
+                                user('Another task.'),
+                            );
+                        },
+                        path('finish-task', async (h) => {
+                                h.appendAssistantMessage('inner done');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), 'current task: task');
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.', true),
+                                    user('Some task.'),
+                                    task('Another task.', true),
+                                    taskResult('another-task', 'inner done'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            },
+                            path('finish-task', async (h) => {
+                                h.appendAssistantMessage('Done.');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), undefined);
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.', true),
+                                    taskResult('task', 'Done.'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            }),
+                        ),
+                        path('abort-task', async (h) => {
+                                h.appendAssistantMessage('partial inner');
+                                await h.runAbortTask();
+                                assert.strictEqual(h.getStatus(), 'pending task: another-task');
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.', true),
+                                    user('Some task.'),
+                                    task('Another task.', true),
+                                    notification('Task aborted. Branch abandoned without summary.'),
+                                );
+                            },
+                            path('finish-task', async (h) => {
+                                h.appendAssistantMessage('Done.');
+                                await h.runFinishTask();
+                                assert.strictEqual(h.getStatus(), undefined);
+                                assert.ok(h.isLlmTriggered());
+                                h.assertBranchHistory(
+                                    user('main work'),
+                                    assistant('working...'),
+                                    task('Some task.', true),
+                                    taskResult('task', 'Done.'),
+                                    notification('Task finished. Last response attached.'),
+                                );
+                            }),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+);
 
-    appendUserMessage('main work');
-    appendAssistantMessage('working on main...');
-    await runPushTask('Analyze performance.');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
-
-    await runStartTask();
-    // Fresh context branches from the first visible entry, so 'main work' is included
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
-    assert.ok(isLlmTriggered());
-    assert.strictEqual(getLastHint(), undefined);
-
-    appendAssistantMessage('Found 3 bottlenecks: ...');
-
-    await runFinishTask();
-    assert.deepStrictEqual(getLlmHistory(), [
-      'main work',
-      'working on main...',
-      'Found 3 bottlenecks: ...',
-    ]);
-    assert.ok(isLlmTriggered());
-    assert.ok(getLastHint()?.includes('Task finished'));
-  });
-});
-
-describe('integration: /start-task branch context', () => {
-  it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runFinishTask } =
-      makeHarness();
-
-    appendUserMessage('main work');
-    appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', 'branch');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
-
-    await runStartTask();
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
-    assert.ok(isLlmTriggered());
-    assert.strictEqual(getLastHint(), undefined);
-
-    appendAssistantMessage('Fixed the bug.');
-
-    await runFinishTask();
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
-    assert.ok(isLlmTriggered());
-    assert.ok(getLastHint()?.includes('Task finished'));
-  });
-});
-
-// ── Integration: /auto ───────────────────────────────────────────
-
-describe('integration: /auto fresh context', () => {
+describe('automated workflow', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working on main...');
     await runPushTask('Analyze performance.');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+    assert.strictEqual(getStatus(), 'pending task: analyze-performance');
+    assertBranchHistory(
+      user('main work'),
+      assistant('working on main...'),
+      task('Analyze performance.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
+    // Auto started the task (fresh context)
+    assertBranchHistory(
+      user('Analyze performance.'),
+    );
 
     appendAssistantMessage('Found 3 bottlenecks: ...');
 
     await releaseNextIdle();
     await releaseNextIdle();
     await running;
-    assert.deepStrictEqual(getLlmHistory(), [
-      'main work',
-      'working on main...',
-      'Found 3 bottlenecks: ...',
-    ]);
+    assertBranchHistory(
+      user('main work'),
+      assistant('working on main...'),
+      task('Analyze performance.'),
+      taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
+      notification('Task finished. Last response attached.'),
+    );
     assert.ok(isLlmTriggered());
-    assert.ok(getLastHint()?.includes('Task finished'));
   });
-});
 
-describe('integration: /auto branch context', () => {
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', 'branch');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+    await runPushTask('Quick fix.', true);
+    assert.strictEqual(getStatus(), 'pending task: quick-fix');
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+    // Auto started the task (branch context, inherit_context=true)
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      user('Quick fix.'),
+    );
 
     appendAssistantMessage('Fixed the bug.');
 
     await releaseNextIdle();
     await releaseNextIdle();
     await running;
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      taskResult('quick-fix', 'Fixed the bug.'),
+      notification('Task finished. Last response attached.'),
+    );
     assert.ok(isLlmTriggered());
-    assert.ok(getLastHint()?.includes('Task finished'));
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
-    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, assertBranchHistory, isLlmTriggered, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     appendUserMessage('main work');
     await runPushTask('Analyze performance.');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     setCancelNextNav(true);
 
@@ -148,85 +698,16 @@ describe('integration: /auto branch context', () => {
     await releaseNextIdle();
     await running;
     assert.ok(!isLlmTriggered());
-    assert.deepStrictEqual(getLlmHistory(), ['main work']);
+    // Navigation was cancelled, so no task-start was added
+    assertBranchHistory(
+      user('main work'),
+      task('Analyze performance.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
   });
-});
 
-// ── Registration ─────────────────────────────────────────────────
-
-describe('registration', () => {
-  it('registers the push-task tool and all five task commands', () => {
-    const registered: Array<{ type: string; name: string; description?: string }> = [];
-    const pi = {
-      registerTool: (tool: { name: string; label: string; description: string }) =>
-        registered.push({ type: 'tool', name: tool.name, description: tool.description }),
-      registerCommand: (name: string, opts: { description: string }) =>
-        registered.push({ type: 'command', name, description: opts.description }),
-      on: () => {},
-    } as unknown as ExtensionAPI;
-
-    registerTaskCommands(pi);
-
-    assert.deepStrictEqual(registered, [
-      { type: 'tool', name: 'push-task', description: 'Store a task prompt for a user-started navigation branch.' },
-      { type: 'command', name: 'start-task', description: 'Navigate to a fresh context and inject the active task prompt' },
-      { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
-      { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
-      { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
-      { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
-    ]);
-  });
-});
-
-// ── discardTask ──────────────────────────────────────────────────
-
-describe('discardTask', () => {
-  it('discards a pending task without triggering the LLM', async () => {
-    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runDiscardTask } =
-      makeHarness();
-
-    appendUserMessage('main work');
-    await runPushTask('Quick fix.');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
-
-    await runDiscardTask();
-    assert.strictEqual(getLastHint(), 'Task discarded.');
-    assert.ok(!isLlmTriggered());
-    assert.deepStrictEqual(getLlmHistory(), ['main work']);
-  });
-});
-
-// ── abortTask ───────────────────────────────────────────────────
-
-describe('abortTask', () => {
-  it('aborts an in-progress task and returns to the original branch', async () => {
-    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runAbortTask } =
-      makeHarness();
-
-    appendUserMessage('main work');
-    appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', 'branch');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
-
-    await runStartTask();
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
-    assert.ok(isLlmTriggered());
-    assert.strictEqual(getLastHint(), undefined);
-
-    appendAssistantMessage('Partial work...');
-
-    await runAbortTask();
-    assert.strictEqual(getLastHint(), 'Task aborted. Branch abandoned without summary.');
-    assert.ok(!isLlmTriggered());
-    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...']);
-  });
-});
-
-// ── createAutoCommand ────────────────────────────────────────────
-
-describe('createAutoCommand', () => {
   it('waits when started with no task, then starts work after a later push-task', async () => {
-    const { appendAssistantMessage, getLlmHistory, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendAssistantMessage, assertBranchHistory, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     const running = runAuto();
@@ -235,10 +716,12 @@ describe('createAutoCommand', () => {
     await releaseNextIdle();
 
     await runPushTask('Review spec.');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     await releaseNextIdle();
-    assert.deepStrictEqual(getLlmHistory(), ['Review spec.']);
+    // Auto started the task (fresh context — task entry on sibling branch not visible)
+    assertBranchHistory(
+      user('Review spec.'),
+    );
 
     appendAssistantMessage('Done.');
 
@@ -248,14 +731,14 @@ describe('createAutoCommand', () => {
   });
 
   it('warns and returns when /auto is already running', async () => {
-    const { getLastHint, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
+    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
       makeHarness();
 
     const firstRun = runAuto();
     await flushMicrotasks();
 
     await runAuto();
-    assert.strictEqual(getLastHint(), 'Auto is already running.');
+    assertBranchHistory(notification('Auto is already running.'));
 
     await emitSessionShutdown();
     await releaseNextIdle();
@@ -263,15 +746,13 @@ describe('createAutoCommand', () => {
   });
 
   it('stops when the last assistant message was aborted', async () => {
-    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
       makeHarness();
 
     appendUserMessage('start');
-    await runPushTask('Implement phase 1.', 'branch');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+    await runPushTask('Implement phase 1.', true);
 
     await runStartTask();
-    assert.strictEqual(getLastHint(), undefined);
 
     appendAssistantMessage('Stopped by user.', 'aborted');
 
@@ -284,15 +765,13 @@ describe('createAutoCommand', () => {
   });
 
   it('keeps waiting while follow-up work is pending after finishTask', async () => {
-    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, getLastHint, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
       makeHarness();
 
     appendUserMessage('start');
-    await runPushTask('Quick fix.', 'branch');
-    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+    await runPushTask('Quick fix.', true);
 
     await runStartTask();
-    assert.strictEqual(getLastHint(), undefined);
 
     appendAssistantMessage('Fixed the bug.');
 
@@ -315,17 +794,73 @@ describe('createAutoCommand', () => {
   });
 });
 
+// ── Registration ─────────────────────────────────────────────────
+
+describe('registration', () => {
+  it('registers the push-task tool and all five task commands', () => {
+    const registered: Array<{ type: string; name: string; description?: string }> = [];
+    const pi = {
+      registerTool: (tool: { name: string; label: string; description: string }) =>
+        registered.push({ type: 'tool', name: tool.name, description: tool.description }),
+      registerCommand: (name: string, opts: { description: string }) =>
+        registered.push({ type: 'command', name, description: opts.description }),
+      registerMessageRenderer: () => {},
+      on: () => {},
+    } as unknown as ExtensionAPI;
+
+    registerTaskCommands(pi);
+
+    assert.deepStrictEqual(registered, [
+      { type: 'tool', name: 'push-task', description: 'Store a task prompt for a user-started navigation branch.' },
+      { type: 'command', name: 'start-task', description: 'Navigate to a fresh context and inject the active task prompt' },
+      { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
+      { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
+      { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
+      { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
+    ]);
+  });
+});
+
+const assistant = (content: string) => ({
+  type: 'message' as const,
+  message: { role: 'assistant' as const, content: [{ type: 'text' as const, text: content }] }
+}) as unknown as Partial<BranchEntry>;
+
+const user = (content: string) => ({
+  type: 'message' as const,
+  message: { role: 'user' as const, content: [{ type: 'text', text: content }] }
+}) as unknown as Partial<BranchEntry>;
+
+const task = (prompt: string, inherit_context = false) => ({
+  type: 'custom' as const,
+  customType: 'task',
+  data: { prompt, inherit_context }
+}) as unknown as Partial<BranchEntry>;
+
+const taskResult = (slug: string, content?: string) => ({
+  type: 'custom_message' as const,
+  customType: 'task-result',
+  details: { slug },
+  ...(content !== undefined ? { content: [{ type: 'text' as const, text: content }] } : {}),
+}) as unknown as Partial<BranchEntry>;
+
 // ── Test harness ─────────────────────────────────────────────────
 
 function makeHarness() {
   const sm = SessionManager.inMemory();
+  // Seed a non-visible root entry so findFreshTargetId can escape past user messages.
+  // Pi always inserts thinking_level_change at session creation (main.js:471).
+  sm.appendThinkingLevelChange('off');
   const idleWaiters: Array<() => void> = [];
   const sessionShutdownHandlers: Array<() => unknown> = [];
   const triggeredCustomMessages = new Set<string>();
   const triggeredUserMessages = new Set<string>();
-  const hints: Array<{ text: string }> = [];
+
+  const trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
   let cancelNextNav = false;
   let pendingMessages = false;
+  let taskStatus: string | undefined;
+
 
   const pi = {
     appendEntry(customType: string, data?: unknown) {
@@ -333,7 +868,7 @@ function makeHarness() {
     },
     sendUserMessage(content: string | Array<{ type: string; text: string }>) {
       const text = typeof content === 'string' ? content : content.map((b) => b.text).join('');
-      sm.appendMessage({ role: 'user', content: text, timestamp: Date.now() });
+      sm.appendMessage({ role: 'user', content: [{ type: 'text', text }], timestamp: Date.now() });
       const branch = sm.getBranch();
       const last = branch[branch.length - 1];
       if (last) triggeredUserMessages.add(last.id);
@@ -348,6 +883,7 @@ function makeHarness() {
         message.display ?? true,
         message.details,
       );
+
       if (options?.triggerTurn) {
         const branch = sm.getBranch();
         const last = branch[branch.length - 1];
@@ -357,11 +893,13 @@ function makeHarness() {
     on(eventName: string, handler: () => unknown) {
       if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
     },
+    registerMessageRenderer() {},
     registerTool() {},
     registerCommand() {},
   } as unknown as ExtensionAPI;
 
   const ctx = {
+    hasUI: true,
     waitForIdle: async () => {
       await new Promise<void>((resolve) => {
         idleWaiters.push(resolve);
@@ -371,8 +909,16 @@ function makeHarness() {
     sessionManager: sm,
     ui: {
       notify(message: string) {
-        hints.push({ text: message });
+        trackedHints.push({ text: message, afterEntryId: sm.getLeafId() });
       },
+      setStatus(key: string, value: string | undefined) {
+        if (key === 'task') taskStatus = value;
+      },
+      theme: {
+        fg: (_key: string, text: string) => text,
+        bg: (_key: string, text: string) => text,
+        bold: (text: string) => text,
+      } as unknown as Theme,
     },
     navigateTree: async (targetId: string) => {
       if (cancelNextNav) {
@@ -402,7 +948,7 @@ function makeHarness() {
   }
 
   function appendUserMessage(text: string): void {
-    sm.appendMessage({ role: 'user', content: text, timestamp: 0 });
+    sm.appendMessage({ role: 'user', content: [{ type: 'text', text }], timestamp: 0 });
   }
 
   function appendAssistantMessage(text: string, stopReason?: string): void {
@@ -416,27 +962,88 @@ function makeHarness() {
     } as Parameters<typeof sm.appendMessage>[0]);
   }
 
-  function getLastHint(): string | undefined {
-    if (hints.length === 0) return undefined;
-    const last = hints[hints.length - 1];
-    hints.length = 0;
-    return last.text;
+  function assertBranchHistory(...expected: Partial<BranchEntry>[]) {
+    const entries = sm.getBranch();
+    const actual: Partial<BranchEntry>[] = [];
+    const consumedHints = new Set<number>();
+
+    for (const entry of entries) {
+      // Skip entries invisible to both the user and LLM context.
+      const HIDDEN_TYPES = new Set(['thinking_level_change', 'model_change', 'session_info', 'label']);
+      const isSkipped =
+        HIDDEN_TYPES.has(entry.type) ||
+        (entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start'));
+
+      if (!isSkipped) {
+        // Strip IDs, internal fields, display, and content for comparison
+        const { id: _id, parentId: _pid, timestamp: _ts, display: _dp, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
+
+        // Build stripped version excluding fields we always strip
+        const stripped: Record<string, unknown> = { ...restEntry };
+
+        // Clean nested message fields
+        if (stripped.message && typeof stripped.message === 'object') {
+          const { timestamp: _mt, model: _mp, provider: _pp, stopReason: _sr, ...msgRest } = stripped.message as Record<string, unknown>;
+          stripped.message = msgRest;
+        }
+
+        // Process data: only include non-dynamic keys
+        if (rawData && typeof rawData === 'object') {
+          const cleaned: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(rawData as Record<string, unknown>)) {
+            if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
+              cleaned[k] = v;
+            }
+          }
+          if (Object.keys(cleaned).length > 0) stripped.data = cleaned;
+        }
+
+        // Process details: only include non-dynamic keys
+        if (rawDetails && typeof rawDetails === 'object') {
+          const cleaned: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(rawDetails as Record<string, unknown>)) {
+            if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
+              cleaned[k] = v;
+            }
+          }
+          if (Object.keys(cleaned).length > 0) stripped.details = cleaned;
+        }
+
+        actual.push(stripped as Partial<BranchEntry>);
+      }
+
+      // Insert tracked hints with matching afterEntryId after the entry
+      for (let i = 0; i < trackedHints.length; i++) {
+        if (trackedHints[i].afterEntryId === entry.id) {
+          actual.push(notification(trackedHints[i].text));
+          consumedHints.add(i);
+        }
+      }
+    }
+
+    // Unclassified hints (afterEntryId === null) go at start
+    for (let i = 0; i < trackedHints.length; i++) {
+      if (!consumedHints.has(i) && trackedHints[i].afterEntryId === null) {
+        actual.unshift(notification(trackedHints[i].text));
+        consumedHints.add(i);
+      }
+    }
+
+    // Remove consumed hints so they don't leak across calls.
+    // Also discard orphaned hints (non-null afterEntryId from a different branch).
+    const remaining: Array<{ text: string; afterEntryId: string | null }> = [];
+    for (let i = 0; i < trackedHints.length; i++) {
+      if (!consumedHints.has(i) && trackedHints[i].afterEntryId === null) {
+        remaining.push(trackedHints[i]);
+      }
+    }
+    trackedHints.length = 0;
+    trackedHints.push(...remaining);
+
+    assert.deepStrictEqual(actual, expected);
   }
 
-  function getLlmHistory(): string[] {
-    const ctx = buildSessionContext(sm.getEntries(), sm.getLeafId());
-    return ctx.messages.map(m => {
-      const msg = m as { content?: string | Array<{ type: string; text?: string }> };
-      if (typeof msg.content === 'string') return msg.content;
-      if (!Array.isArray(msg.content)) return '';
-      return msg.content
-        .filter((b): b is { type: 'text'; text: string } =>
-          typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
-        )
-        .map(b => b.text ?? '')
-        .join('');
-    });
-  }
+
 
   async function releaseNextIdle() {
     const next = idleWaiters.shift();
@@ -469,19 +1076,9 @@ function makeHarness() {
 
   // ── Convenience wrappers (pre-bound to pi / ctx) ───────────────
 
-  async function runPushTask(prompt: string, context?: 'fresh' | 'branch') {
+  async function runPushTask(prompt: string, inherit_context?: boolean) {
     const tool = createPushTaskTool(pi);
-    const result = await tool.execute('call-1', { prompt, context }, undefined, undefined, ctx);
-    const content = result.content;
-    let text: string;
-    if (typeof content === 'string') {
-      text = content;
-    } else if (Array.isArray(content)) {
-      text = (content[0] as { text: string })?.text ?? '';
-    } else {
-      text = '';
-    }
-    if (text) hints.push({ text });
+    await tool.execute('call-1', { prompt, inherit_context }, undefined, undefined, ctx);
   }
 
   async function runTaskCommand(command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }) {
@@ -493,7 +1090,7 @@ function makeHarness() {
   const runStartTask = () => runTaskCommand(createStartTaskCommand(pi));
   const runFinishTask = () => runTaskCommand(createFinishTaskCommand(pi));
   const runDiscardTask = () => runTaskCommand(createDiscardTaskCommand(pi));
-  const runAbortTask = () => runTaskCommand(createAbortTaskCommand(pi));
+  const runAbortTask = () => runTaskCommand(createAbortTaskCommand());
 
   // Auto-register commands so the shutdown handler is set up
   registerTaskCommands(pi);
@@ -502,10 +1099,14 @@ function makeHarness() {
     return createAutoCommand(pi).handler('', ctx) as Promise<void>;
   }
 
+  function getStatus(): string | undefined {
+    return taskStatus;
+  }
+
   return {
-    getLlmHistory,
+    assertBranchHistory,
     isLlmTriggered,
-    getLastHint,
+    getStatus,
     appendUserMessage,
     appendAssistantMessage,
     releaseNextIdle,
@@ -522,3 +1123,65 @@ function makeHarness() {
   };
 }
 
+
+const notification = (text: string) => ({
+  type: 'notification' as const,
+  text,
+  afterEntryId: null as string | null
+}) as unknown as Partial<BranchEntry>;
+
+type BranchEntry = import('@earendil-works/pi-coding-agent').SessionEntry | NotificationEntry;
+
+// ── Branch history helpers ──────────────────────────────────────
+
+type NotificationEntry = {
+  type: 'notification';
+  text: string;
+  afterEntryId: string | null;
+};
+
+// ── pathSuite test helper ───────────────────────────────────────
+
+interface PathNode {
+    name: string;
+    fn?: (h: ReturnType<typeof makeHarness>) => Promise<void> | void;
+    children: PathNode[];
+}
+
+type PathFn = (
+    name: string,
+    fn?: (h: ReturnType<typeof makeHarness>) => Promise<void> | void,
+    ...children: PathNode[]
+) => PathNode;
+
+function pathSuite(
+    description: string,
+    fn: (path: PathFn) => PathNode | PathNode[],
+): void {
+    describe(description, () => {
+        const roots = fn(path);
+        const rootsArray = Array.isArray(roots) ? roots : [roots];
+
+        function registerTests(node: PathNode, ancestors: PathNode[]): void {
+            const chain = [...ancestors, node];
+            const name = chain.map(n => n.name).join(' → ');
+
+            it(name, async () => {
+                const h = makeHarness();
+                for (const ancestor of chain) {
+                    if (ancestor.fn) {
+                        await ancestor.fn(h);
+                    }
+                }
+            });
+
+            for (const child of node.children) {
+                registerTests(child, chain);
+            }
+        }
+
+        for (const root of rootsArray) {
+            registerTests(root, []);
+        }
+    });
+}

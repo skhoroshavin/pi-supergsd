@@ -12,11 +12,11 @@ If Pi is already running, restart it or run `/reload`.
 
 ## Philosophy
 
-Pi's author, Mario Zechner, deliberately avoids subagents — zero observability, poor context transfer, painful debugging. As he puts it: "a black box within a black box." Instead, Pi has a session tree, where you can precisely control what the model sees. That said, Mario still sees value in automating new sessions for some use cases, like code review.
+Pi coding agent doesn't include a built-in sub-agent tool. Its author [Mario Zechner](https://mariozechner.at/posts/2025-11-30-pi-coding-agent/) explains why: they're "a black box within a black box" — you can't see what they do, context doesn't transfer well, and debugging is painful. Pi's session tree gives you that control instead.
 
-This extension implements a minimal task system that tries to respect these design decisions. It introduces one tool (`push-task`) and a few commands. There are no background processes or parallel agents. A task runs as a normal branch in the session tree, so all standard Pi tools for steering it work as expected. You can start a fresh-context review, then bring results back only after double-checking them. Or you can queue a set of prepared tasks and run them hands-free with `/auto` - still fully inspectable, with the ability to stop and reprompt mid-task if needed.
+This extension adds a minimal task system that keeps those principles: minimal, in your control, nothing hidden. It introduces one tool (`push-task`) and a few commands. No background processes, no parallel agents. A task runs as a branch in the session tree, so standard Pi tools work as expected. Start a fresh-context review, check the results, bring them back. Or queue tasks and run them hands-free with `/auto`, while still seeing everything that's happening and able to stop, reprompt, and continue at any point.
 
-This extension also bundles a subset of [Superpowers](https://github.com/obra/superpowers) skills, patched for Pi conventions (`/skill:` instead of `superpowers:`, `Pi` instead of `Claude Code`, etc) and routed through the task system rather than dispatching subagents.
+This extension also bundles a subset of [Superpowers](https://github.com/obra/superpowers) skills, adapted for Pi and routed through the task system rather than dispatching subagents.
 
 ## Tools and commands reference
 
@@ -30,20 +30,20 @@ This extension also bundles a subset of [Superpowers](https://github.com/obra/su
 
 ### `push-task` tool
 
-Queues a task with `context` `"fresh"` (clean session) or `"branch"` (current branch). Defaults to `"fresh"`. The task sits pending — nothing runs until you start it.
+Queues a task with `inherit_context` defaulting to `false` (fresh session). Set `inherit_context: true` to continue on the current branch. The task sits pending — nothing runs until you start it.
 
 ## Use cases
 
-### Review with in-branch fixes
+### Review with fresh context
 
-The LLM queues a review after implementation. You start it manually, fix issues right in the branch, then merge findings back.
+The LLM queues a review after implementation. You start it manually, correct review right in the branch, and then merge findings back.
 
 ```
 LLM:     Implementation done. Let me queue a fresh review.
 
 LLM:     [calls push-task({ prompt: "Review the implementation
          against the plan. Check correctness, edge cases,
-         and test coverage.", context: "fresh" })]
+         and test coverage."})]
 
 LLM:     Task stored. Run /start-task to review.
 

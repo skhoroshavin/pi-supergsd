@@ -8,6 +8,11 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   unslop.configs.full,
   {
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", { "varsIgnorePattern": "^_" }],
+    },
+  },
+  {
     settings: {
       unslop: {
         architecture: {},
