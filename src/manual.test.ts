@@ -1,7 +1,5 @@
 import assert from 'node:assert';
 
-import { describe } from 'node:test';
-
 import {
   assistant,
   notification,
@@ -11,8 +9,7 @@ import {
   user,
 } from './test-helpers/index.js';
 
-describe('manual workflow', () => {
-  pathSuite((path) => {
+pathSuite('manual workflow', (path) => {
     return [
         path('push AAA', async (h) => {
             h.appendUserMessage('main work');
@@ -764,5 +761,4 @@ describe('manual workflow', () => {
         );
     }),
     ];
-  });
 });
