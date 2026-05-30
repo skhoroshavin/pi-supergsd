@@ -880,28 +880,19 @@ describe('automated workflow', () => {
     );
   });
 
-  it('waits when started with no task, then starts work after a later push-task', async () => {
-    const { appendAssistantMessage, assertBranchHistory, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+  it('notifies and exits when started with no pending tasks', async () => {
+    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, runAuto } =
       makeHarness();
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
-
-    await runPushTask('Review spec.');
-
-    await releaseNextIdle();
-    // Auto started the task (fresh context — task entry on sibling branch not visible)
-    assertBranchHistory(
-      user('Review spec.'),
-    );
-
-    appendAssistantMessage('Done.');
-
-    await releaseNextIdle();
-    await releaseNextIdle();
     await running;
+    // Should have exited without looping forever
+    assertBranchHistory(
+      notification('No pending tasks to run.'),
+    );
   });
 
   it('warns and returns when /auto is already running', async () => {

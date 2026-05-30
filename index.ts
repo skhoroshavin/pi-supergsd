@@ -81,7 +81,14 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
             continue;
           }
 
-          if (sawTaskActivity && !ctx.hasPendingMessages()) {
+          // No pending tasks and no current task
+          if (!sawTaskActivity) {
+            // Never had any task activity — nothing to process
+            ctx.ui.notify('No pending tasks to run.', 'info');
+            break;
+          }
+
+          if (!ctx.hasPendingMessages()) {
             break;
           }
         }
