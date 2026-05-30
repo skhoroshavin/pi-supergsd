@@ -27,7 +27,7 @@
   "license": "MIT",
   "files": [
     "index.ts",
-    "src",
+    "src/index.ts",
     "skills",
     "README.md",
     "LICENSE"
@@ -41,11 +41,11 @@
     ]
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.75.5",
-    "typebox": "^1.1.38"
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-tui": "^0.75.5",
     "@types/node": "^25.9.1",
     "eslint": "^10.4.0",
     "eslint-plugin-unslop": "^0.7.3",

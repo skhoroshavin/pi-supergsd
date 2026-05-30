@@ -12,7 +12,7 @@ import {
 
 import { Box, Text } from '@earendil-works/pi-tui';
 
-import { Type } from 'typebox';
+import { Type, type Static } from 'typebox';
 
 export function toolPushTask(pi: ExtensionAPI): ToolDefinition {
   return defineTool({
@@ -25,11 +25,11 @@ export function toolPushTask(pi: ExtensionAPI): ToolDefinition {
       'Do not batch multiple push-task calls together, and do not mix push-task with other tool calls in the same turn.',
     ],
     parameters: pushTaskParameters,
-    renderCall(args, theme, context) {
+    renderCall(args: PushTaskParams, theme, context) {
       const header = theme.fg('toolTitle', theme.bold('push-task'))
         + (args.inherit_context ? ' ' + theme.fg('warning', '[inherit]') : '');
 
-      const promptLines = (args.prompt as string).split('\n');
+      const promptLines = args.prompt.split('\n');
       const maxLines = context.expanded ? promptLines.length : 7;
       const displayLines = promptLines.slice(0, maxLines)
         .map(l => theme.fg('dim', l.trimEnd() || ' '));
@@ -45,7 +45,7 @@ export function toolPushTask(pi: ExtensionAPI): ToolDefinition {
     renderResult() {
       return new Text('', 0, 0);
     },
-    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params: PushTaskParams, signal, _onUpdate, ctx) {
       if (signal?.aborted) {
         throw new Error('Task storage aborted.');
       }
@@ -201,7 +201,33 @@ export const rendererTaskResult: MessageRenderer<{ slug?: string; sourceEntryId?
   return box;
 }
 
+export function updateTaskStatus(
+  session: ReadonlySessionLike,
+  setStatus: (key: string, value: string | undefined) => void,
+  theme: Theme,
+): void {
+  const pending = pendingTask(session);
+  if (pending) {
+    const slug = makeSlug(pending.data.prompt);
+    setStatus('task', theme.fg('dim', `pending task: ${slug}`));
+    return;
+  }
+
+  if (currentTask(session)) {
+    const prompt = findTaskPrompt(session);
+    if (prompt) {
+      const slug = makeSlug(prompt);
+      setStatus('task', theme.fg('dim', `current task: ${slug}`));
+    }
+    return;
+  }
+
+  setStatus('task', undefined);
+}
+
 type CommandOptions = Omit<RegisteredCommand, 'name' | 'sourceInfo'>;
+
+type PushTaskParams = Static<typeof pushTaskParameters>;
 
 function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
   const branch = session.getBranch();
@@ -275,7 +301,7 @@ async function finishTask(
   }
 
   // Capture last assistant message content before navigation
-  let lastAssistantContent: unknown;
+  let lastAssistantContent: TaskResultContent | undefined;
   let lastAssistantId: string | undefined;
   const branch = ctx.sessionManager.getBranch();
   for (let i = branch.length - 1; i >= 0; i--) {
@@ -308,11 +334,11 @@ async function finishTask(
   if (result.cancelled) return 'cancelled';
 
   // Inject last assistant message after navigation
-  if (lastAssistantId) {
+  if (lastAssistantId && lastAssistantContent !== undefined) {
     pi.sendMessage({
       customType: 'task-result',
       // Content is filtered to only TextContent blocks (or original string)
-      content: lastAssistantContent as unknown as string,
+      content: lastAssistantContent,
       display: true,
       details: { sourceEntryId: lastAssistantId, slug },
     }, { triggerTurn: true });
@@ -329,6 +355,8 @@ async function finishTask(
     updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
   }
 }
+
+type TaskResultContent = string | Array<{ type: 'text'; text: string }>;
 
 async function abortTask(
   ctx: ExtensionCommandContext,
@@ -406,30 +434,6 @@ function findPreConversationEntry(
   return null;
 }
 
-export function updateTaskStatus(
-  session: ReadonlySessionLike,
-  setStatus: (key: string, value: string | undefined) => void,
-  theme: Theme,
-): void {
-  const pending = pendingTask(session);
-  if (pending) {
-    const slug = makeSlug(pending.data.prompt);
-    setStatus('task', theme.fg('dim', `pending task: ${slug}`));
-    return;
-  }
-
-  if (currentTask(session)) {
-    const prompt = findTaskPrompt(session);
-    if (prompt) {
-      const slug = makeSlug(prompt);
-      setStatus('task', theme.fg('dim', `current task: ${slug}`));
-    }
-    return;
-  }
-
-  setStatus('task', undefined);
-}
-
 /**
  * Find the user message content injected as the task prompt after the
  * most recent TASK_START entry. Returns undefined if no task is active.
@@ -469,7 +473,7 @@ function findTaskPrompt(session: ReadonlySessionLike): string | undefined {
 
 function pendingTask(
   session: ReadonlySessionLike,
-): (SessionEntry & { data: TaskData }) | null {
+): TaskEntry | null {
   const branch = session.getBranch();
   let skip = 0;
 
@@ -482,8 +486,8 @@ function pendingTask(
       skip++;
       continue;
     }
-    if (entry.type === 'custom' && entry.customType === TASK_ENTRY_TYPE) {
-      if (skip === 0) return entry as SessionEntry & { data: TaskData };
+    if (isTaskEntry(entry)) {
+      if (skip === 0) return entry;
       skip--;
     }
   }
@@ -491,34 +495,21 @@ function pendingTask(
   return null;
 }
 
-const TASK_ENTRY_TYPE = 'task';
-
 const TASK_DONE_ENTRY_TYPE = 'task-done';
-
-interface TaskData {
-  prompt: string;
-  inherit_context: boolean;
-}
 
 function currentTask(
   session: ReadonlySessionLike,
-): (SessionEntry & { data: TaskStartData }) | null {
+): TaskStartEntry | null {
   const branch = session.getBranch();
 
   for (let i = branch.length - 1; i >= 0; i--) {
     const entry = branch[i];
-    if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
-      return entry as SessionEntry & { data: TaskStartData };
+    if (isTaskStartEntry(entry)) {
+      return entry;
     }
   }
 
   return null;
-}
-
-const TASK_START_ENTRY_TYPE = 'task-start';
-
-interface TaskStartData {
-  returnTo: string;
 }
 
 /**
@@ -530,6 +521,57 @@ interface ReadonlySessionLike {
   getEntries(): SessionEntry[];
   getLeafId(): string | null;
   getBranch(): SessionEntry[];
+}
+
+function isTaskEntry(entry: SessionEntry): entry is TaskEntry {
+  return entry.type === 'custom'
+    && entry.customType === TASK_ENTRY_TYPE
+    && isTaskData(entry.data);
+}
+
+type TaskEntry = SessionEntry & {
+  type: 'custom';
+  customType: typeof TASK_ENTRY_TYPE;
+  data: TaskData;
+};
+
+const TASK_ENTRY_TYPE = 'task';
+
+function isTaskData(value: unknown): value is TaskData {
+  return isRecord(value)
+    && typeof value.prompt === 'string'
+    && typeof value.inherit_context === 'boolean';
+}
+
+interface TaskData {
+  prompt: string;
+  inherit_context: boolean;
+}
+
+function isTaskStartEntry(entry: SessionEntry): entry is TaskStartEntry {
+  return entry.type === 'custom'
+    && entry.customType === TASK_START_ENTRY_TYPE
+    && isTaskStartData(entry.data);
+}
+
+type TaskStartEntry = SessionEntry & {
+  type: 'custom';
+  customType: typeof TASK_START_ENTRY_TYPE;
+  data: TaskStartData;
+};
+
+const TASK_START_ENTRY_TYPE = 'task-start';
+
+function isTaskStartData(value: unknown): value is TaskStartData {
+  return isRecord(value) && typeof value.returnTo === 'string';
+}
+
+interface TaskStartData {
+  returnTo: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 function makeSlug(prompt: string): string {
@@ -551,20 +593,6 @@ function makeSlug(prompt: string): string {
   return result;
 }
 
-/** Extract a plain text string from content that may be a string or an array of text blocks. */
-function extractTextContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter((b): b is { type: 'text'; text: string } =>
-        typeof b === 'object' && b !== null && 'type' in b && b.type === 'text',
-      )
-      .map(b => b.text)
-      .join('\n');
-  }
-  return String(content ?? '');
-}
-
 const STOPWORDS = new Set([
   'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
   'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
@@ -579,6 +607,20 @@ const STOPWORDS = new Set([
   'most', 'other', 'some', 'such', 'no', 'only', 'own', 'same', 'up',
   'out', 'about', 'over', 'again', 'while',
 ]);
+
+/** Extract a plain text string from content that may be a string or an array of text blocks. */
+function extractTextContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((b): b is { type: 'text'; text: string } =>
+        typeof b === 'object' && b !== null && 'type' in b && b.type === 'text',
+      )
+      .map(b => b.text)
+      .join('\n');
+  }
+  return String(content ?? '');
+}
 
 const pushTaskParameters = Type.Object({
   prompt: Type.String({ description: 'Full prompt for the task, including all context and instructions.' }),

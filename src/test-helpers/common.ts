@@ -1,58 +1,4 @@
-export {
-  assistant,
-  user,
-  task,
-  taskResult,
-  userEsc,
-  userCtrlC,
-  userRunsAuto,
-  notification,
-};
-
-import type {
-  SessionEntry,
-} from '@earendil-works/pi-coding-agent';
-
-const assistant = (content: string, stopReason?: string) => ({
-  type: 'message' as const,
-  message: {
-    role: 'assistant' as const,
-    content: [{ type: 'text' as const, text: content }],
-    ...(stopReason ? { stopReason } : {}),
-  }
-}) as unknown as Partial<BranchEntry>;
-
-const user = (content: string) => ({
-  type: 'message' as const,
-  message: { role: 'user' as const, content: [{ type: 'text', text: content }] }
-}) as unknown as Partial<BranchEntry>;
-
-const task = (prompt: string, inherit_context = false) => ({
-  type: 'custom' as const,
-  customType: 'task',
-  data: { prompt, inherit_context }
-}) as unknown as Partial<BranchEntry>;
-
-const taskResult = (slug: string, content?: string) => ({
-  type: 'custom_message' as const,
-  customType: 'task-result',
-  details: { slug },
-  ...(content !== undefined ? { content: [{ type: 'text' as const, text: content }] } : {}),
-}) as unknown as Partial<BranchEntry>;
-
-const userEsc = () => ({ type: 'user-esc' as const });
-
-const userCtrlC = () => ({ type: 'user-ctrl-c' as const });
-
-const userRunsAuto = () => ({ type: 'user-runs-auto' as const });
-
-const notification = (text: string) => ({
-  type: 'notification' as const,
-  text,
-  afterEntryId: null as string | null
-}) as unknown as Partial<BranchEntry>;
-
-export type BranchEntry = SessionEntry | NotificationEntry;
+export type BranchEntry = UserEntry | AssistantEntry | TaskEntry | TaskResultEntry | NotificationEntry;
 
 export type NotificationEntry = {
   type: 'notification';
@@ -65,15 +11,106 @@ export interface AutoConfig {
 }
 
 /** Entry kinds that can appear in a reaction pair's match slot. */
-export type MatchDescriptor =
-  | Partial<BranchEntry>;
+export type MatchDescriptor = UserEntry | AssistantEntry | TaskEntry;
 
 /** Entry kinds that can appear in a reaction pair's reaction slot. */
 export type ReactionDescriptor =
-  | Partial<BranchEntry>
+  | UserEntry
+  | AssistantEntry
+  | TaskEntry
   | { type: 'user-esc' }
   | { type: 'user-ctrl-c' }
-  | { type: 'user-runs-auto' }
-  ;
+  | { type: 'user-runs-auto' };
 
+export {
+  assistant,
+  user,
+  task,
+  taskResult,
+  userEsc,
+  userCtrlC,
+  userRunsAuto,
+  notification,
+};
 
+const assistant = (content: string, stopReason?: string): AssistantEntry => ({
+  type: 'message',
+  message: {
+    role: 'assistant',
+    content: [{ type: 'text', text: content }],
+    ...(stopReason ? { stopReason } : {}),
+  },
+});
+
+type AssistantEntry = {
+  type: 'message';
+  message: {
+    role: 'assistant';
+    content: TextBlock[];
+    stopReason?: string;
+  };
+};
+
+const user = (content: string): UserEntry => ({
+  type: 'message',
+  message: {
+    role: 'user',
+    content: [{ type: 'text', text: content }],
+  },
+});
+
+type UserEntry = {
+  type: 'message';
+  message: {
+    role: 'user';
+    content: TextBlock[];
+  };
+};
+
+const task = (prompt: string, inherit_context = false): TaskEntry => ({
+  type: 'custom',
+  customType: 'task',
+  data: { prompt, inherit_context },
+});
+
+type TaskEntry = {
+  type: 'custom';
+  customType: 'task';
+  data: {
+    prompt: string;
+    inherit_context: boolean;
+  };
+};
+
+const taskResult = (slug: string, content?: string): TaskResultEntry => ({
+  type: 'custom_message',
+  customType: 'task-result',
+  details: { slug },
+  ...(content !== undefined ? { content: [{ type: 'text', text: content }] } : {}),
+});
+
+type TaskResultEntry = {
+  type: 'custom_message';
+  customType: 'task-result';
+  details: {
+    slug: string;
+  };
+  content?: TextBlock[];
+};
+
+type TextBlock = {
+  type: 'text';
+  text: string;
+};
+
+const userEsc = (): { type: 'user-esc' } => ({ type: 'user-esc' });
+
+const userCtrlC = (): { type: 'user-ctrl-c' } => ({ type: 'user-ctrl-c' });
+
+const userRunsAuto = (): { type: 'user-runs-auto' } => ({ type: 'user-runs-auto' });
+
+const notification = (text: string): NotificationEntry => ({
+  type: 'notification',
+  text,
+  afterEntryId: null,
+});

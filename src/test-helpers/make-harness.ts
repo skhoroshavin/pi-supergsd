@@ -4,6 +4,7 @@ import {
   SessionManager,
   type ExtensionAPI,
   type ExtensionCommandContext,
+  type SessionEntry,
   type Theme,
 } from '@earendil-works/pi-coding-agent';
 
@@ -25,6 +26,7 @@ import {
 } from './common.js';
 
 export { makeHarness };
+
 export type { Harness };
 
 type Harness = ReturnType<typeof makeHarness>;
@@ -49,20 +51,20 @@ function makeHarness() {
     appendEntry(customType: string, data?: unknown) {
       sm.appendCustomEntry(customType, data);
     },
-    sendUserMessage(content: string | Array<{ type: string; text: string }>) {
-      const text = typeof content === 'string' ? content : content.map((b) => b.text).join('');
-      sm.appendMessage({ role: 'user', content: [{ type: 'text', text }], timestamp: Date.now() });
+    sendUserMessage(content: Parameters<ExtensionAPI['sendUserMessage']>[0]) {
+      const text = extractContentText(content) ?? '';
+      sm.appendMessage(makeUserMessage(text, Date.now()));
       const branch = sm.getBranch();
       const last = branch[branch.length - 1];
       if (last) triggeredUserMessages.add(last.id);
     },
     sendMessage(
-      message: { customType: string; content: unknown; display?: boolean; details?: unknown },
-      options?: { triggerTurn?: boolean },
+      message: Parameters<ExtensionAPI['sendMessage']>[0],
+      options?: Parameters<ExtensionAPI['sendMessage']>[1],
     ) {
       sm.appendCustomMessageEntry(
         message.customType,
-        message.content as string,
+        message.content,
         message.display ?? true,
         message.details,
       );
@@ -135,62 +137,77 @@ function makeHarness() {
   }
 
   function appendUserMessage(text: string): void {
-    sm.appendMessage({ role: 'user', content: [{ type: 'text', text }], timestamp: 0 });
+    sm.appendMessage(makeUserMessage(text));
   }
 
   function appendAssistantMessage(text: string, stopReason?: string): void {
-    sm.appendMessage({
-      role: 'assistant',
-      content: [{ type: 'text', text }],
-      timestamp: 0,
-      model: 'test',
-      provider: 'test',
-      ...(stopReason ? { stopReason } : {}),
-    } as Parameters<typeof sm.appendMessage>[0]);
+    sm.appendMessage(makeAssistantMessage(text, stopReason));
   }
 
-  function stripVisibleEntry(entry: BranchEntry): Partial<BranchEntry> | null {
+  function stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
     const HIDDEN_TYPES = new Set(['thinking_level_change', 'model_change', 'session_info', 'label']);
     const isSkipped =
-      HIDDEN_TYPES.has(entry.type) ||
-      (entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start'));
+      HIDDEN_TYPES.has(entry.type)
+      || (entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start'));
 
     if (isSkipped) {
       return null;
     }
 
-    const { id: _id, parentId: _pid, timestamp: _ts, display: _dp, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
-    const stripped: Record<string, unknown> = { ...restEntry };
-
-    if (stripped.message && typeof stripped.message === 'object') {
-      const { timestamp: _mt, model: _mp, provider: _pp, ...msgRest } = stripped.message as Record<string, unknown>;
-      stripped.message = msgRest;
-    }
-
-    if (rawData && typeof rawData === 'object') {
-      const cleaned: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(rawData as Record<string, unknown>)) {
-        if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
-          cleaned[k] = v;
-        }
+    if (entry.type === 'message') {
+      if (entry.message.role === 'user') {
+        const text = extractContentText(entry.message.content) ?? '';
+        return {
+          type: 'message',
+          message: { role: 'user', content: [{ type: 'text', text }] },
+        };
       }
-      if (Object.keys(cleaned).length > 0) stripped.data = cleaned;
-    }
 
-    if (rawDetails && typeof rawDetails === 'object') {
-      const cleaned: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(rawDetails as Record<string, unknown>)) {
-        if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
-          cleaned[k] = v;
-        }
+      if (entry.message.role === 'assistant') {
+        const text = extractContentText(entry.message.content) ?? '';
+        return {
+          type: 'message',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text }],
+            ...(entry.message.stopReason && entry.message.stopReason !== 'stop'
+              ? { stopReason: entry.message.stopReason }
+              : {}),
+          },
+        };
       }
-      if (Object.keys(cleaned).length > 0) stripped.details = cleaned;
+
+      return null;
     }
 
-    return stripped as Partial<BranchEntry>;
+    if (entry.type === 'custom') {
+      if (entry.customType !== 'task') return null;
+      const data = readTaskData(entry.data);
+      if (!data) return null;
+      return {
+        type: 'custom',
+        customType: 'task',
+        data,
+      };
+    }
+
+    if (entry.type === 'custom_message') {
+      if (entry.customType !== 'task-result') return null;
+      const slug = readTaskResultSlug(entry.details);
+      if (!slug) return null;
+      const text = extractContentText(entry.content);
+      return {
+        type: 'custom_message',
+        customType: 'task-result',
+        details: { slug },
+        ...(text !== null ? { content: [{ type: 'text', text }] } : {}),
+      };
+    }
+
+    return null;
   }
 
-  function entriesEqual(actual: Partial<BranchEntry>, expected: Partial<BranchEntry>): boolean {
+  function entriesEqual(actual: BranchEntry, expected: BranchEntry): boolean {
     try {
       assert.deepStrictEqual(actual, expected);
       return true;
@@ -199,9 +216,9 @@ function makeHarness() {
     }
   }
 
-  function assertBranchHistory(...expected: Partial<BranchEntry>[]) {
+  function assertBranchHistory(...expected: BranchEntry[]) {
     const entries = sm.getBranch();
-    const actual: Partial<BranchEntry>[] = [];
+    const actual: BranchEntry[] = [];
     const consumedHints = new Set<number>();
 
     for (const entry of entries) {
@@ -241,10 +258,10 @@ function makeHarness() {
     assert.deepStrictEqual(actual, expected);
   }
 
-  function assertSessionContains(...expected: Partial<BranchEntry>[]): void {
+  function assertSessionContains(...expected: BranchEntry[]): void {
     const actual = sm.getEntries()
       .map(entry => stripVisibleEntry(entry))
-      .filter((entry): entry is Partial<BranchEntry> => entry !== null);
+      .filter((entry): entry is BranchEntry => entry !== null);
 
     for (const expectedEntry of expected) {
       assert.ok(
@@ -270,19 +287,11 @@ function makeHarness() {
   // ── Convenience wrappers (pre-bound to pi / ctx) ───────────────
 
   async function runPushTask(prompt: string, inherit_context?: boolean) {
-    const tool = toolPushTask(pi) as {
-      execute: (
-        toolCallId: string,
-        params: { prompt: string; inherit_context?: boolean },
-        signal: AbortSignal | undefined,
-        onUpdate: unknown,
-        ctx: ExtensionCommandContext,
-      ) => Promise<unknown>;
-    };
+    const tool = toolPushTask(pi);
     await tool.execute('call-1', { prompt, inherit_context }, undefined, undefined, ctx);
   }
 
-  async function runTaskCommand(command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }) {
+  async function runTaskCommand(command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> }) {
     const handlerP = command.handler('', ctx);
     const next = idleWaiters.shift();
     assert.ok(next, 'Expected a pending waitForIdle call.');
@@ -293,14 +302,14 @@ function makeHarness() {
     await handlerP;
   }
 
-  const runStartTask = () => runTaskCommand(cmdStartTask(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
-  const runFinishTask = () => runTaskCommand(cmdFinishTask(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
-  const runDiscardTask = () => runTaskCommand(cmdDiscardTask(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
-  const runAbortTask = () => runTaskCommand(cmdAbortTask() as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
+  const runStartTask = () => runTaskCommand(cmdStartTask(pi));
+  const runFinishTask = () => runTaskCommand(cmdFinishTask(pi));
+  const runDiscardTask = () => runTaskCommand(cmdDiscardTask(pi));
+  const runAbortTask = () => runTaskCommand(cmdAbortTask());
 
   // Shared auto handler — created once so closure state (running/stopped)
   // is shared across runAuto and userRunsAuto reaction.
-  const autoHandler = (cmdAuto(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }).handler;
+  const autoHandler = cmdAuto(pi).handler;
 
   /**
    * Scan branch entries not yet in the seenIds set and apply the first
@@ -329,49 +338,24 @@ function makeHarness() {
    * Check whether a branch entry matches a match descriptor.
    * Phase 2: supports user() match — user messages whose text contains the pattern.
    */
-  function entryMatches(entry: BranchEntry, match: MatchDescriptor): boolean {
-    const m = match as Record<string, unknown>;
+  function entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
+    if (match.type === 'message') {
+      if (entry.type !== 'message') return false;
+      if (entry.message.role !== 'user' && entry.message.role !== 'assistant') return false;
+      if (entry.message.role !== match.message.role) return false;
 
-    // --- message-type matches (user, assistant) ---
-    if (m.type === 'message' && m.message && typeof m.message === 'object') {
-      const msg = m.message as Record<string, unknown>;
-      const matchRole = msg.role as string;
-
-      // Narrow to user/assistant roles which have `content` (excludes BashExecutionMessage etc.)
-      if (entry.type === 'message' && (entry.message.role === 'user' || entry.message.role === 'assistant')) {
-        if (entry.message.role !== matchRole) return false;
-        const matchText = extractContentText(msg.content);
-        const entryText = extractContentText(entry.message.content);
-        if (matchText && entryText && entryText.includes(matchText)) return true;
-      }
-      return false;
+      const matchText = extractContentText(match.message.content);
+      const entryText = extractContentText(entry.message.content);
+      return matchText !== null && entryText !== null && entryText.includes(matchText);
     }
 
-    // --- custom-type matches (task) ---
-    if (m.type === 'custom' && entry.type === 'custom') {
-      const matchCustomType = m.customType as string;
-      const matchData = m.data as Record<string, unknown> | undefined;
+    if (match.type === 'custom') {
+      if (entry.type !== 'custom' || entry.customType !== match.customType) return false;
+      const entryData = readTaskData(entry.data);
+      if (!entryData) return false;
 
-      if (entry.customType !== matchCustomType) return false;
-
-      // If the match has data, check the entry's data fields
-      if (matchData) {
-        const entryData = entry.data as Record<string, unknown> | undefined;
-        if (!entryData) return false;
-
-        // task("prompt") match: data.prompt must contain the pattern
-        if (typeof matchData.prompt === 'string') {
-          const entryPrompt = entryData.prompt;
-          if (typeof entryPrompt !== 'string') return false;
-          if (!entryPrompt.includes(matchData.prompt)) return false;
-        }
-
-        // task("prompt", inherit) match: inherit_context must match if specified
-        if (typeof matchData.inherit_context === 'boolean') {
-          if (entryData.inherit_context !== matchData.inherit_context) return false;
-        }
-      }
-
+      if (!entryData.prompt.includes(match.data.prompt)) return false;
+      if (entryData.inherit_context !== match.data.inherit_context) return false;
       return true;
     }
 
@@ -383,16 +367,14 @@ function makeHarness() {
    * Phase 2: supports assistant() reaction — injects an assistant message.
    */
   function applyReaction(session: SessionManager, reaction: ReactionDescriptor): void {
-    const r = reaction as Record<string, unknown>;
-
     // --- user-esc reaction: cancel next navigation ---
-    if (r.type === 'user-esc') {
+    if (reaction.type === 'user-esc') {
       cancelNextNav = true;
       return;
     }
 
     // --- user-ctrl-c reaction: trigger session shutdown ---
-    if (r.type === 'user-ctrl-c') {
+    if (reaction.type === 'user-ctrl-c') {
       for (const handler of sessionShutdownHandlers) {
         handler();
       }
@@ -400,7 +382,7 @@ function makeHarness() {
     }
 
     // --- user-runs-auto reaction: invoke auto handler reentrantly ---
-    if (r.type === 'user-runs-auto') {
+    if (reaction.type === 'user-runs-auto') {
       // Invoke the same auto handler from within the active run. The
       // second invocation detects the closure's `running` flag is true,
       // injects "Auto is already running", and returns immediately.
@@ -411,55 +393,24 @@ function makeHarness() {
     }
 
     // --- message-type reactions (assistant, user) ---
-    if (r.type === 'message' && r.message && typeof r.message === 'object') {
-      const msg = r.message as Record<string, unknown>;
+    if (reaction.type === 'message') {
+      const text = extractContentText(reaction.message.content) ?? '';
 
-      if (msg.role === 'assistant') {
-        const text = extractContentText(msg.content) ?? '';
-        const stopReason = msg.stopReason as string | undefined;
-        session.appendMessage({
-          role: 'assistant',
-          content: [{ type: 'text', text }],
-          timestamp: 0,
-          model: 'test',
-          provider: 'test',
-          ...(stopReason ? { stopReason } : {}),
-        } as Parameters<typeof session.appendMessage>[0]);
+      if (reaction.message.role === 'assistant') {
+        session.appendMessage(
+          makeAssistantMessage(text, reaction.message.stopReason as AssistantAppendedMessage['stopReason']),
+        );
         return;
       }
 
-      if (msg.role === 'user') {
-        const text = extractContentText(msg.content) ?? '';
-        session.appendMessage({
-          role: 'user',
-          content: [{ type: 'text', text }],
-          timestamp: 0,
-        });
-        return;
-      }
+      session.appendMessage(makeUserMessage(text));
+      return;
     }
 
     // --- custom-type reactions (task) ---
-    if (r.type === 'custom' && r.customType === 'task') {
-      const data = r.data as Record<string, unknown> | undefined;
-      const prompt = typeof data?.prompt === 'string' ? data.prompt : '';
-      const inherit_context = data?.inherit_context === true;
-      session.appendCustomEntry('task', { prompt, inherit_context });
-      return;
+    if (reaction.type === 'custom') {
+      session.appendCustomEntry('task', reaction.data);
     }
-  }
-
-  /** Extract plain text from content (string or array of text blocks). */
-  function extractContentText(content: unknown): string | null {
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-      const blocks = content as Array<{ type?: string; text?: string }>;
-      return blocks
-        .filter(b => b.type === 'text' && typeof b.text === 'string')
-        .map(b => b.text!)
-        .join('');
-    }
-    return null;
   }
 
   async function runAuto(config: AutoConfig): Promise<void> {
@@ -524,4 +475,72 @@ function makeHarness() {
     runAbortTask,
     runAuto,
   };
+}
+
+function makeUserMessage(text: string, timestamp = 0): AppendedMessage {
+  return { role: 'user', content: [{ type: 'text', text }], timestamp };
+}
+
+function makeAssistantMessage(
+  text: string,
+  stopReason?: string,
+): AssistantAppendedMessage {
+  return {
+    role: 'assistant',
+    content: [{ type: 'text', text }],
+    api: 'test',
+    provider: 'test',
+    model: 'test',
+    usage: TEST_USAGE,
+    stopReason: normalizeStopReason(stopReason),
+    timestamp: 0,
+  };
+}
+
+const TEST_USAGE = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 0,
+  cost: {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    total: 0,
+  },
+};
+
+type AssistantAppendedMessage = Extract<AppendedMessage, { role: 'assistant' }>;
+
+type AppendedMessage = Parameters<SessionManager['appendMessage']>[0];
+
+function readTaskData(data: unknown): { prompt: string; inherit_context: boolean } | null {
+  if (!isRecord(data)) return null;
+  if (typeof data.prompt !== 'string' || typeof data.inherit_context !== 'boolean') return null;
+  return { prompt: data.prompt, inherit_context: data.inherit_context };
+}
+
+function readTaskResultSlug(details: unknown): string | null {
+  return isRecord(details) && typeof details.slug === 'string' ? details.slug : null;
+}
+
+function extractContentText(content: unknown): string | null {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return null;
+  return content
+    .filter(isTextBlock)
+    .map(block => block.text)
+    .join('');
+}
+
+function isTextBlock(value: unknown): value is TextBlock {
+  return isRecord(value) && value.type === 'text' && typeof value.text === 'string';
+}
+
+type TextBlock = { type: 'text'; text: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
