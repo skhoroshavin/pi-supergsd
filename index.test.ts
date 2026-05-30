@@ -1268,14 +1268,47 @@ function makeHarness() {
   function entryMatches(entry: BranchEntry, match: MatchDescriptor): boolean {
     const m = match as Record<string, unknown>;
 
-    // user("text") match: type='message', role='user', content contains pattern
+    // --- message-type matches (user, assistant) ---
     if (m.type === 'message' && m.message && typeof m.message === 'object') {
       const msg = m.message as Record<string, unknown>;
-      if (msg.role === 'user' && entry.type === 'message' && entry.message.role === 'user') {
+      const matchRole = msg.role as string;
+
+      // Narrow to user/assistant roles which have `content` (excludes BashExecutionMessage etc.)
+      if (entry.type === 'message' && (entry.message.role === 'user' || entry.message.role === 'assistant')) {
+        if (entry.message.role !== matchRole) return false;
         const matchText = extractContentText(msg.content);
         const entryText = extractContentText(entry.message.content);
         if (matchText && entryText && entryText.includes(matchText)) return true;
       }
+      return false;
+    }
+
+    // --- custom-type matches (task) ---
+    if (m.type === 'custom' && entry.type === 'custom') {
+      const matchCustomType = m.customType as string;
+      const matchData = m.data as Record<string, unknown> | undefined;
+
+      if (entry.customType !== matchCustomType) return false;
+
+      // If the match has data, check the entry's data fields
+      if (matchData) {
+        const entryData = entry.data as Record<string, unknown> | undefined;
+        if (!entryData) return false;
+
+        // task("prompt") match: data.prompt must contain the pattern
+        if (typeof matchData.prompt === 'string') {
+          const entryPrompt = entryData.prompt;
+          if (typeof entryPrompt !== 'string') return false;
+          if (!entryPrompt.includes(matchData.prompt)) return false;
+        }
+
+        // task("prompt", inherit) match: inherit_context must match if specified
+        if (typeof matchData.inherit_context === 'boolean') {
+          if (entryData.inherit_context !== matchData.inherit_context) return false;
+        }
+      }
+
+      return true;
     }
 
     return false;
