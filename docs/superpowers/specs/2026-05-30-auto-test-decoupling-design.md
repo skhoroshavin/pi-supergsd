@@ -30,7 +30,7 @@ Tests also depend on the module-level `autoState = { running: false }` variable,
 
 ### Test changes (`index.test.ts`)
 
-4. **`runAuto(config)`** — single new harness method. Internally resolves all `waitForIdle()` calls, matches reactions, and injects entries automatically. Hard step cap (~100 idle cycles) with timeout assertion — auto always runs to completion or the test fails. Returns `Promise<void>`.
+4. **`runAuto(config)`** — single new harness method. Internally resolves all `waitForIdle()` calls, matches reactions, and injects entries automatically. Hard step cap (~100 idle cycles) — auto always runs to completion or the test fails with a descriptive error. Returns `Promise<void>`.
 
    ```ts
    interface AutoConfig {
@@ -47,18 +47,18 @@ Tests also depend on the module-level `autoState = { running: false }` variable,
    - `assistant("text")` — inject an assistant message
    - `user("text")` — inject a user message
    - `task("prompt")` / `task("prompt", inherit)` — inject a task entry (equivalent to pushTask)
-   - `userEsc()` — cancel the next `navigateTree` call, or stop the auto loop if no navigation is pending
-   - `userCtrlC()` — trigger session shutdown
+   - `userEsc()` — cancel the next `navigateTree` call and stop the auto loop; or stop the auto loop immediately if no navigation is pending
+   - `userRunsAuto()` — invoke `/auto` again from within the running auto session (used to test the "already running" guard)
 
    Helper signatures:
    ```ts
    const userEsc = () => ({ type: 'user-esc' as const });
-   const userCtrlC = () => ({ type: 'user-ctrl-c' as const });
+   const userRunsAuto = () => ({ type: 'user-runs-auto' as const });
    ```
 
 7. **Reactions are immutable** — pure stateless matching, no consumption. If the same pattern appears twice on the branch, the same reaction fires each time.
 
-8. **Matching engine.** After each idle resolution, the harness scans the current branch for new entries since the last scan. For each new entry, it finds the first matching reaction pair. The reaction is applied, and the loop continues. When `hasPendingMessages()` would return true (unresolved reactions pending), the auto loop does not exit.
+8. **Matching engine.** After each idle resolution, the harness scans the current branch for new entries since the last scan. For each new entry, it finds the first matching reaction pair and applies the reaction. The auto loop exits (allowing auto to stop) only when all reactions whose match side has been seen have had their reaction side fully applied — i.e., no reaction "work" remains to be done. This is the test-harness equivalent of Pi's `hasPendingMessages()` returning false, but the harness does not mock `hasPendingMessages()` — it determines loop-continuation purely from reaction state.
 
 ### Harness removals
 
@@ -86,7 +86,7 @@ The existing `runAuto()` is replaced by the new config-based version.
 
 #### Case details
 
-**1–2: Task runs to completion.** Auto sees pending task, starts it, user message matches response pattern → assistant injected, auto finishes the task, branch history shows `taskResult` back on original branch.
+**1–2: Task runs to completion.** Auto sees pending task, starts it, user message matches response pattern → assistant injected, auto finishes the task, branch history shows `taskResult` back on original branch. While auto runs, `getStatus()` includes `[auto]` prefix; after auto stops, the prefix is gone.
 
 **3: No pending tasks.** Auto started with no task entries on branch. Loop sees nothing to do, notifies "No pending tasks to run", exits.
 
@@ -98,12 +98,12 @@ The existing `runAuto()` is replaced by the new config-based version.
 
 **7: Already running.** A reaction triggers a second `runAuto()` call from within the first. The second invocation detects the first is still running, injects "Auto is already running" notification, returns immediately.
 
-**8: User steering.** User queue-messages a steering instruction while the assistant is mid-response. The auto loop continues because `hasPendingMessages()` returns true, then the user message fires, causing the assistant to respond differently.
+**8: User steering.** User queue-messages a steering instruction while the assistant is mid-response. The auto loop continues because the reaction `[assistant("thinking..."), user("steer it")]` still has pending work (the `user` side hasn't been applied yet after the assistant match is seen), causing the harness to keep the loop alive rather than exiting.
 
 ### Error handling & edge cases
 
-- **Timeout:** If auto doesn't complete within the step cap or configurable timeout, the test fails with a descriptive error.
-- **No matching reaction:** If a new entry appears with no matching reaction pair, auto continues — equivalent to an idle resolution with no LLM response yet.
+- **Step cap:** If auto doesn't complete within the hard step cap (~100 idle cycles), the test fails with a descriptive error.
+- **No matching reaction:** If a new entry appears with no matching reaction pair and no reaction work is pending, auto's own loop logic determines whether to continue or exit — same as a real session with no pending tasks. Reactions supplement the harness, not replace auto's control flow.
 - **Manual tests unaffected:** The pathSuite-based manual workflow tests continue using `runPushTask`, `runStartTask`, `runFinishTask`, etc. unchanged. `runAuto` is additive.
 
 ### Non-goals
