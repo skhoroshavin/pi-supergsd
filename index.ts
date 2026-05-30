@@ -65,6 +65,19 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
       running = true;
       let sawTaskActivity = false;
 
+      // Wrap setStatus so task status lines show [auto] prefix while running.
+      // startTask, finishTask, and discardTask all call updateTaskStatus which
+      // uses ctx.ui.setStatus — by wrapping it here, all status updates during
+      // the auto loop automatically get the prefix.
+      const originalSetStatus = ctx.ui.setStatus.bind(ctx.ui);
+      ctx.ui.setStatus = (key: string, value: string | undefined) => {
+        if (key === 'task' && value !== undefined) {
+          originalSetStatus(key, `[auto] ${value}`);
+        } else {
+          originalSetStatus(key, value);
+        }
+      };
+
       try {
         while (!stopped) {
           await ctx.waitForIdle();
@@ -104,6 +117,7 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
           }
         }
       } finally {
+        ctx.ui.setStatus = originalSetStatus;
         running = false;
         stopped = false;
       }
