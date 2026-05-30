@@ -15,6 +15,7 @@ import { Box, Text } from '@earendil-works/pi-tui';
 import { Type, type Static } from 'typebox';
 
 import { makeSlug } from './slug.js';
+
 import {
   firstTextContent,
   renderTextContent,
@@ -222,28 +223,25 @@ export function updateTaskStatus(
   setStatus('task', undefined);
 }
 
-function refreshTaskStatus(ctx: TaskStatusContext, options: TaskStatusOptions = {}): void {
-  if (ctx.hasUI) {
-    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme, options);
-  }
-}
-
 type CommandOptions = Omit<RegisteredCommand, 'name' | 'sourceInfo'>;
 
 type PushTaskAPI = Pick<ExtensionAPI, 'appendEntry'>;
-type TaskCommandAPI = Pick<ExtensionAPI, 'appendEntry' | 'sendMessage' | 'sendUserMessage'>;
+
 interface AutoCommandAPI extends TaskCommandAPI {
   on(eventName: 'session_shutdown', handler: () => unknown): void;
 }
+
 type TaskStatusTheme = Pick<Theme, 'fg'>;
 
 type TaskStatusOptions = {
   prefix?: string;
 };
 
-type TaskStatusContext = Pick<ExtensionCommandContext, 'hasUI' | 'sessionManager' | 'ui'>;
-
 type PushTaskParams = Static<typeof pushTaskParameters>;
+
+type TaskActionOptions = {
+  statusPrefix?: string;
+};
 
 function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
   const branch = session.getBranch();
@@ -251,29 +249,6 @@ function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
   return last?.type === 'message'
     && last.message.role === 'assistant'
     && last.message.stopReason === 'aborted';
-}
-
-function findLastEntry<T extends SessionEntry>(
-  session: ReadonlySessionLike,
-  predicate: (entry: SessionEntry) => entry is T,
-): T | undefined {
-  const branch = session.getBranch();
-  for (let i = branch.length - 1; i >= 0; i--) {
-    const entry = branch[i];
-    if (predicate(entry)) return entry;
-  }
-  return undefined;
-}
-
-function findLastEntryIndex(
-  session: ReadonlySessionLike,
-  predicate: (entry: SessionEntry) => boolean,
-): number {
-  const branch = session.getBranch();
-  for (let i = branch.length - 1; i >= 0; i--) {
-    if (predicate(branch[i])) return i;
-  }
-  return -1;
 }
 
 async function startTask(
@@ -377,6 +352,8 @@ async function finishTask(
   refreshTaskStatus(ctx, { prefix: options.statusPrefix });
 }
 
+type TaskCommandAPI = Pick<ExtensionAPI, 'appendEntry' | 'sendMessage' | 'sendUserMessage'>;
+
 async function abortTask(
   ctx: ExtensionCommandContext,
   options: TaskActionOptions = {},
@@ -397,9 +374,13 @@ async function abortTask(
 
 type TaskActionResult = 'cancelled' | void;
 
-type TaskActionOptions = {
-  statusPrefix?: string;
-};
+function refreshTaskStatus(ctx: TaskStatusContext, options: TaskStatusOptions = {}): void {
+  if (ctx.hasUI) {
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme, options);
+  }
+}
+
+type TaskStatusContext = Pick<ExtensionCommandContext, 'hasUI' | 'sessionManager' | 'ui'>;
 
 /** Type guard: is the entry an assistant message with content? */
 function isAssistantMessageEntry(entry: SessionEntry): entry is SessionMessageEntry & { message: { role: 'assistant' } } {
@@ -479,6 +460,17 @@ function findTaskPrompt(session: ReadonlySessionLike): string | undefined {
   return undefined;
 }
 
+function findLastEntryIndex(
+  session: ReadonlySessionLike,
+  predicate: (entry: SessionEntry) => boolean,
+): number {
+  const branch = session.getBranch();
+  for (let i = branch.length - 1; i >= 0; i--) {
+    if (predicate(branch[i])) return i;
+  }
+  return -1;
+}
+
 // ── Lookup utilities ──────────────────────────────────────────────
 
 function pendingTask(
@@ -513,6 +505,18 @@ function currentTask(
   return findLastEntry(session, isTaskStartEntry) ?? null;
 }
 
+function findLastEntry<T extends SessionEntry>(
+  session: ReadonlySessionLike,
+  predicate: (entry: SessionEntry) => entry is T,
+): T | undefined {
+  const branch = session.getBranch();
+  for (let i = branch.length - 1; i >= 0; i--) {
+    const entry = branch[i];
+    if (predicate(entry)) return entry;
+  }
+  return undefined;
+}
+
 /**
  * Minimal read-only session interface needed by lookup functions.
  * Compatible with both ReadonlySessionManager (from ExtensionCommandContext)
@@ -523,25 +527,9 @@ interface ReadonlySessionLike {
   getBranch(): SessionEntry[];
 }
 
-function isCustomEntry<TCustomType extends string, TData>(
-  entry: SessionEntry,
-  customType: TCustomType,
-  isData: (value: unknown) => value is TData,
-): entry is CustomEntry<TCustomType, TData> {
-  return entry.type === 'custom'
-    && entry.customType === customType
-    && isData(entry.data);
-}
-
 function isTaskEntry(entry: SessionEntry): entry is TaskEntry {
   return isCustomEntry(entry, TASK_ENTRY_TYPE, isTaskData);
 }
-
-type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
-  type: 'custom';
-  customType: TCustomType;
-  data: TData;
-};
 
 type TaskEntry = CustomEntry<typeof TASK_ENTRY_TYPE, TaskData>;
 
@@ -565,6 +553,22 @@ function isTaskStartEntry(entry: SessionEntry): entry is TaskStartEntry {
 type TaskStartEntry = CustomEntry<typeof TASK_START_ENTRY_TYPE, TaskStartData>;
 
 const TASK_START_ENTRY_TYPE = 'task-start';
+
+function isCustomEntry<TCustomType extends string, TData>(
+  entry: SessionEntry,
+  customType: TCustomType,
+  isData: (value: unknown) => value is TData,
+): entry is CustomEntry<TCustomType, TData> {
+  return entry.type === 'custom'
+    && entry.customType === customType
+    && isData(entry.data);
+}
+
+type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
+  type: 'custom';
+  customType: TCustomType;
+  data: TData;
+};
 
 function isTaskStartData(value: unknown): value is TaskStartData {
   return isRecord(value) && typeof value.returnTo === 'string';
