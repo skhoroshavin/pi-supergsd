@@ -7,6 +7,7 @@ export {
   userCtrlC,
   userRunsAuto,
   notification,
+  assumeCommandContext,
 } from './common.js';
 
 export { makeHarness } from './make-harness.js';

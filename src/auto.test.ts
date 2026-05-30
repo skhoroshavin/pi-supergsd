@@ -4,8 +4,6 @@ import { describe, it } from 'node:test';
 
 import {
   SessionManager,
-  type ExtensionAPI,
-  type ExtensionCommandContext,
   type Theme,
 } from '@earendil-works/pi-coding-agent';
 
@@ -15,6 +13,7 @@ import {
 
 import {
   assistant,
+  assumeCommandContext,
   makeHarness,
   notification,
   task,
@@ -123,12 +122,9 @@ describe('automated workflow', () => {
       on(eventName: string, handler: () => unknown) {
         if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
       },
-      registerMessageRenderer() {},
-      registerTool() {},
-      registerCommand() {},
-    } as unknown as ExtensionAPI;
+    } satisfies Parameters<typeof cmdAuto>[0];
 
-    const ctx = {
+    const ctx = assumeCommandContext({
       hasUI: true,
       waitForIdle: async () => {
         await new Promise<void>((resolve) => {
@@ -146,10 +142,10 @@ describe('automated workflow', () => {
           fg: (_key: string, text: string) => text,
           bg: (_key: string, text: string) => text,
           bold: (text: string) => text,
-        } as unknown as Theme,
+        } satisfies Pick<Theme, 'fg' | 'bg' | 'bold'>,
       },
       navigateTree: async () => ({ cancelled: false }),
-    } as unknown as ExtensionCommandContext;
+    });
 
     const auto = cmdAuto(pi);
     for (const handler of sessionShutdownHandlers) {

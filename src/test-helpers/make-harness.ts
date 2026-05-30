@@ -18,6 +18,7 @@ import {
 } from '../index.js';
 
 import {
+  assumeCommandContext,
   notification,
   type AutoConfig,
   type BranchEntry,
@@ -78,12 +79,9 @@ function makeHarness() {
     on(eventName: string, handler: () => unknown) {
       if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
     },
-    registerMessageRenderer() {},
-    registerTool() {},
-    registerCommand() {},
-  } as unknown as ExtensionAPI;
+  } satisfies Parameters<typeof cmdAuto>[0] & Parameters<typeof toolPushTask>[0];
 
-  const ctx = {
+  const ctx = assumeCommandContext({
     hasUI: true,
     waitForIdle: async () => {
       await new Promise<void>((resolve) => {
@@ -107,7 +105,7 @@ function makeHarness() {
         fg: (_key: string, text: string) => text,
         bg: (_key: string, text: string) => text,
         bold: (text: string) => text,
-      } as unknown as Theme,
+      } satisfies Pick<Theme, 'fg' | 'bg' | 'bold'>,
     },
     navigateTree: async (targetId: string) => {
       if (cancelNextNav) {
@@ -117,7 +115,7 @@ function makeHarness() {
       sm.branch(targetId);
       return { cancelled: false };
     },
-  } as unknown as ExtensionCommandContext & { sessionManager: SessionManager };
+  });
 
   // ── Plumbing helpers ──────────────────────────────────────────
 

@@ -1,3 +1,5 @@
+import type { ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
+
 export type BranchEntry = UserEntry | AssistantEntry | TaskEntry | TaskResultEntry | NotificationEntry;
 
 export type NotificationEntry = {
@@ -31,6 +33,7 @@ export {
   userCtrlC,
   userRunsAuto,
   notification,
+  assumeCommandContext,
 };
 
 const assistant = (content: string, stopReason?: string): AssistantEntry => ({
@@ -114,3 +117,7 @@ const notification = (text: string): NotificationEntry => ({
   text,
   afterEntryId: null,
 });
+
+function assumeCommandContext<T extends object>(value: T): ExtensionCommandContext & T {
+  return value as unknown as ExtensionCommandContext & T;
+}

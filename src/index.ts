@@ -6,7 +6,7 @@ import {
   type RegisteredCommand,
   type SessionEntry,
   type SessionMessageEntry,
-  Theme,
+  type Theme,
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 
@@ -14,7 +14,7 @@ import { Box, Text } from '@earendil-works/pi-tui';
 
 import { Type, type Static } from 'typebox';
 
-export function toolPushTask(pi: ExtensionAPI): ToolDefinition {
+export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
   return defineTool({
     name: 'push-task',
     label: 'Push Task',
@@ -66,7 +66,7 @@ export function toolPushTask(pi: ExtensionAPI): ToolDefinition {
   });
 }
 
-export function cmdStartTask(pi: ExtensionAPI): CommandOptions {
+export function cmdStartTask(pi: TaskCommandAPI): CommandOptions {
   return {
     description: 'Navigate to a fresh context and inject the active task prompt',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
@@ -76,7 +76,7 @@ export function cmdStartTask(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export function cmdDiscardTask(pi: ExtensionAPI): CommandOptions {
+export function cmdDiscardTask(pi: TaskCommandAPI): CommandOptions {
   return {
     description: 'Discard the active task without executing it',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
@@ -86,7 +86,7 @@ export function cmdDiscardTask(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export function cmdFinishTask(pi: ExtensionAPI): CommandOptions {
+export function cmdFinishTask(pi: TaskCommandAPI): CommandOptions {
   return {
     description: 'Finish the current task and return to the task start point',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
@@ -106,7 +106,7 @@ export function cmdAbortTask(): CommandOptions {
   };
 }
 
-export function cmdAuto(pi: ExtensionAPI): CommandOptions {
+export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
   let running = false;
   let stopCurrentRun: (() => void) | null = null;
 
@@ -204,7 +204,7 @@ export const rendererTaskResult: MessageRenderer<{ slug?: string; sourceEntryId?
 export function updateTaskStatus(
   session: ReadonlySessionLike,
   setStatus: (key: string, value: string | undefined) => void,
-  theme: Theme,
+  theme: TaskStatusTheme,
 ): void {
   const pending = pendingTask(session);
   if (pending) {
@@ -227,6 +227,13 @@ export function updateTaskStatus(
 
 type CommandOptions = Omit<RegisteredCommand, 'name' | 'sourceInfo'>;
 
+type PushTaskAPI = Pick<ExtensionAPI, 'appendEntry'>;
+type TaskCommandAPI = Pick<ExtensionAPI, 'appendEntry' | 'sendMessage' | 'sendUserMessage'>;
+interface AutoCommandAPI extends TaskCommandAPI {
+  on(eventName: 'session_shutdown', handler: () => unknown): void;
+}
+type TaskStatusTheme = Pick<Theme, 'fg'>;
+
 type PushTaskParams = Static<typeof pushTaskParameters>;
 
 function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
@@ -238,7 +245,7 @@ function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
 }
 
 async function startTask(
-  pi: ExtensionAPI,
+  pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
   const activeTask = pendingTask(ctx.sessionManager);
@@ -273,7 +280,7 @@ async function startTask(
 }
 
 async function discardTask(
-  pi: ExtensionAPI,
+  pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
   const activeTask = pendingTask(ctx.sessionManager);
@@ -291,7 +298,7 @@ async function discardTask(
 }
 
 async function finishTask(
-  pi: ExtensionAPI,
+  pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
 ): Promise<TaskActionResult> {
   const taskStart = currentTask(ctx.sessionManager);
