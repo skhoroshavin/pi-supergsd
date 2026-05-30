@@ -1286,8 +1286,16 @@ function makeHarness() {
   // Auto-register commands so the shutdown handler is set up
   registerTaskCommands(pi);
 
+  // Shared auto handler — created once so closure state (running/stopped)
+  // is shared across runAuto, legacyRunAuto, and userRunsAuto reaction.
+  // Must be created before registerTaskCommands so the primary closure owns
+  // the session_shutdown handler (registerTaskCommands internally calls
+  // createAutoCommand again, but its handler is discarded by the mock; the
+  // extra shutdown handler from that call is harmless).
+  const autoHandler = createAutoCommand(pi).handler;
+
   function legacyRunAuto(): Promise<void> {
-    return createAutoCommand(pi).handler('', ctx) as Promise<void>;
+    return autoHandler('', ctx) as Promise<void>;
   }
 
   /**
@@ -1390,6 +1398,17 @@ function makeHarness() {
       return;
     }
 
+    // --- user-runs-auto reaction: invoke auto handler reentrantly ---
+    if (r.type === 'user-runs-auto') {
+      // Invoke the same auto handler from within the active run. The
+      // second invocation detects the closure's `running` flag is true,
+      // injects "Auto is already running", and returns immediately.
+      // Fire-and-forget: the handler is async but the guard check and
+      // notification happen synchronously before any await.
+      autoHandler('', ctx).catch(() => {});
+      return;
+    }
+
     // --- message-type reactions (assistant, user) ---
     if (r.type === 'message' && r.message && typeof r.message === 'object') {
       const msg = r.message as Record<string, unknown>;
@@ -1449,7 +1468,7 @@ function makeHarness() {
     // This is needed for user-esc tests where the task entry exists before auto runs.
     const seenIds = new Set<string>();
 
-    const handlerPromise = createAutoCommand(pi).handler('', ctx).finally(() => { settled = true; });
+    const handlerPromise = autoHandler('', ctx).finally(() => { settled = true; });
 
     const MAX_STEPS = 100;
     for (let steps = 0; steps < MAX_STEPS && !settled; steps++) {
