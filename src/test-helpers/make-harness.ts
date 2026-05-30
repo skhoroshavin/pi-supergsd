@@ -397,9 +397,7 @@ function makeHarness() {
       const text = extractContentText(reaction.message.content) ?? '';
 
       if (reaction.message.role === 'assistant') {
-        session.appendMessage(
-          makeAssistantMessage(text, reaction.message.stopReason as AssistantAppendedMessage['stopReason']),
-        );
+        session.appendMessage(makeAssistantMessage(text, reaction.message.stopReason));
         return;
       }
 
@@ -533,6 +531,18 @@ function extractContentText(content: unknown): string | null {
     .filter(isTextBlock)
     .map(block => block.text)
     .join('');
+}
+
+function normalizeStopReason(stopReason?: string): AssistantAppendedMessage['stopReason'] {
+  switch (stopReason) {
+    case 'length':
+    case 'toolUse':
+    case 'error':
+    case 'aborted':
+      return stopReason;
+    default:
+      return 'stop';
+  }
 }
 
 function isTextBlock(value: unknown): value is TextBlock {
