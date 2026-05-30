@@ -3,6 +3,8 @@ import {
   type ExtensionAPI,
 } from '@earendil-works/pi-coding-agent';
 
+import { extractTextContent as readTextContent } from '../text-content.js';
+
 export class PiStub implements Partial<ExtensionAPI> {
   constructor(private readonly sessionManager: SessionManager) {}
 
@@ -68,22 +70,7 @@ export function makeUserMessage(text: string, timestamp = 0): AppendedMessage {
 }
 
 export function extractContentText(content: unknown): string | null {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return null;
-  return content
-    .filter(isTextBlock)
-    .map(block => block.text)
-    .join('');
+  return readTextContent(content, '');
 }
 
 type AppendedMessage = Parameters<SessionManager['appendMessage']>[0];
-
-function isTextBlock(value: unknown): value is TextBlock {
-  return isRecord(value) && value.type === 'text' && typeof value.text === 'string';
-}
-
-type TextBlock = { type: 'text'; text: string };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
