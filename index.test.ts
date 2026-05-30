@@ -777,42 +777,31 @@ pathSuite('manual workflow', (path) => {
 
 describe('automated workflow', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, legacyRunAuto } =
-      makeHarness();
+    const h = makeHarness();
 
-    appendUserMessage('main work');
-    appendAssistantMessage('working on main...');
-    await runPushTask('Analyze performance.');
-    assert.strictEqual(getStatus(), 'pending task: analyze-performance');
-    assertBranchHistory(
+    h.appendUserMessage('main work');
+    h.appendAssistantMessage('working on main...');
+    await h.runPushTask('Analyze performance.');
+    assert.strictEqual(h.getStatus(), 'pending task: analyze-performance');
+    h.assertBranchHistory(
       user('main work'),
       assistant('working on main...'),
       task('Analyze performance.'),
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
     );
 
-    const running = legacyRunAuto();
+    await h.runAuto({
+      reactions: [[user('Analyze performance'), assistant('Found 3 bottlenecks: ...')]],
+    });
 
-    await flushMicrotasks();
-    await releaseNextIdle();
-    // Auto started the task (fresh context)
-    assertBranchHistory(
-      user('Analyze performance.'),
-    );
-
-    appendAssistantMessage('Found 3 bottlenecks: ...');
-
-    await releaseNextIdle();
-    await releaseNextIdle();
-    await running;
-    assertBranchHistory(
+    h.assertBranchHistory(
       user('main work'),
       assistant('working on main...'),
       task('Analyze performance.'),
       taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
       notification('Task finished. Last response attached.'),
     );
-    assert.ok(isLlmTriggered());
+    assert.ok(h.isLlmTriggered());
   });
 
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
@@ -1258,18 +1247,19 @@ function makeHarness() {
   }
 
   /**
-   * Scan new branch entries (from fromIndex through the current branch end)
-   * and apply the first matching reaction for each new entry.
-   * The caller is responsible for tracking the scan position.
+   * Scan branch entries not yet in the seenIds set and apply the first
+   * matching reaction for each new entry. Uses entry IDs to track seen
+   * state, so it works correctly across navigation (branch length changes).
    */
   function scanAndReact(
     session: SessionManager,
     reactions: Array<[MatchDescriptor, ReactionDescriptor]>,
-    fromIndex: number,
+    seenIds: Set<string>,
   ): void {
     const branch = session.getBranch();
-    for (let i = fromIndex; i < branch.length; i++) {
-      const entry = branch[i];
+    for (const entry of branch) {
+      if (seenIds.has(entry.id)) continue;
+      seenIds.add(entry.id);
       for (const [match, reaction] of reactions) {
         if (entryMatches(entry, match)) {
           applyReaction(session, reaction);
@@ -1338,7 +1328,7 @@ function makeHarness() {
   async function runAuto(config: AutoConfig): Promise<void> {
     const reactions = config.reactions ?? [];
     let settled = false;
-    let lastScanIndex = sm.getBranch().length;
+    const seenIds = new Set<string>(sm.getBranch().map(e => e.id));
 
     const handlerPromise = createAutoCommand(pi).handler('', ctx).finally(() => { settled = true; });
 
@@ -1353,8 +1343,7 @@ function makeHarness() {
       }
 
       // After idle resolution, scan for new entries and apply matching reactions
-      scanAndReact(sm, reactions, lastScanIndex);
-      lastScanIndex = sm.getBranch().length;
+      scanAndReact(sm, reactions, seenIds);
     }
 
     if (!settled) {
