@@ -32,10 +32,6 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
     return box;
   });
 
-  pi.on('session_shutdown', async () => {
-    autoState.running = false;
-  });
-
   pi.on('session_start', async (_event, ctx) => {
     updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
   });
@@ -50,22 +46,35 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
 }
 
 export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
+  let running = false;
+  let stopped = false;
+
+  // Register shutdown handler inside the closure so it can set `stopped`.
+  pi.on('session_shutdown', async () => {
+    stopped = true;
+  });
+
   return {
     description: 'Automatically run pushed task branches',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      if (autoState.running) {
+      if (running) {
         ctx.ui.notify('Auto is already running.', 'warning');
         return;
       }
 
-      autoState.running = true;
+      running = true;
       let sawTaskActivity = false;
 
       try {
-        while (autoState.running) {
+        while (!stopped) {
           await ctx.waitForIdle();
 
-          if (!autoState.running) break;
+          // Re-check after idle: userCtrlC/stopped may have been set
+          // while we were waiting (the reaction engine runs before the
+          // waiter resolves). Without this, we'd fall through to task
+          // processing and might call finishTask even though the session
+          // was shut down.
+          if (stopped) break;
 
           if (lastAssistantWasAborted(ctx.sessionManager)) break;
 
@@ -95,7 +104,8 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
           }
         }
       } finally {
-        autoState.running = false;
+        running = false;
+        stopped = false;
       }
     },
   };
@@ -573,8 +583,6 @@ const STOPWORDS = new Set([
   'most', 'other', 'some', 'such', 'no', 'only', 'own', 'same', 'up',
   'out', 'about', 'over', 'again', 'while',
 ]);
-
-const autoState = { running: false };
 
 const pushTaskParameters = Type.Object({
   prompt: Type.String({ description: 'Full prompt for the task, including all context and instructions.' }),
