@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use /skill:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add the `userEsc()` reaction descriptor, extend the matching engine to support `assistant()` and `task()` match descriptors, implement the `user-esc` reaction that cancels navigation and stops the auto loop, and port the two cancellation tests.
+**Goal:** Add the `userEsc()` reaction descriptor, extend the matching engine to support `assistant()` and `task()` match descriptors, use `userEsc()` for navigation-cancellation scenarios, and port the two cancellation tests.
 
 **Architecture:** `userEsc()` returns `{ type: 'user-esc' as const }`. The matching engine gains two new match checks (`assistant` messages and `task` custom entries) so reaction chains like `[assistant("text"), userEsc()]` work. When `user-esc` fires, the harness sets `cancelNextNav = true` (the existing flag from the `navigateTree` mock). Auto's own control flow picks this up — `navigateTree` returns `{ cancelled: true }`, `startTask`/`finishTask` return `'cancelled'`, auto's handler breaks its loop, `settled` becomes true, and the harness loop exits naturally. The scan runs BEFORE idle resolution so `cancelNextNav` is set before auto's handler makes any navigation call. The first scan iteration covers all entries (index 0) to handle pre-existing task entries; subsequent scans are delta-only.
+
+**Implementation note:** The final aborted-assistant test does **not** use `userEsc()`. It injects a real assistant message with `stopReason: 'aborted'`, then lets `/auto` exit through `lastAssistantWasAborted()`. That keeps the test aligned with source behavior instead of replacing it with a harness-only stop path.
 
 **Tech Stack:** Node 20+, TypeScript, node:test, node:assert, tsx
 

@@ -873,12 +873,7 @@ describe('automated workflow', () => {
       ],
     });
 
-    // Auto completes: task started on fresh branch, reaction chain fires
-    // (assistant injected, then userRunsAuto triggers second handler
-    // invocation which detects "already running" and returns), then task
-    // finishes normally. Task-branch entries (including the "already
-    // running" notification) are not visible after finishTask navigates
-    // back — same pattern as tests #1/#2.
+    h.assertNotifications('Auto is already running.');
     h.assertBranchHistory(
       user('start'),
       task('first task'),
@@ -887,7 +882,6 @@ describe('automated workflow', () => {
       notification('Task finished. Last response attached.'),
     );
     assert.ok(h.isLlmTriggered());
-    // Status line should be clean — no stale [auto] prefix remains.
     assert.strictEqual(h.getStatus(), undefined);
   });
 
@@ -899,12 +893,19 @@ describe('automated workflow', () => {
 
     await h.runAuto({
       reactions: [
-        [user('Implement phase 1'), assistant('Stopped by user.')],
-        [assistant('Stopped by user.'), userEsc()],
+        [user('Implement phase 1'), assistant('Stopped by user.', 'aborted')],
       ],
     });
 
     assert.ok(!h.isLlmTriggered());
+    h.assertBranchHistory(
+      user('start'),
+      task('Implement phase 1.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      user('Implement phase 1.'),
+      assistant('Stopped by user.', 'aborted'),
+    );
+    assert.strictEqual(h.getStatus(), 'current task: implement-phase-1');
   });
 
   it('processes a subtask pushed during a task', async () => {
@@ -985,6 +986,7 @@ describe('automated workflow', () => {
       user('Shutdown task'),
       assistant('working...'),
     );
+    assert.strictEqual(h.getStatus(), 'current task: shutdown-task');
   });
 });
 
@@ -1067,6 +1069,7 @@ function makeHarness() {
   const triggeredUserMessages = new Set<string>();
 
   const trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
+  const notificationLog: string[] = [];
   let cancelNextNav = false;
   let taskStatus: string | undefined;
 
@@ -1119,6 +1122,7 @@ function makeHarness() {
     ui: {
       notify(message: string) {
         trackedHints.push({ text: message, afterEntryId: sm.getLeafId() });
+        notificationLog.push(message);
       },
       setStatus(key: string, value: string | undefined) {
         if (key === 'task') taskStatus = value;
@@ -1192,7 +1196,7 @@ function makeHarness() {
 
         // Clean nested message fields
         if (stripped.message && typeof stripped.message === 'object') {
-          const { timestamp: _mt, model: _mp, provider: _pp, stopReason: _sr, ...msgRest } = stripped.message as Record<string, unknown>;
+          const { timestamp: _mt, model: _mp, provider: _pp, ...msgRest } = stripped.message as Record<string, unknown>;
           stripped.message = msgRest;
         }
 
@@ -1254,13 +1258,9 @@ function makeHarness() {
 
 
 
-  async function releaseNextIdle() {
-    const next = idleWaiters.shift();
-    assert.ok(next, 'Expected a pending waitForIdle call.');
-    next();
-    // Drain microtasks so anything awaiting the released idle can proceed.
-    for (let i = 0; i < 10; i++) {
-      await Promise.resolve();
+  function assertNotifications(...expected: string[]): void {
+    for (const text of expected) {
+      assert.ok(notificationLog.includes(text), `Expected notification log to include: ${text}`);
     }
   }
 
@@ -1275,7 +1275,12 @@ function makeHarness() {
 
   async function runTaskCommand(command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }) {
     const handlerP = command.handler('', ctx);
-    await releaseNextIdle();
+    const next = idleWaiters.shift();
+    assert.ok(next, 'Expected a pending waitForIdle call.');
+    next();
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
     await handlerP;
   }
 
@@ -1284,15 +1289,8 @@ function makeHarness() {
   const runDiscardTask = () => runTaskCommand(createDiscardTaskCommand(pi));
   const runAbortTask = () => runTaskCommand(createAbortTaskCommand());
 
-  // Auto-register commands so the shutdown handler is set up
-  registerTaskCommands(pi);
-
   // Shared auto handler — created once so closure state (running/stopped)
   // is shared across runAuto and userRunsAuto reaction.
-  // Must be created before registerTaskCommands so the primary closure owns
-  // the session_shutdown handler (registerTaskCommands internally calls
-  // createAutoCommand again, but its handler is discarded by the mock; the
-  // extra shutdown handler from that call is harmless).
   const autoHandler = createAutoCommand(pi).handler;
 
 
@@ -1388,9 +1386,6 @@ function makeHarness() {
 
     // --- user-ctrl-c reaction: trigger session shutdown ---
     if (r.type === 'user-ctrl-c') {
-      // Call all registered session_shutdown handlers.
-      // They are synchronous in practice (autoState.running = false),
-      // but fire them all to match emitSessionShutdown behaviour.
       for (const handler of sessionShutdownHandlers) {
         handler();
       }
@@ -1504,6 +1499,7 @@ function makeHarness() {
 
   return {
     assertBranchHistory,
+    assertNotifications,
     isLlmTriggered,
     getStatus,
     appendUserMessage,

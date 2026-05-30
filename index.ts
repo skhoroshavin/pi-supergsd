@@ -118,6 +118,7 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
         }
       } finally {
         ctx.ui.setStatus = originalSetStatus;
+        updateTaskStatus(ctx.sessionManager, originalSetStatus, ctx.ui.theme);
         running = false;
         stopped = false;
       }

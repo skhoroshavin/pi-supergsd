@@ -4,7 +4,9 @@
 
 **Goal:** Add `user()`, `task()`, and `userCtrlC()` as reaction descriptors, implement fixed-point reaction iteration so reaction chains complete before each idle resolution, and port/create three tests: subtask within a task (#6), user steering message queued (#8), and session shutdown during auto (#9).
 
-**Architecture:** The scan+react step inside `runAuto`’s idle loop is upgraded from a single scan to a fixed-point iteration: it re-scans until no new entries are added in a full pass. This ensures nested reaction chains (e.g., assistant match → user reaction → user match → assistant reaction) all fire before auto’s handler gets to respond. `userCtrlC` triggers the session-shutdown handlers synchronously, which sets `autoState.running = false`, causing auto’s own loop to break. No separate pending-message tracking flag is needed — the fixed-point engine naturally drains all reaction work before each idle resolution, so auto never exits with work pending.
+**Architecture:** The scan+react step inside `runAuto`’s idle loop is upgraded from a single scan to a fixed-point iteration: it re-scans until no new entries are added in a full pass. This ensures nested reaction chains (e.g., assistant match → user reaction → user match → assistant reaction) all fire before auto’s handler gets to respond. `userCtrlC` triggers the session-shutdown handlers synchronously, which stops auto through the real session-shutdown path. No separate pending-message tracking flag is needed — the fixed-point engine naturally drains all reaction work before each idle resolution, so auto never exits with work pending.
+
+**Implementation note:** The final source no longer uses module-level `autoState`; the shutdown path sets the closure-local `stopped` flag inside `createAutoCommand()`.
 
 **Tech Stack:** Node 20+, TypeScript, node:test, node:assert, tsx
 

@@ -57,7 +57,7 @@
 **Scope:**
 - Implement `user("text")` match descriptor: scans branch for new user messages containing pattern
 - Implement `assistant("text")` reaction descriptor: injects an assistant message entry
-- Basic matching engine: after each idle, scan branch for new entries, find first matching reaction pair, apply
+- Basic matching engine: during the idle pump, scan branch for new entries, find first matching reaction pair, apply
 - Port tests #1 and #2
 
 **Out of scope:**
@@ -88,13 +88,13 @@
 
 ## Phase 3: `userEsc` + navigation cancel and aborted assistant tests
 
-**Outcome:** `userEsc()` reaction descriptor is implemented. Two tests ported: "stops when navigation cancelled" and "stops after aborted assistant."
+**Outcome:** `userEsc()` reaction descriptor is implemented for navigation-cancellation scenarios. Two tests ported: "stops when navigation cancelled" and "stops after aborted assistant," with the aborted-assistant case using a real assistant message whose `stopReason` is `'aborted'`.
 
 **Why now:** `userEsc` introduces the first non-message reaction type — it cancels `navigateTree` and stops the loop. Two tests exercise different entry points for this behavior.
 
 **Scope:**
 - `userEsc()` helper: returns `{ type: 'user-esc' as const }`
-- Harness: when `userEsc` fires, cancel next `navigateTree` call and stop auto loop
+- Harness: when `userEsc` fires, cancel the next `navigateTree` call
 - Port tests #4 and #5
 
 **Out of scope:**
@@ -119,13 +119,13 @@
 **Risks:**
 - `navigateTree` cancellation timing — must cancel the *first* nav call in that idle cycle, not a later one. Mitigation: cancel flag consumed atomically.
 
-**Context notes:** Test #5 uses a multi-step reaction: `[user(...), assistant(...)]` then `[assistant(...), userEsc()]`. This validates that the matching engine correctly handles reaction chains where the output of one pair becomes the input match for the next.
+**Context notes:** Test #5 injects a real aborted assistant message via `assistant(..., 'aborted')`. This keeps the test aligned with the source behavior: `/auto` exits because `lastAssistantWasAborted()` sees the assistant's stop reason, not because the harness synthesizes a separate stop signal.
 
 ---
 
 ## Phase 4: `user`, `task`, `userCtrlC` reactions + subtask, steering, and shutdown tests
 
-**Outcome:** `user()` as reaction descriptor, `task()` as reaction descriptor, and `userCtrlC()` reaction are implemented. Pending-message tracking is added to the harness. Three tests ported: "subtask within a task," "user steering message queued," and "session shutdown during auto."
+**Outcome:** `user()` as reaction descriptor, `task()` as reaction descriptor, and `userCtrlC()` reaction are implemented. Fixed-point reaction iteration is added to the harness so chained reactions drain before each idle resolution. Three tests ported: "subtask within a task," "user steering message queued," and "session shutdown during auto."
 
 **Why now:** This phase introduces all remaining reaction types except `userRunsAuto`. The subtask and steering tests need `task()` and `user()` as reactions, respectively. Session shutdown needs `userCtrlC`. Three tests fit together because they all extend the reaction engine rather than adding fundamentally new mechanisms.
 
@@ -133,7 +133,7 @@
 - `user("text")` as reaction descriptor: injects a user message entry
 - `task("prompt")` / `task("prompt", inherit)` as reaction descriptor: injects a task custom entry
 - `userCtrlC()` helper: returns `{ type: 'user-ctrl-c' as const }`
-- Harness: pending-message-aware loop continuation (auto doesn't exit while reaction work remains)
+- Harness: fixed-point reaction iteration before each idle resolution
 - Port tests #6, #8, #9
 
 **Out of scope:**
@@ -158,13 +158,13 @@
 **Risks:**
 - `userCtrlC` needs session shutdown → triggers `stopped` flag in auto's closure. The harness must dispatch shutdown handlers after the reaction fires. Mitigation: call shutdown handlers between idle resolutions.
 
-**Context notes:** Test #8 (steering) exercises pending-message tracking: after `assistant("thinking...")` matches, the `user("steer it")` reaction hasn't fired yet, so the harness treats this as pending work and keeps the loop alive. This requires the matching engine to track "seen but not fully applied" pairs.
+**Context notes:** Test #8 (steering) exercises fixed-point reaction chaining: `assistant("thinking...")` triggers `user("steer it")`, which immediately triggers the final assistant response before the idle waiter resolves. Auto then finishes the task with the adjusted response.
 
 ---
 
 ## Phase 5: `userRunsAuto` + already-running test + source changes + cleanup
 
-**Outcome:** The final test is ported. Source changes applied (`autoState` → closure, `[auto]` status prefix). All legacy helpers removed from the harness. `legacyRunAuto` deleted.
+**Outcome:** The final test is ported. Source changes applied (`autoState` → closure, `[auto]` status prefix with cleanup on exit). All legacy helpers are removed from the harness, including the old internal `releaseNextIdle` helper. `legacyRunAuto` is deleted.
 
 **Why now:** This is the cleanup phase. All tests are on the new `runAuto`, so legacy infrastructure is dead code. Source changes are applied last because they don't affect the test migration — they only change how auto reports state.
 
@@ -174,9 +174,10 @@
 - Port test #7 ("already running")
 - Source change: remove `autoState`, move `stopped` flag into `createAutoCommand` closure
 - Source change: wrap `updateTaskStatus` with `[auto]` prefix while running
-- Add `getStatus()` assertions to test #1 (verify `[auto]` prefix appears/clears)
+- Add `getStatus()` assertions to early-exit tests so `[auto]` cleanup is verified when auto stops without finishing
+- Add harness notification-log assertions for the re-entrant "already running" warning
 - Remove from harness: `legacyRunAuto`, `releaseNextIdle`, `flushMicrotasks`, `emitSessionShutdown`, `setPendingMessages`, `setCancelNextNav`
-- Remove unused mocks from `ctx` (e.g., `hasPendingMessages` if no longer needed, `navigateTree` cancellation controlled by reactions)
+- Keep the required `hasPendingMessages()` ctx method, but hardcode the mock to `false`
 
 **Out of scope:**
 - None — this is the final phase.
@@ -201,6 +202,6 @@
 **Phase boundary health:** Final state. All helpers removed. Single `runAuto(config)` API. Source uses closure-based state.
 
 **Risks:**
-- `userRunsAuto` is the most complex reaction — invoking auto reentrantly while the first invocation is mid-loop. Mitigation: the harness tracks a "currently running" flag, detects the reentrant call, and handles the "already running" notification+return path directly rather than going through the full auto handler.
+- `userRunsAuto` is the most complex reaction — invoking auto reentrantly while the first invocation is mid-loop. Mitigation: the harness reuses the shared auto handler so the real closure-based `running` guard emits the "already running" notification and returns through the same path as production code.
 
-**Context notes:** When removing `emitSessionShutdown`, confirm no other test depends on it. The `session_shutdown` handler registration is still needed in the source for real Pi — only the test harness mock is removed. The new `runAuto` handles shutdown internally via `userCtrlC` reactions.
+**Context notes:** When removing `emitSessionShutdown`, confirm no other test depends on it. The `session_shutdown` handler registration is still needed in the source for real Pi, and the harness keeps only the minimal mock needed for `userCtrlC` reactions. The final harness also keeps a notification log so warnings emitted on non-final branches remain assertable.
