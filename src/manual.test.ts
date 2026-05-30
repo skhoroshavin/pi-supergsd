@@ -9,7 +9,10 @@ import {
   user,
 } from './test-helpers/index.js';
 
-pathSuite('manual workflow', (path) => {
+import { describe } from 'node:test';
+
+describe('manual workflow', () => {
+  pathSuite((path) => {
     return [
         path('push AAA', async (h) => {
             h.appendUserMessage('main work');
@@ -761,4 +764,5 @@ pathSuite('manual workflow', (path) => {
         );
     }),
     ];
+  });
 });

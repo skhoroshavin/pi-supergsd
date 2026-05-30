@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { it } from 'node:test';
 
 import { makeHarness, type Harness } from './make-harness.js';
 
@@ -6,35 +6,32 @@ export { pathSuite };
 export type { PathNode, PathFn };
 
 function pathSuite(
-  description: string,
   fn: (path: PathFn) => PathNode | PathNode[],
 ): void {
-  describe(description, () => {
-    const roots = fn(path);
-    const rootsArray = Array.isArray(roots) ? roots : [roots];
+  const roots = fn(path);
+  const rootsArray = Array.isArray(roots) ? roots : [roots];
 
-    function registerTests(node: PathNode, ancestors: PathNode[]): void {
-      const chain = [...ancestors, node];
-      const name = chain.map(n => n.name).join(' → ');
+  function registerTests(node: PathNode, ancestors: PathNode[]): void {
+    const chain = [...ancestors, node];
+    const name = chain.map(n => n.name).join(' → ');
 
-      it(name, async () => {
-        const h = makeHarness();
-        for (const ancestor of chain) {
-          if (ancestor.fn) {
-            await ancestor.fn(h);
-          }
+    it(name, async () => {
+      const h = makeHarness();
+      for (const ancestor of chain) {
+        if (ancestor.fn) {
+          await ancestor.fn(h);
         }
-      });
-
-      for (const child of node.children) {
-        registerTests(child, chain);
       }
-    }
+    });
 
-    for (const root of rootsArray) {
-      registerTests(root, []);
+    for (const child of node.children) {
+      registerTests(child, chain);
     }
-  });
+  }
+
+  for (const root of rootsArray) {
+    registerTests(root, []);
+  }
 }
 
 const path: PathFn = (name, fn, ...children) => ({ name, fn, children });
