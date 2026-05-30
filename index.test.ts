@@ -1257,22 +1257,104 @@ function makeHarness() {
     return createAutoCommand(pi).handler('', ctx) as Promise<void>;
   }
 
+  /**
+   * Scan new branch entries (from fromIndex through the current branch end)
+   * and apply the first matching reaction for each new entry.
+   * The caller is responsible for tracking the scan position.
+   */
+  function scanAndReact(
+    session: SessionManager,
+    reactions: Array<[MatchDescriptor, ReactionDescriptor]>,
+    fromIndex: number,
+  ): void {
+    const branch = session.getBranch();
+    for (let i = fromIndex; i < branch.length; i++) {
+      const entry = branch[i];
+      for (const [match, reaction] of reactions) {
+        if (entryMatches(entry, match)) {
+          applyReaction(session, reaction);
+          break; // first match wins per entry
+        }
+      }
+    }
+  }
+
+  /**
+   * Check whether a branch entry matches a match descriptor.
+   * Phase 2: supports user() match — user messages whose text contains the pattern.
+   */
+  function entryMatches(entry: BranchEntry, match: MatchDescriptor): boolean {
+    const m = match as Record<string, unknown>;
+
+    // user("text") match: type='message', role='user', content contains pattern
+    if (m.type === 'message' && m.message && typeof m.message === 'object') {
+      const msg = m.message as Record<string, unknown>;
+      if (msg.role === 'user' && entry.type === 'message' && entry.message.role === 'user') {
+        const matchText = extractContentText(msg.content);
+        const entryText = extractContentText(entry.message.content);
+        if (matchText && entryText && entryText.includes(matchText)) return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Apply a reaction descriptor to the session.
+   * Phase 2: supports assistant() reaction — injects an assistant message.
+   */
+  function applyReaction(session: SessionManager, reaction: ReactionDescriptor): void {
+    const r = reaction as Record<string, unknown>;
+
+    // assistant("text") reaction: inject an assistant message
+    if (r.type === 'message' && r.message && typeof r.message === 'object') {
+      const msg = r.message as Record<string, unknown>;
+      if (msg.role === 'assistant') {
+        const text = extractContentText(msg.content) ?? '';
+        session.appendMessage({
+          role: 'assistant',
+          content: [{ type: 'text', text }],
+          timestamp: 0,
+          model: 'test',
+          provider: 'test',
+        } as Parameters<typeof session.appendMessage>[0]);
+      }
+    }
+  }
+
+  /** Extract plain text from content (string or array of text blocks). */
+  function extractContentText(content: unknown): string | null {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      const blocks = content as Array<{ type?: string; text?: string }>;
+      return blocks
+        .filter(b => b.type === 'text' && typeof b.text === 'string')
+        .map(b => b.text!)
+        .join('');
+    }
+    return null;
+  }
+
   async function runAuto(config: AutoConfig): Promise<void> {
-    void config; // placeholder — reaction matching in Phase 2
+    const reactions = config.reactions ?? [];
     let settled = false;
+    let lastScanIndex = sm.getBranch().length;
+
     const handlerPromise = createAutoCommand(pi).handler('', ctx).finally(() => { settled = true; });
 
     const MAX_STEPS = 100;
     for (let steps = 0; steps < MAX_STEPS && !settled; steps++) {
-      // Yield so any pending microtasks from the handler flush
       await Promise.resolve();
 
       const waiter = idleWaiters.shift();
       if (waiter) {
         waiter();
-        // Drain microtasks so the handler body executes past the resolved await
         for (let i = 0; i < 10; i++) await Promise.resolve();
       }
+
+      // After idle resolution, scan for new entries and apply matching reactions
+      scanAndReact(sm, reactions, lastScanIndex);
+      lastScanIndex = sm.getBranch().length;
     }
 
     if (!settled) {
