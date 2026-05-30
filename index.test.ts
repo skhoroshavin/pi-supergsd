@@ -977,9 +977,15 @@ const taskResult = (slug: string, content?: string) => ({
   ...(content !== undefined ? { content: [{ type: 'text' as const, text: content }] } : {}),
 }) as unknown as Partial<BranchEntry>;
 
+const userEsc = () => ({ type: 'user-esc' as const });
+
 // ── Test harness ─────────────────────────────────────────────────
 
 function makeHarness() {
+  // userEsc is referenced through reaction types in runAuto; reference it here
+  // to suppress TS6133 until it's used in tests (Tasks 4-5).
+  void userEsc;
+
   const sm = SessionManager.inMemory();
   // Seed a non-visible root entry so findFreshTargetId can escape past user messages.
   // Pi always inserts thinking_level_change at session creation (main.js:471).
@@ -1373,7 +1379,8 @@ type MatchDescriptor =
 
 /** Entry kinds that can appear in a reaction pair's reaction slot. */
 type ReactionDescriptor =
-  | Partial<BranchEntry>   // assistant(), user(), task() helpers produce these
+  | Partial<BranchEntry>                        // assistant(), user(), task() helpers produce these
+  | { type: 'user-esc' }                       // userEsc()
   ;
 
 interface AutoConfig {
