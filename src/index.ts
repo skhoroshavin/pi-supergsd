@@ -523,17 +523,27 @@ interface ReadonlySessionLike {
   getBranch(): SessionEntry[];
 }
 
-function isTaskEntry(entry: SessionEntry): entry is TaskEntry {
+function isCustomEntry<TCustomType extends string, TData>(
+  entry: SessionEntry,
+  customType: TCustomType,
+  isData: (value: unknown) => value is TData,
+): entry is CustomEntry<TCustomType, TData> {
   return entry.type === 'custom'
-    && entry.customType === TASK_ENTRY_TYPE
-    && isTaskData(entry.data);
+    && entry.customType === customType
+    && isData(entry.data);
 }
 
-type TaskEntry = SessionEntry & {
+function isTaskEntry(entry: SessionEntry): entry is TaskEntry {
+  return isCustomEntry(entry, TASK_ENTRY_TYPE, isTaskData);
+}
+
+type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
   type: 'custom';
-  customType: typeof TASK_ENTRY_TYPE;
-  data: TaskData;
+  customType: TCustomType;
+  data: TData;
 };
+
+type TaskEntry = CustomEntry<typeof TASK_ENTRY_TYPE, TaskData>;
 
 const TASK_ENTRY_TYPE = 'task';
 
@@ -549,16 +559,10 @@ interface TaskData {
 }
 
 function isTaskStartEntry(entry: SessionEntry): entry is TaskStartEntry {
-  return entry.type === 'custom'
-    && entry.customType === TASK_START_ENTRY_TYPE
-    && isTaskStartData(entry.data);
+  return isCustomEntry(entry, TASK_START_ENTRY_TYPE, isTaskStartData);
 }
 
-type TaskStartEntry = SessionEntry & {
-  type: 'custom';
-  customType: typeof TASK_START_ENTRY_TYPE;
-  data: TaskStartData;
-};
+type TaskStartEntry = CustomEntry<typeof TASK_START_ENTRY_TYPE, TaskStartData>;
 
 const TASK_START_ENTRY_TYPE = 'task-start';
 
