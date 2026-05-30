@@ -881,16 +881,9 @@ describe('automated workflow', () => {
   });
 
   it('notifies and exits when started with no pending tasks', async () => {
-    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, legacyRunAuto } =
-      makeHarness();
-
-    const running = legacyRunAuto();
-
-    await flushMicrotasks();
-    await releaseNextIdle();
-    await running;
-    // Should have exited without looping forever
-    assertBranchHistory(
+    const h = makeHarness();
+    await h.runAuto({ reactions: [] });
+    h.assertBranchHistory(
       notification('No pending tasks to run.'),
     );
   });
