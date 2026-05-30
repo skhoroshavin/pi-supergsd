@@ -8,7 +8,7 @@ export {
   userRunsAuto,
   notification,
   assumeCommandContext,
-} from './common.js';
+} from './descriptors.js';
 
 export { TestHarness } from './test-harness.js';
 
