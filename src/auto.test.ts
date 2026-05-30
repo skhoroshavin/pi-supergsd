@@ -51,7 +51,6 @@ describe('automated workflow', () => {
       taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
       notification('Task finished. Last response attached.'),
     );
-    // Status line should be clean — no stale [auto] prefix remains.
     assert.strictEqual(h.getStatus(), undefined);
   });
 

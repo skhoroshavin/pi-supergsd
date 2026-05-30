@@ -2,10 +2,7 @@ import { it } from 'node:test';
 
 import { makeHarness, type Harness } from './make-harness.js';
 
-export { pathSuite, path };
-export type { PathNode, PathFn };
-
-function pathSuite(...roots: PathNode[]): void {
+export function pathSuite(...roots: PathNode[]): void {
 
   function registerTests(node: PathNode, ancestors: PathNode[]): void {
     const chain = [...ancestors, node];
@@ -30,15 +27,15 @@ function pathSuite(...roots: PathNode[]): void {
   }
 }
 
-const path: PathFn = (name, fn, ...children) => ({ name, fn, children });
+export const path: PathFn = (name, fn, ...children) => ({ name, fn, children });
 
-type PathFn = (
+export type PathFn = (
   name: string,
   fn?: (h: Harness) => Promise<void> | void,
   ...children: PathNode[]
 ) => PathNode;
 
-interface PathNode {
+export interface PathNode {
   name: string;
   fn?: (h: Harness) => Promise<void> | void;
   children: PathNode[];
