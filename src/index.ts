@@ -2,6 +2,7 @@ import {
   defineTool,
   type ExtensionAPI,
   type ExtensionCommandContext,
+  type MessageRenderer,
   type RegisteredCommand,
   type SessionEntry,
   type SessionMessageEntry,
@@ -13,39 +14,99 @@ import { Box, Text } from '@earendil-works/pi-tui';
 
 import { Type } from 'typebox';
 
-export default function registerTaskCommands(pi: ExtensionAPI): void {
-  pi.registerTool(createPushTaskTool(pi));
-  pi.registerCommand('start-task', createStartTaskCommand(pi));
-  pi.registerCommand('discard-task', createDiscardTaskCommand(pi));
-  pi.registerCommand('finish-task', createFinishTaskCommand(pi));
-  pi.registerCommand('abort-task', createAbortTaskCommand());
-  pi.registerCommand('auto', createAutoCommand(pi));
+export function toolPushTask(pi: ExtensionAPI): ToolDefinition {
+  return defineTool({
+    name: 'push-task',
+    label: 'Push Task',
+    description: 'Store a task prompt for a user-started navigation branch.',
+    promptSnippet: 'Store a focused task prompt for a user-started navigation branch.',
+    promptGuidelines: [
+      'Use push-task to hand off a self-contained task for isolated execution.',
+      'Do not batch multiple push-task calls together, and do not mix push-task with other tool calls in the same turn.',
+    ],
+    parameters: pushTaskParameters,
+    renderCall(args, theme, context) {
+      const header = theme.fg('toolTitle', theme.bold('push-task'))
+        + (args.inherit_context ? ' ' + theme.fg('warning', '[inherit]') : '');
 
-  pi.registerMessageRenderer('task-result', (message, _options, theme) => {
-    const details = message.details as { slug?: string; sourceEntryId?: string } | undefined;
-    const label = details?.slug
-      ? theme.fg('customMessageLabel', `${details.slug} result:`)
-      : theme.fg('customMessageLabel', 'result:');
-    const text = extractTextContent(message.content);
-    const box = new Box(1, 1, (t: string) => theme.bg('customMessageBg', t));
-    box.addChild(new Text(`${label}\n${text}`, 0, 0));
-    return box;
-  });
+      const promptLines = (args.prompt as string).split('\n');
+      const maxLines = context.expanded ? promptLines.length : 7;
+      const displayLines = promptLines.slice(0, maxLines)
+        .map(l => theme.fg('dim', l.trimEnd() || ' '));
 
-  pi.on('session_start', async (_event, ctx) => {
-    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
-  });
+      if (!context.expanded && promptLines.length > maxLines) {
+        const totalLines = promptLines.length;
+        const moreLines = totalLines - maxLines;
+        displayLines.push(theme.fg('muted', `... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`));
+      }
 
-  pi.on('turn_end', async (_event, ctx) => {
-    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
-  });
+      return new Text([header, ...displayLines].join('\n'), 0, 0);
+    },
+    renderResult() {
+      return new Text('', 0, 0);
+    },
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      if (signal?.aborted) {
+        throw new Error('Task storage aborted.');
+      }
 
-  pi.on('session_tree', async (_event, ctx) => {
-    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+      pi.appendEntry(TASK_ENTRY_TYPE, { prompt: params.prompt, inherit_context: params.inherit_context ?? false });
+
+      if (ctx.hasUI) {
+        updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+        ctx.ui.notify('Task stored. Use `/start-task` or `/auto` to start it.', 'info');
+      }
+
+      return {
+        content: [],
+        details: { prompt: params.prompt, inherit_context: params.inherit_context ?? false },
+        terminate: true,
+      };
+    },
   });
 }
 
-export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
+export function cmdStartTask(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Navigate to a fresh context and inject the active task prompt',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await startTask(pi, ctx);
+    },
+  };
+}
+
+export function cmdDiscardTask(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Discard the active task without executing it',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await discardTask(pi, ctx);
+    },
+  };
+}
+
+export function cmdFinishTask(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Finish the current task and return to the task start point',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await finishTask(pi, ctx);
+    },
+  };
+}
+
+export function cmdAbortTask(): CommandOptions {
+  return {
+    description: 'Abort the current task without finishing',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await abortTask(ctx);
+    },
+  };
+}
+
+export function cmdAuto(pi: ExtensionAPI): CommandOptions {
   let running = false;
   let stopCurrentRun: (() => void) | null = null;
 
@@ -130,98 +191,14 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
-export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
-  return defineTool({
-    name: 'push-task',
-    label: 'Push Task',
-    description: 'Store a task prompt for a user-started navigation branch.',
-    promptSnippet: 'Store a focused task prompt for a user-started navigation branch.',
-    promptGuidelines: [
-      'Use push-task to hand off a self-contained task for isolated execution.',
-      'Do not batch multiple push-task calls together, and do not mix push-task with other tool calls in the same turn.',
-    ],
-    parameters: pushTaskParameters,
-    renderCall(args, theme, context) {
-      const header = theme.fg('toolTitle', theme.bold('push-task'))
-        + (args.inherit_context ? ' ' + theme.fg('warning', '[inherit]') : '');
-
-      const promptLines = (args.prompt as string).split('\n');
-      const maxLines = context.expanded ? promptLines.length : 7;
-      const displayLines = promptLines.slice(0, maxLines)
-        .map(l => theme.fg('dim', l.trimEnd() || ' '));
-
-      if (!context.expanded && promptLines.length > maxLines) {
-        const totalLines = promptLines.length;
-        const moreLines = totalLines - maxLines;
-        displayLines.push(theme.fg('muted', `... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`));
-      }
-
-      return new Text([header, ...displayLines].join('\n'), 0, 0);
-    },
-    renderResult() {
-      return new Text('', 0, 0);
-    },
-    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      if (signal?.aborted) {
-        throw new Error('Task storage aborted.');
-      }
-
-      pi.appendEntry(TASK_ENTRY_TYPE, { prompt: params.prompt, inherit_context: params.inherit_context ?? false });
-
-      if (ctx.hasUI) {
-        updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
-        ctx.ui.notify('Task stored. Use `/start-task` or `/auto` to start it.', 'info');
-      }
-
-      return {
-        content: [],
-        details: { prompt: params.prompt, inherit_context: params.inherit_context ?? false },
-        terminate: true,
-      };
-    },
-  });
-}
-
-// ── Thin command wrappers ───────────────────────────────────────
-
-export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Navigate to a fresh context and inject the active task prompt',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await startTask(pi, ctx);
-    },
-  };
-}
-
-export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Discard the active task without executing it',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await discardTask(pi, ctx);
-    },
-  };
-}
-
-export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Finish the current task and return to the task start point',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await finishTask(pi, ctx);
-    },
-  };
-}
-
-export function createAbortTaskCommand(): CommandOptions {
-  return {
-    description: 'Abort the current task without finishing',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await abortTask(ctx);
-    },
-  };
+export const rendererTaskResult: MessageRenderer<{ slug?: string; sourceEntryId?: string }> = (message, _options, theme): Box => {
+  const label = message.details?.slug
+      ? theme.fg('customMessageLabel', `${message.details.slug} result:`)
+      : theme.fg('customMessageLabel', 'result:');
+  const text = extractTextContent(message.content);
+  const box = new Box(1, 1, (t: string) => theme.bg('customMessageBg', t));
+  box.addChild(new Text(`${label}\n${text}`, 0, 0));
+  return box;
 }
 
 type CommandOptions = Omit<RegisteredCommand, 'name' | 'sourceInfo'>;
@@ -429,7 +406,7 @@ function findPreConversationEntry(
   return null;
 }
 
-function updateTaskStatus(
+export function updateTaskStatus(
   session: ReadonlySessionLike,
   setStatus: (key: string, value: string | undefined) => void,
   theme: Theme,

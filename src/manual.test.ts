@@ -1,12 +1,12 @@
 import assert from 'node:assert';
 
 import {
-  createPushTaskTool,
-  createStartTaskCommand,
-  createFinishTaskCommand,
-  createAbortTaskCommand,
-  createDiscardTaskCommand,
-  createAutoCommand,
+  toolPushTask,
+  cmdStartTask,
+  cmdFinishTask,
+  cmdAbortTask,
+  cmdDiscardTask,
+  cmdAuto,
 } from './index.js';
 
 import {
@@ -19,12 +19,12 @@ import {
 } from './test-helpers/index.js';
 
 const implementation = {
-  createPushTaskTool,
-  createStartTaskCommand,
-  createFinishTaskCommand,
-  createAbortTaskCommand,
-  createDiscardTaskCommand,
-  createAutoCommand,
+  createPushTaskTool: toolPushTask,
+  createStartTaskCommand: cmdStartTask,
+  createFinishTaskCommand: cmdFinishTask,
+  createAbortTaskCommand: cmdAbortTask,
+  createDiscardTaskCommand: cmdDiscardTask,
+  createAutoCommand: cmdAuto,
 };
 
 pathSuite('manual workflow', implementation, (path) => {

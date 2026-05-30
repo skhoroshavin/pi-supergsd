@@ -10,12 +10,12 @@ import {
 } from '@earendil-works/pi-coding-agent';
 
 import {
-  createAutoCommand,
-  createPushTaskTool,
-  createStartTaskCommand,
-  createFinishTaskCommand,
-  createAbortTaskCommand,
-  createDiscardTaskCommand,
+  cmdAuto,
+  toolPushTask,
+  cmdStartTask,
+  cmdFinishTask,
+  cmdAbortTask,
+  cmdDiscardTask,
 } from './index.js';
 
 import {
@@ -156,7 +156,7 @@ describe('automated workflow', () => {
       navigateTree: async () => ({ cancelled: false }),
     } as unknown as ExtensionCommandContext;
 
-    const auto = createAutoCommand(pi);
+    const auto = cmdAuto(pi);
     for (const handler of sessionShutdownHandlers) {
       await handler();
     }
@@ -312,10 +312,10 @@ describe('automated workflow', () => {
 });
 
 const implementation = {
-  createPushTaskTool,
-  createStartTaskCommand,
-  createFinishTaskCommand,
-  createAbortTaskCommand,
-  createDiscardTaskCommand,
-  createAutoCommand,
+  createPushTaskTool: toolPushTask,
+  createStartTaskCommand: cmdStartTask,
+  createFinishTaskCommand: cmdFinishTask,
+  createAbortTaskCommand: cmdAbortTask,
+  createDiscardTaskCommand: cmdDiscardTask,
+  createAutoCommand: cmdAuto,
 };
