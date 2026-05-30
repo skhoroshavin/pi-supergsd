@@ -1,13 +1,5 @@
 import type { ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
 
-export type BranchEntry = UserEntry | AssistantEntry | TaskEntry | TaskResultEntry | NotificationEntry;
-
-export type NotificationEntry = {
-  type: 'notification';
-  text: string;
-  afterEntryId: string | null;
-};
-
 export interface AutoConfig {
   reactions?: Array<[MatchDescriptor, ReactionDescriptor]>;
 }
@@ -24,6 +16,36 @@ export type ReactionDescriptor =
   | { type: 'user-ctrl-c' }
   | { type: 'user-runs-auto' };
 
+export type BranchEntry = UserEntry | AssistantEntry | TaskEntry | TaskResultEntry | NotificationEntry;
+
+export type NotificationEntry = {
+  type: 'notification';
+  text: string;
+  afterEntryId: string | null;
+};
+
+export type ResponseDescriptor = RespondsDescriptor | ThinksDescriptor | AbortsDescriptor | PushTaskDescriptor;
+
+export type PromptMatch = { type: 'match:prompt'; text: string };
+
+export type QueuedTaskMatch = {
+  type: 'match:queued-task';
+  prompt: string;
+  inherit_context: boolean;
+};
+
+export type RespondsDescriptor = { type: 'response:text'; text: string };
+
+export type ThinksDescriptor = { type: 'response:thinking'; text: string };
+
+export type AbortsDescriptor = { type: 'response:aborted'; text: string };
+
+export type PushTaskDescriptor = {
+  type: 'response:push-task';
+  prompt: string;
+  inherit_context: boolean;
+};
+
 export {
   assistant,
   user,
@@ -34,6 +56,12 @@ export {
   userRunsAuto,
   notification,
   assumeCommandContext,
+  prompt,
+  queuedTask,
+  responds,
+  thinks,
+  aborts,
+  pushTask,
 };
 
 const assistant = (content: string, stopReason?: string): AssistantEntry => ({
@@ -105,6 +133,26 @@ type TextBlock = {
   type: 'text';
   text: string;
 };
+
+const prompt = (text: string): PromptMatch => ({ type: 'match:prompt', text });
+
+const queuedTask = (prompt_: string, inherit_context = false): QueuedTaskMatch => ({
+  type: 'match:queued-task',
+  prompt: prompt_,
+  inherit_context,
+});
+
+const responds = (text: string): RespondsDescriptor => ({ type: 'response:text', text });
+
+const thinks = (text: string): ThinksDescriptor => ({ type: 'response:thinking', text });
+
+const aborts = (text: string): AbortsDescriptor => ({ type: 'response:aborted', text });
+
+const pushTask = (prompt_: string, inherit_context = false): PushTaskDescriptor => ({
+  type: 'response:push-task',
+  prompt: prompt_,
+  inherit_context,
+});
 
 const userEsc = (): { type: 'user-esc' } => ({ type: 'user-esc' });
 

@@ -15,6 +15,8 @@ import {
 import registerSuperGsd from '../../index.js';
 import { assertBranchHistory, assertSessionContains } from './assertions.js';
 import type { BranchEntry } from './descriptors.js';
+import type { ResponseDescriptor } from './descriptors.js';
+import { FAUX_MODEL, FAUX_PROVIDER, FauxResponseQueue } from './faux-provider.js';
 import { TestUI } from './ui.js';
 
 export class TestHarness {
@@ -22,6 +24,7 @@ export class TestHarness {
     private readonly session: AgentSession,
     private readonly sessionManager: SessionManager,
     private readonly ui: TestUI,
+    private readonly fauxResponses: FauxResponseQueue,
   ) {}
 
   static async create(): Promise<TestHarness> {
@@ -34,11 +37,35 @@ export class TestHarness {
       retry: { enabled: false },
     });
     const sessionManager = SessionManager.inMemory(cwd);
+    const fauxResponses = new FauxResponseQueue();
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir,
       settingsManager,
-      extensionFactories: [registerSuperGsd],
+      extensionFactories: [
+        (pi) => {
+          pi.registerProvider(FAUX_PROVIDER, {
+            api: FAUX_MODEL.api,
+            baseUrl: FAUX_MODEL.baseUrl,
+            apiKey: 'test-key',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- inline types don't match pi-ai ProviderConfig
+            streamSimple: fauxResponses.stream as any,
+            models: [{
+              id: FAUX_MODEL.id,
+              name: FAUX_MODEL.name,
+              api: FAUX_MODEL.api,
+              baseUrl: FAUX_MODEL.baseUrl,
+              reasoning: FAUX_MODEL.reasoning,
+              thinkingLevelMap: FAUX_MODEL.thinkingLevelMap,
+              input: [...FAUX_MODEL.input],
+              cost: FAUX_MODEL.cost,
+              contextWindow: FAUX_MODEL.contextWindow,
+              maxTokens: FAUX_MODEL.maxTokens,
+            }],
+          });
+        },
+        registerSuperGsd,
+      ],
     });
     await resourceLoader.reload();
 
@@ -50,11 +77,14 @@ export class TestHarness {
       resourceLoader,
       sessionManager,
       settingsManager,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- inline types don't match pi-ai Model<any>
+      model: FAUX_MODEL as any,
+      thinkingLevel: 'off' as const,
       noTools: 'builtin',
     });
 
     const ui = new TestUI();
-    const harness = new TestHarness(session, sessionManager, ui);
+    const harness = new TestHarness(session, sessionManager, ui, fauxResponses);
     await session.bindExtensions({
       uiContext: ui.context,
       commandContextActions: harness.commandContextActions(),
@@ -98,6 +128,23 @@ export class TestHarness {
 
   registeredToolNames(): string[] {
     return this.session.getAllTools().map(tool => tool.name).sort();
+  }
+
+  modelName(): string | undefined {
+    const model = this.session.model;
+    return model ? `${model.provider}/${model.id}` : undefined;
+  }
+
+  async prompt(text: string, ...responses: ResponseDescriptor[]): Promise<void> {
+    this.fauxResponses.enqueue(...responses);
+    await this.session.prompt(text, { expandPromptTemplates: false, source: 'test' as never });
+    await this.session.agent.waitForIdle();
+    this.assertNoQueuedResponses(`prompt(${JSON.stringify(text)})`);
+  }
+
+  private assertNoQueuedResponses(label: string): void {
+    const remaining = this.fauxResponses.remaining();
+    assert.deepStrictEqual(remaining, [], `${label} left unused faux responses queued`);
   }
 
   private commandContextActions() {

@@ -8,6 +8,12 @@ export {
   userRunsAuto,
   notification,
   assumeCommandContext,
+  prompt,
+  queuedTask,
+  responds,
+  thinks,
+  aborts,
+  pushTask,
 } from './descriptors.js';
 
 export { TestHarness } from './harness.js';
