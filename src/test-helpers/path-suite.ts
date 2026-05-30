@@ -2,14 +2,10 @@ import { it } from 'node:test';
 
 import { makeHarness, type Harness } from './make-harness.js';
 
-export { pathSuite };
+export { pathSuite, path };
 export type { PathNode, PathFn };
 
-function pathSuite(
-  fn: (path: PathFn) => PathNode | PathNode[],
-): void {
-  const roots = fn(path);
-  const rootsArray = Array.isArray(roots) ? roots : [roots];
+function pathSuite(...roots: PathNode[]): void {
 
   function registerTests(node: PathNode, ancestors: PathNode[]): void {
     const chain = [...ancestors, node];
@@ -29,7 +25,7 @@ function pathSuite(
     }
   }
 
-  for (const root of rootsArray) {
+  for (const root of roots) {
     registerTests(root, []);
   }
 }

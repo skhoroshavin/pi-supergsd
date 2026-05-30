@@ -12,7 +12,7 @@ export {
 
 export { makeHarness } from './make-harness.js';
 
-export { pathSuite } from './path-suite.js';
+export { path, pathSuite } from './path-suite.js';
 
 export type {
   BranchEntry,

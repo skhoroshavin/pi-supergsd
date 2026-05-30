@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import {
   assistant,
   notification,
+  path,
   pathSuite,
   task,
   taskResult,
@@ -12,8 +13,7 @@ import {
 import { describe } from 'node:test';
 
 describe('manual workflow', () => {
-  pathSuite((path) => {
-    return [
+  pathSuite(
         path('push AAA', async (h) => {
             h.appendUserMessage('main work');
             h.appendAssistantMessage('working...');
@@ -763,6 +763,5 @@ describe('manual workflow', () => {
             notification('Not inside task, nothing to abort.'),
         );
     }),
-    ];
-  });
+  );
 });
