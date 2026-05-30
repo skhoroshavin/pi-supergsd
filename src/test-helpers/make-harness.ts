@@ -28,17 +28,6 @@ import {
 
 export class Harness {
   constructor() {
-    this.sm = SessionManager.inMemory();
-    this.idleWaiters = [];
-    this.sessionShutdownHandlers = [];
-    this.triggeredCustomMessages = new Set<string>();
-    this.triggeredUserMessages = new Set<string>();
-    this.trackedHints = [];
-    this.notificationLog = [];
-    this.taskStatusHistory = [];
-    this.cancelNextNav = false;
-    this.taskStatus = undefined;
-
     // Seed a non-visible root entry so findFreshTargetId can escape past user messages.
     // Pi always inserts thinking_level_change at session creation (main.js:471).
     this.sm.appendThinkingLevelChange('off');
@@ -117,15 +106,15 @@ export class Harness {
     this.autoHandler = cmdAuto(this.pi).handler;
   }
 
-  private readonly sm: SessionManager;
-  private readonly idleWaiters: Array<() => void>;
-  private readonly sessionShutdownHandlers: Array<() => unknown>;
-  private readonly triggeredCustomMessages: Set<string>;
-  private readonly triggeredUserMessages: Set<string>;
-  private readonly trackedHints: Array<{ text: string; afterEntryId: string | null }>;
-  private readonly notificationLog: string[];
-  private readonly taskStatusHistory: Array<string | undefined>;
-  private cancelNextNav: boolean;
+  private readonly sm = SessionManager.inMemory();
+  private readonly idleWaiters: Array<() => void> = [];
+  private readonly sessionShutdownHandlers: Array<() => unknown> = [];
+  private readonly triggeredCustomMessages = new Set<string>();
+  private readonly triggeredUserMessages = new Set<string>();
+  private readonly trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
+  private readonly notificationLog: string[] = [];
+  private readonly taskStatusHistory: Array<string | undefined> = [];
+  private cancelNextNav = false;
   private taskStatus: string | undefined;
   private readonly pi: Parameters<typeof cmdAuto>[0] & Parameters<typeof toolPushTask>[0];
   private readonly ctx: ExtensionCommandContext;
@@ -148,15 +137,15 @@ export class Harness {
     return false;
   }
 
-appendUserMessage(text: string): void {
+  appendUserMessage(text: string): void {
     this.sm.appendMessage(makeUserMessage(text));
   }
 
-appendAssistantMessage(text: string, stopReason?: string): void {
+  appendAssistantMessage(text: string, stopReason?: string): void {
     this.sm.appendMessage(makeAssistantMessage(text, stopReason));
   }
 
-assertBranchHistory(...expected: BranchEntry[]): void {
+  assertBranchHistory(...expected: BranchEntry[]): void {
     const entries = this.sm.getBranch();
     const actual: BranchEntry[] = [];
     const consumedHints = new Set<number>();
@@ -198,7 +187,7 @@ assertBranchHistory(...expected: BranchEntry[]): void {
     assert.deepStrictEqual(actual, expected);
   }
 
-assertSessionContains(...expected: BranchEntry[]): void {
+  assertSessionContains(...expected: BranchEntry[]): void {
     const actual = this.sm.getEntries()
       .map(entry => this.stripVisibleEntry(entry))
       .filter((entry): entry is BranchEntry => entry !== null);
@@ -211,41 +200,41 @@ assertSessionContains(...expected: BranchEntry[]): void {
     }
   }
 
-assertNotifications(...expected: string[]): void {
+  assertNotifications(...expected: string[]): void {
     for (const text of expected) {
       assert.ok(this.notificationLog.includes(text), `Expected notification log to include: ${text}`);
     }
   }
 
-assertTaskStatusHistoryIncludes(expected: string | undefined): void {
+  assertTaskStatusHistoryIncludes(expected: string | undefined): void {
     assert.ok(
       this.taskStatusHistory.includes(expected),
       `Expected task status history to include ${JSON.stringify(expected)}, got ${JSON.stringify(this.taskStatusHistory)}`,
     );
   }
 
-async runPushTask(prompt: string, inherit_context?: boolean): Promise<void> {
+  async runPushTask(prompt: string, inherit_context?: boolean): Promise<void> {
     const tool = toolPushTask(this.pi);
     await tool.execute('call-1', { prompt, inherit_context }, undefined, undefined, this.ctx);
   }
 
-async runStartTask(): Promise<void> {
+  async runStartTask(): Promise<void> {
     await this.runTaskCommand(cmdStartTask(this.pi));
   }
 
-async runFinishTask(): Promise<void> {
+  async runFinishTask(): Promise<void> {
     await this.runTaskCommand(cmdFinishTask(this.pi));
   }
 
-async runDiscardTask(): Promise<void> {
+  async runDiscardTask(): Promise<void> {
     await this.runTaskCommand(cmdDiscardTask(this.pi));
   }
 
-async runAbortTask(): Promise<void> {
+  async runAbortTask(): Promise<void> {
     await this.runTaskCommand(cmdAbortTask());
   }
 
-async runAuto(config: AutoConfig): Promise<void> {
+  async runAuto(config: AutoConfig): Promise<void> {
     const reactions = config.reactions ?? [];
     let settled = false;
     let lastStep = -1;
@@ -289,11 +278,11 @@ async runAuto(config: AutoConfig): Promise<void> {
     await handlerPromise;
   }
 
-getStatus(): string | undefined {
+  getStatus(): string | undefined {
     return this.taskStatus;
   }
 
-private stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
+  private stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
     const HIDDEN_TYPES = new Set(['thinking_level_change', 'model_change', 'session_info', 'label']);
     const isSkipped =
       HIDDEN_TYPES.has(entry.type)
@@ -356,7 +345,7 @@ private stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
     return null;
   }
 
-private entriesEqual(actual: BranchEntry, expected: BranchEntry): boolean {
+  private entriesEqual(actual: BranchEntry, expected: BranchEntry): boolean {
     try {
       assert.deepStrictEqual(actual, expected);
       return true;
@@ -365,7 +354,7 @@ private entriesEqual(actual: BranchEntry, expected: BranchEntry): boolean {
     }
   }
 
-private async runTaskCommand(command: TaskCommand): Promise<void> {
+  private async runTaskCommand(command: TaskCommand): Promise<void> {
     const handlerP = command.handler('', this.ctx);
     const next = this.idleWaiters.shift();
     assert.ok(next, 'Expected a pending waitForIdle call.');
@@ -376,7 +365,7 @@ private async runTaskCommand(command: TaskCommand): Promise<void> {
     await handlerP;
   }
 
-private scanAndReact(
+  private scanAndReact(
     reactions: Array<[MatchDescriptor, ReactionDescriptor]>,
     seenIds: Set<string>,
   ): void {
@@ -393,7 +382,7 @@ private scanAndReact(
     }
   }
 
-private entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
+  private entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
     if (match.type === 'message') {
       if (entry.type !== 'message') return false;
       if (entry.message.role !== 'user' && entry.message.role !== 'assistant') return false;
@@ -417,7 +406,7 @@ private entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
     return false;
   }
 
-private applyReaction(reaction: ReactionDescriptor): void {
+  private applyReaction(reaction: ReactionDescriptor): void {
     // --- user-esc reaction: cancel next navigation ---
     if (reaction.type === 'user-esc') {
       this.cancelNextNav = true;
