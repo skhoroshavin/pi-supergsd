@@ -777,7 +777,7 @@ pathSuite('manual workflow', (path) => {
 
 describe('automated workflow', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, legacyRunAuto } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -791,7 +791,7 @@ describe('automated workflow', () => {
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
     );
 
-    const running = runAuto();
+    const running = legacyRunAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
@@ -816,7 +816,7 @@ describe('automated workflow', () => {
   });
 
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, legacyRunAuto } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -830,7 +830,7 @@ describe('automated workflow', () => {
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
     );
 
-    const running = runAuto();
+    const running = legacyRunAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
@@ -858,7 +858,7 @@ describe('automated workflow', () => {
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
-    const { appendUserMessage, assertBranchHistory, isLlmTriggered, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, assertBranchHistory, isLlmTriggered, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, legacyRunAuto } =
       makeHarness();
 
     appendUserMessage('main work');
@@ -866,7 +866,7 @@ describe('automated workflow', () => {
 
     setCancelNextNav(true);
 
-    const running = runAuto();
+    const running = legacyRunAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
@@ -881,10 +881,10 @@ describe('automated workflow', () => {
   });
 
   it('notifies and exits when started with no pending tasks', async () => {
-    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, runAuto } =
+    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, legacyRunAuto } =
       makeHarness();
 
-    const running = runAuto();
+    const running = legacyRunAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
@@ -896,13 +896,13 @@ describe('automated workflow', () => {
   });
 
   it('warns and returns when /auto is already running', async () => {
-    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
+    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, emitSessionShutdown, legacyRunAuto } =
       makeHarness();
 
-    const firstRun = runAuto();
+    const firstRun = legacyRunAuto();
     await flushMicrotasks();
 
-    await runAuto();
+    await legacyRunAuto();
     assertBranchHistory(notification('Auto is already running.'));
 
     await emitSessionShutdown();
@@ -911,7 +911,7 @@ describe('automated workflow', () => {
   });
 
   it('stops when the last assistant message was aborted', async () => {
-    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, legacyRunAuto } =
       makeHarness();
 
     appendUserMessage('start');
@@ -921,7 +921,7 @@ describe('automated workflow', () => {
 
     appendAssistantMessage('Stopped by user.', 'aborted');
 
-    const running = runAuto();
+    const running = legacyRunAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
@@ -930,7 +930,7 @@ describe('automated workflow', () => {
   });
 
   it('keeps waiting while follow-up work is pending after finishTask', async () => {
-    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, legacyRunAuto } =
       makeHarness();
 
     appendUserMessage('start');
@@ -941,7 +941,7 @@ describe('automated workflow', () => {
     appendAssistantMessage('Fixed the bug.');
 
     let resolved = false;
-    const running = runAuto().then(() => {
+    const running = legacyRunAuto().then(() => {
       resolved = true;
     });
 
@@ -1260,7 +1260,7 @@ function makeHarness() {
   // Auto-register commands so the shutdown handler is set up
   registerTaskCommands(pi);
 
-  function runAuto(): Promise<void> {
+  function legacyRunAuto(): Promise<void> {
     return createAutoCommand(pi).handler('', ctx) as Promise<void>;
   }
 
@@ -1284,7 +1284,7 @@ function makeHarness() {
     runFinishTask,
     runDiscardTask,
     runAbortTask,
-    runAuto,
+    legacyRunAuto,
   };
 }
 
