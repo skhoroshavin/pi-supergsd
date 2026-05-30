@@ -48,11 +48,13 @@ Tests also depend on the module-level `autoState = { running: false }` variable,
    - `user("text")` — inject a user message
    - `task("prompt")` / `task("prompt", inherit)` — inject a task entry (equivalent to pushTask)
    - `userEsc()` — cancel the next `navigateTree` call and stop the auto loop; or stop the auto loop immediately if no navigation is pending
+   - `userCtrlC()` — trigger session shutdown, setting the `stopped` flag in auto's closure and causing the loop to exit
    - `userRunsAuto()` — invoke `/auto` again from within the running auto session (used to test the "already running" guard)
 
    Helper signatures:
    ```ts
    const userEsc = () => ({ type: 'user-esc' as const });
+   const userCtrlC = () => ({ type: 'user-ctrl-c' as const });
    const userRunsAuto = () => ({ type: 'user-runs-auto' as const });
    ```
 
@@ -83,6 +85,7 @@ The existing `runAuto()` is replaced by the new config-based version.
 | 6 | subtask within a task | `[[user("parent"), assistant("working...")], [assistant("working..."), task("subtask")], [user("subtask"), assistant("sub done")]]` |
 | 7 | /auto already running | `[[user("first"), assistant("done")], [assistant("done"), userRunsAuto()]]` |
 | 8 | user steering message queued | `[[user("task"), assistant("thinking...")], [assistant("thinking..."), user("steer it")]]` |
+| 9 | session shutdown during auto | `[[user("task"), assistant("working...")], [assistant("working..."), userCtrlC()]]` |
 
 #### Case details
 
@@ -99,6 +102,8 @@ The existing `runAuto()` is replaced by the new config-based version.
 **7: Already running.** A reaction triggers a second `runAuto()` call from within the first. The second invocation detects the first is still running, injects "Auto is already running" notification, returns immediately.
 
 **8: User steering.** User queue-messages a steering instruction while the assistant is mid-response. The auto loop continues because the reaction `[assistant("thinking..."), user("steer it")]` still has pending work (the `user` side hasn't been applied yet after the assistant match is seen), causing the harness to keep the loop alive rather than exiting.
+
+**9: Session shutdown.** A `userCtrlC()` reaction triggers session shutdown, which sets the `stopped` flag in auto's closure. The auto loop breaks on the next iteration and exits. The test verifies auto stops without marking the task done.
 
 ### Error handling & edge cases
 
