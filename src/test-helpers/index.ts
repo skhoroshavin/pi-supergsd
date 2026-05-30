@@ -10,6 +10,7 @@ export {
   assumeCommandContext,
 } from './descriptors.js';
 
-export { TestHarness } from './test-harness.js';
+export { TestHarness } from './harness.js';
+export { LegacyTestHarness } from './legacy-harness.js';
 
 export { node } from './test-tree.js';

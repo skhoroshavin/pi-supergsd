@@ -14,7 +14,7 @@ import {
 import {
   assistant,
   assumeCommandContext,
-  TestHarness,
+  LegacyTestHarness as TestHarness,
   notification,
   task,
   taskResult,
