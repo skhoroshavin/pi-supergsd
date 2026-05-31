@@ -33,7 +33,7 @@ The current harness lost that placement data, so it can no longer reconstruct th
 - Do not make notifications real Pi session entries
 - Do not snapshot the literal TUI widget tree
 - Do not change runtime extension behavior just to support tests
-- Do not remove `assertSessionContains(...)`, which serves a different purpose
+- Do not remove `assertSessionContains(...)` in this change; keep it temporarily as a legacy compatibility helper
 
 ## Proposed module: `src/test-helpers/test-session.ts`
 
@@ -84,6 +84,8 @@ The exported test descriptor surface should also move here:
 
 `src/test-helpers/index.ts` should re-export those helpers from `test-session.ts`.
 
+`assertSessionContains(...)` remains on `TestHarness` temporarily as a legacy compatibility helper.
+
 ## Naming
 
 The public test-visible union should be named `SessionEntry`.
@@ -115,15 +117,16 @@ type SessionEntry =
 type NotificationEntry = {
   type: "notification";
   message: string;
-  level: "error" | "warning" | "info" | undefined;
 };
 ```
 
 The constructor is:
 
 ```ts
-notification(message: string, level?: "error" | "warning" | "info")
+notification(message: string)
 ```
+
+Notification levels may still be passed through the runtime UI API, but they are intentionally not part of the visible test-session assertion model.
 
 Internal placement metadata is not part of the expected test value.
 
@@ -134,7 +137,6 @@ When `ctx.ui.notify(...)` fires, `TestSession` should record:
 ```ts
 {
   message: string;
-  level: "error" | "warning" | "info" | undefined;
   anchorEntryId: string | null;
 }
 ```
@@ -156,7 +158,7 @@ This replaces the old visible-session assertion pair:
 - remove `assertBranchHistory(...)`
 - remove `assertNotifications(...)`
 
-`assertSessionContains(...)` stays unchanged.
+`assertSessionContains(...)` stays for now as a legacy compatibility API during migration, but is no longer the preferred primary assertion and should be considered for later removal.
 
 `assertNotificationEntries(...)` should be removed after migration unless a remaining low-level test proves it still adds value.
 
@@ -194,10 +196,7 @@ Example: `finishTask(...)` may emit a notification after appending a hidden `tas
 
 ## Equality semantics
 
-For notifications, assertion equality compares only:
-
-- `message`
-- `level`
+For notifications, assertion equality compares only `message`.
 
 It does not compare internal anchor metadata.
 
@@ -229,7 +228,7 @@ h.assertSession(
   user("main work"),
   assistant("working...", "toolUse"),
   task("Task AAA"),
-  notification("Task stored. Use `/start-task` or `/auto` to start it.", "info"),
+  notification("Task stored. Use `/start-task` or `/auto` to start it."),
 );
 ```
 
@@ -250,8 +249,6 @@ If a notification was anchored to an entry that is not on the current branch, om
 ### 5. Null anchor
 If a notification has `anchorEntryId === null`, treat it as a leading visible item before branch content.
 
-### 6. Level-aware notifications
-Tests should be able to assert `info`, `warning`, and `error` levels when the level matters.
 
 ## File-level changes
 
