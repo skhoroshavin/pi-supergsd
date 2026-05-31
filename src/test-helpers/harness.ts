@@ -17,11 +17,15 @@ import {
 import registerSuperGsd from "../../index.js";
 import { isDeepStrictEqual } from "node:util";
 import { extractTextContent } from "../text-content.js";
-import { visibleEntries, type BranchEntry } from "./descriptors.js";
+import {
+  durableEntries,
+  type DurableSessionEntry,
+  type SessionEntry as TestSessionEntry,
+  TestSession,
+} from "./test-session.js";
 import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
 import { MockLLM } from "./mock-llm.js";
 import { MockUser, type MockUserAction } from "./mock-user.js";
-import { TestUI } from "./ui.js";
 
 export class TestHarness {
   private constructor(
@@ -29,7 +33,7 @@ export class TestHarness {
     readonly user: MockUser,
     private readonly session: AgentSession,
     private readonly sessionManager: SessionManager,
-    private readonly ui: TestUI,
+    private readonly testSession: TestSession,
     private readonly fauxProvider: FauxProvider,
     private seenReactionEntryIds = new Set<string>(),
     private cancelNextNav = false,
@@ -94,16 +98,17 @@ export class TestHarness {
       noTools: "builtin",
     });
 
+    const testSession = new TestSession(sessionManager);
     const harness = new TestHarness(
       llm,
       user,
       session,
       sessionManager,
-      new TestUI(),
+      testSession,
       fauxProvider,
     );
     await session.bindExtensions({
-      uiContext: harness.ui.context,
+      uiContext: harness.testSession.context,
       commandContextActions: harness.commandContextActions(),
       shutdownHandler: () => {
         // No-op: we don't want extension shutdown to terminate the process.
@@ -118,19 +123,15 @@ export class TestHarness {
   }
 
   getStatus(): string | undefined {
-    return this.ui.status;
+    return this.testSession.status;
   }
 
-  assertBranchHistory(...expected: BranchEntry[]): void {
-    assert.deepStrictEqual(
-      visibleEntries(this.sessionManager.getBranch()),
-      expected,
-    );
+  assertSession(...expected: TestSessionEntry[]): void {
+    assert.deepStrictEqual(this.testSession.entries(), expected);
   }
 
-  assertSessionContains(...expected: BranchEntry[]): void {
-    const actual = visibleEntries(this.sessionManager.getEntries());
-
+  assertSessionContains(...expected: DurableSessionEntry[]): void {
+    const actual = durableEntries(this.sessionManager.getEntries());
     for (const expectedEntry of expected) {
       assert.ok(
         actual.some((entry) => isDeepStrictEqual(entry, expectedEntry)),
@@ -139,30 +140,32 @@ export class TestHarness {
     }
   }
 
+  assertTaskStatusHistoryIncludes(expected: string | undefined): void {
+    assert.ok(
+      this.testSession.taskStatusHistory.includes(expected),
+      `Expected task status history to include ${JSON.stringify(expected)}`,
+    );
+  }
+
+  // Temporary wrappers until src/auto.test.ts and src/manual.test.ts are
+  // migrated.
+  assertBranchHistory(...expected: DurableSessionEntry[]): void {
+    const visible = this.testSession
+      .entries()
+      .filter(
+        (entry): entry is DurableSessionEntry => entry.type !== "notification",
+      );
+    assert.deepStrictEqual(visible, expected);
+  }
+
   assertNotifications(...expected: string[]): void {
-    const messages = this.ui.notificationLog.map((entry) => entry.message);
+    const actual = this.testSession.notificationMessages;
     for (const text of expected) {
       assert.ok(
-        messages.includes(text),
+        actual.includes(text),
         `Expected notification log to include: ${text}`,
       );
     }
-  }
-
-  assertNotificationEntries(
-    expected: Array<{
-      message: string;
-      level: "error" | "warning" | "info" | undefined;
-    }>,
-  ): void {
-    assert.deepStrictEqual(this.ui.notificationLog, expected);
-  }
-
-  assertTaskStatusHistoryIncludes(expected: string | undefined): void {
-    assert.ok(
-      this.ui.taskStatusHistory.includes(expected),
-      `Expected task status history to include ${JSON.stringify(expected)}`,
-    );
   }
 
   async waitForIdle(): Promise<void> {

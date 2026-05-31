@@ -5,6 +5,7 @@ import { describe, it, type TestContext } from "node:test";
 import {
   aborts,
   assistant,
+  notification,
   pushTask,
   responds,
   task,
@@ -26,7 +27,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.llm.onPrompt("main work", responds("working..."));
 
     await h.prompt("main work");
-    h.assertBranchHistory(user("main work"), assistant("working..."));
+    h.assertSession(user("main work"), assistant("working..."));
   });
 
   it("slash-prefixed prompts go through the real slash pipeline", async (t) => {
@@ -35,9 +36,9 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
     await h.prompt("/start-task");
 
-    h.assertNotificationEntries([
-      { message: "No pending task. Use push-task first.", level: "warning" },
-    ]);
+    h.assertSession(
+      notification("No pending task. Use push-task first."),
+    );
   });
 
   it("supports thinking and aborted response descriptors", async (t) => {
@@ -46,7 +47,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.llm.onPrompt("stop", aborts("Stopped by user."));
 
     await h.prompt("think");
-    h.assertBranchHistory(user("think"), assistant(""));
+    h.assertSession(user("think"), assistant(""));
 
     await h.prompt("stop");
     h.assertSessionContains(
@@ -60,9 +61,13 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.llm.onPrompt("delegate work", pushTask("subtask", true));
 
     await h.prompt("delegate work");
-    h.assertSessionContains(user("delegate work"), task("subtask", true));
-    h.assertNotifications(
-      "Task stored. Use `/start-task` or `/auto` to start it.",
+    h.assertSession(
+      user("delegate work"),
+      assistant("", "toolUse"),
+      task("subtask", true),
+      notification(
+        "Task stored. Use `/start-task` or `/auto` to start it.",
+      ),
     );
   });
 
@@ -104,19 +109,34 @@ describe("AgentSession-backed TestHarness foundation", () => {
     );
 
     await h.prompt("Analyze X");
-    h.assertSessionContains(
+    h.assertSession(
       user("Analyze X"),
       assistant("preparing subagent", "toolUse"),
       task("Detailed X analysis"),
+      notification(
+        "Task stored. Use `/start-task` or `/auto` to start it.",
+      ),
     );
   });
 
-  it("records notification levels", async (t) => {
+  it("assertSessionContains still scans durable whole-session entries across branches", async (t) => {
     const h = await makeHarness(t);
+    h.llm.onPrompt(
+      "main work",
+      responds("working..."),
+      pushTask("Task AAA"),
+    );
+    h.llm.onPrompt("Task AAA", responds("Done."));
+
+    await h.prompt("main work");
     await h.prompt("/start-task");
-    h.assertNotificationEntries([
-      { message: "No pending task. Use push-task first.", level: "warning" },
-    ]);
+
+    h.assertSession(user("Task AAA"), assistant("Done."));
+    h.assertSessionContains(
+      user("main work"),
+      assistant("working...", "toolUse"),
+      task("Task AAA"),
+    );
   });
 
   it("fires assistant and queued-task user actions once per new entry", async (t) => {
@@ -130,12 +150,15 @@ describe("AgentSession-backed TestHarness foundation", () => {
     await h.prompt("main work");
     await h.waitForIdle();
 
-    h.assertSessionContains(
+    h.assertSession(
       user("main work"),
       assistant("working..."),
       user("queue follow-up"),
       assistant("", "toolUse"),
       task("follow-up"),
+      notification(
+        "Task stored. Use `/start-task` or `/auto` to start it.",
+      ),
       user("answer follow-up"),
       assistant("queued response"),
     );
