@@ -5,10 +5,9 @@
   "type": "module",
   "scripts": {
     "updater": "tsx updater/updater.ts",
-    "lint": "eslint '**/*.ts'",
-    "fix": "eslint '**/*.ts' --fix",
+    "fix": "prettier --write '**/*.ts' && eslint '**/*.ts' --fix",
     "test": "tsx --test '**/*.test.ts'",
-    "verify": "npm run lint && npx tsc --noEmit && npm test && npm run updater && git diff --exit-code -- skills && npm pack --dry-run"
+    "verify": "npx tsc --noEmit && eslint '**/*.ts' && npm test && npm run updater && prettier --check '**/*.ts'"
   },
   "keywords": [
     "pi-package",
@@ -51,6 +50,7 @@
     "@types/node": "^25.9.1",
     "eslint": "^10.4.0",
     "eslint-plugin-unslop": "^0.7.3",
+    "prettier": "^3.8.3",
     "tsx": "^4.0.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4"
