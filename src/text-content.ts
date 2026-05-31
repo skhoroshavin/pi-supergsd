@@ -1,5 +1,3 @@
-export { makeSlug } from './slug.js';
-
 export function renderTextContent(content: unknown): string {
   return extractTextContent(content) ?? String(content ?? '');
 }

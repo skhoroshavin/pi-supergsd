@@ -1,9 +1,7 @@
 export {
   aborts,
   assistant,
-  prompt,
   pushTask,
-  queuedTask,
   responds,
   task,
   taskResult,
@@ -16,6 +14,7 @@ export {
   assumeCommandContext,
 } from './descriptors.js';
 
+export { ReactionEngine } from './reaction-engine.js';
 export { TestHarness } from './harness.js';
 
 export { node } from './test-tree.js';

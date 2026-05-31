@@ -9,6 +9,7 @@
 /* ─── Descriptor types ─── */
 
 import type { ResponseDescriptor } from './descriptors.js';
+import { ReactionEngine } from './reaction-engine.js';
 
 export const FAUX_PROVIDER = 'supergsd-test';
 
@@ -28,47 +29,25 @@ export const FAUX_MODEL: Model = {
   maxTokens: 4096,
 };
 
-export class FauxResponseQueue {
-  private readonly queued: ResponseDescriptor[] = [];
-  private callCount = 0;
-  private readonly seenPrompts: string[] = [];
-
-  enqueue(...responses: ResponseDescriptor[]): void {
-    this.queued.push(...responses);
-  }
-
-  remaining(): readonly ResponseDescriptor[] {
-    return this.queued;
-  }
-
-  prompts(): readonly string[] {
-    return this.seenPrompts;
-  }
+export class FauxProvider {
+  constructor(private readonly engine: ReactionEngine) {}
 
   stream = (_model: Model, context: Context): FauxEventStream => {
     const stream = new FauxEventStream();
     const lastUser = [...context.messages].reverse().find(message => message.role === 'user');
-    if (lastUser) this.seenPrompts.push(readUserText(lastUser.content));
+    const promptText = lastUser ? readUserText(lastUser.content) : '';
+    const responses = this.engine.matchPrompt(promptText);
 
-    const attemptNumber = this.callCount + 1;
 
     queueMicrotask(() => {
-      // Shift synchronously — if nothing is queued, error immediately.
-      // Auto reactions no longer use the faux provider (they append
-      // directly to the session manager), so we fail fast here.
-      const descriptor = this.queued.shift();
-      if (!descriptor) {
-        const error = makeAssistantMessage(
-          [],
-          'error',
-          `No faux response queued for provider call ${attemptNumber}`,
-        );
-        stream.push({ type: 'error', reason: 'error' as const, error });
-        stream.end(error);
+      if (responses.length === 0) {
+        // No matching rule — emit only a minimal stop event without content blocks
+        const message = makeAssistantMessage([], 'stop');
+        stream.end(message);
         return;
       }
-      this.callCount = attemptNumber;
-      emitDescriptor(stream, descriptor, attemptNumber);
+
+      emitPromptResponses(stream, responses);
     });
 
     return stream;
@@ -173,38 +152,12 @@ function readUserText(content: string | TextContent[]): string {
     .join('\n');
 }
 
-function emitDescriptor(
+function emitPromptResponses(
   stream: FauxEventStream,
-  descriptor: ResponseDescriptor,
-  callNumber: number,
+  responses: ResponseDescriptor[],
 ): void {
-  if (descriptor.type === 'response:text') {
-    const block: TextContent = { type: 'text', text: descriptor.text };
-    const message = makeAssistantMessage([block], 'stop');
-    stream.push({ type: 'start', partial: message });
-    stream.push({ type: 'text_start', contentIndex: 0, partial: message });
-    stream.push({ type: 'text_delta', contentIndex: 0, delta: descriptor.text, partial: message });
-    stream.push({ type: 'text_end', contentIndex: 0, content: descriptor.text, partial: message });
-    stream.push({ type: 'done', reason: 'stop', message });
-    stream.end(message);
-    return;
-  }
-
-  if (descriptor.type === 'response:thinking') {
-    const message = makeAssistantMessage(
-      [{ type: 'thinking', thinking: descriptor.text }],
-      'stop',
-    );
-    stream.push({ type: 'start', partial: message });
-    stream.push({ type: 'thinking_start', contentIndex: 0, partial: message });
-    stream.push({ type: 'thinking_delta', contentIndex: 0, delta: descriptor.text, partial: message });
-    stream.push({ type: 'thinking_end', contentIndex: 0, content: descriptor.text, partial: message });
-    stream.push({ type: 'done', reason: 'stop', message });
-    stream.end(message);
-    return;
-  }
-
-  if (descriptor.type === 'response:aborted') {
+  if (responses.length === 1 && responses[0].type === 'response:aborted') {
+    const descriptor = responses[0];
     const message = makeAssistantMessage(
       [{ type: 'text', text: descriptor.text }],
       'aborted',
@@ -216,18 +169,52 @@ function emitDescriptor(
     return;
   }
 
-  // response:push-task
-  const toolCall: ToolCall = {
-    type: 'toolCall' as const,
-    id: `call-${callNumber}`,
-    name: 'push-task',
-    arguments: { prompt: descriptor.prompt, inherit_context: descriptor.inherit_context },
-  };
-  const message = makeAssistantMessage([toolCall], 'toolUse');
+  const content = responses.map((descriptor, index) => {
+    if (descriptor.type === 'response:text') {
+      return { type: 'text' as const, text: descriptor.text };
+    }
+    if (descriptor.type === 'response:thinking') {
+      return { type: 'thinking' as const, thinking: descriptor.text };
+    }
+    if (descriptor.type === 'response:push-task') {
+      return {
+        type: 'toolCall' as const,
+        id: `call-${index + 1}`,
+        name: 'push-task',
+        arguments: {
+          prompt: descriptor.prompt,
+          inherit_context: descriptor.inherit_context,
+        },
+      };
+    }
+    throw new Error('aborts(...) must be the only descriptor in onPrompt(...)');
+  });
+
+  const stopReason = content.some(block => block.type === 'toolCall') ? 'toolUse' : 'stop';
+  const message = makeAssistantMessage(content, stopReason);
+
   stream.push({ type: 'start', partial: message });
-  stream.push({ type: 'toolcall_start', contentIndex: 0, partial: message });
-  stream.push({ type: 'toolcall_end', contentIndex: 0, toolCall, partial: message });
-  stream.push({ type: 'done', reason: 'toolUse', message });
+
+  for (const [index, block] of content.entries()) {
+    if (block.type === 'text') {
+      stream.push({ type: 'text_start', contentIndex: index, partial: message });
+      stream.push({ type: 'text_delta', contentIndex: index, delta: block.text, partial: message });
+      stream.push({ type: 'text_end', contentIndex: index, content: block.text, partial: message });
+      continue;
+    }
+
+    if (block.type === 'thinking') {
+      stream.push({ type: 'thinking_start', contentIndex: index, partial: message });
+      stream.push({ type: 'thinking_delta', contentIndex: index, delta: block.thinking, partial: message });
+      stream.push({ type: 'thinking_end', contentIndex: index, content: block.thinking, partial: message });
+      continue;
+    }
+
+    stream.push({ type: 'toolcall_start', contentIndex: index, partial: message });
+    stream.push({ type: 'toolcall_end', contentIndex: index, toolCall: block, partial: message });
+  }
+
+  stream.push({ type: 'done', reason: stopReason, message });
   stream.end(message);
 }
 

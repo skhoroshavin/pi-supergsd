@@ -1,31 +1,5 @@
 import type { ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
 
-export interface AutoConfig {
-  reactions?: Array<[MatchDescriptor, ReactionDescriptor | ResponseDescriptor | ResponseDescriptor[]]>;
-}
-
-
-
-export type BranchEntry = UserEntry | AssistantEntry | TaskEntry | TaskResultEntry | NotificationEntry;
-
-export type NotificationEntry = {
-  type: 'notification';
-  text: string;
-  afterEntryId: string | null;
-};
-
-export type MatchDescriptor = PromptMatch | QueuedTaskMatch | UserEntry | AssistantEntry;
-
-export type PromptMatch = { type: 'match:prompt'; text: string };
-
-export type QueuedTaskMatch = {
-  type: 'match:queued-task';
-  prompt: string;
-  inherit_context: boolean;
-};
-
-export type ReactionDescriptor = ControlReactionDescriptor | ResponseDescriptor | ResponseDescriptor[];
-
 export type ControlReactionDescriptor =
   | { type: 'user-esc' }
   | { type: 'user-ctrl-c' }
@@ -44,6 +18,14 @@ export type PushTaskDescriptor = {
   type: 'response:push-task';
   prompt: string;
   inherit_context: boolean;
+};
+
+export type BranchEntry = UserEntry | AssistantEntry | TaskEntry | TaskResultEntry | NotificationEntry;
+
+export type NotificationEntry = {
+  type: 'notification';
+  text: string;
+  afterEntryId: string | null;
 };
 
 export type AssistantEntry = {
@@ -82,8 +64,6 @@ export {
   userRunsAuto,
   notification,
   assumeCommandContext,
-  prompt,
-  queuedTask,
   responds,
   thinks,
   aborts,
@@ -133,14 +113,6 @@ type TextBlock = {
   type: 'text';
   text: string;
 };
-
-const prompt = (text: string): PromptMatch => ({ type: 'match:prompt', text });
-
-const queuedTask = (prompt_: string, inherit_context = false): QueuedTaskMatch => ({
-  type: 'match:queued-task',
-  prompt: prompt_,
-  inherit_context,
-});
 
 const responds = (text: string): RespondsDescriptor => ({ type: 'response:text', text });
 

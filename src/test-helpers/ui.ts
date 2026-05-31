@@ -1,7 +1,7 @@
 import type { ExtensionUIContext, Theme } from '@earendil-works/pi-coding-agent';
 
 export class TestUI {
-  private readonly notificationLog: string[] = [];
+  private readonly notificationLog: TestNotification[] = [];
   private readonly taskStatusHistory: Array<string | undefined> = [];
   private taskStatus: string | undefined;
 
@@ -12,8 +12,8 @@ export class TestUI {
   } satisfies Pick<Theme, 'fg' | 'bg' | 'bold'>;
 
   readonly context: ExtensionUIContext = {
-    notify: (message: string) => {
-      this.notificationLog.push(message);
+    notify: (message: string, level?: 'error' | 'warning' | 'info') => {
+      this.notificationLog.push({ message, level });
     },
     setStatus: (key: string, value: string | undefined) => {
       if (key !== 'task') return;
@@ -37,7 +37,7 @@ export class TestUI {
     return this.taskStatus;
   }
 
-  notifications(): readonly string[] {
+  notifications(): readonly TestNotification[] {
     return this.notificationLog;
   }
 
@@ -45,3 +45,8 @@ export class TestUI {
     return this.taskStatusHistory;
   }
 }
+
+export type TestNotification = {
+  message: string;
+  level: 'error' | 'warning' | 'info' | undefined;
+};
