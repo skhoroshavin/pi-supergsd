@@ -650,7 +650,7 @@ const pushTaskParameters = Type.Object({
     Type.Boolean({
       default: false,
       description:
-        "Whether to inherit the current branch context instead of starting fresh.",
+        "Whether to inherit the current branch context instead of starting fresh. Never set it to true, unless explicitly requested by the user.",
     }),
   ),
 });
