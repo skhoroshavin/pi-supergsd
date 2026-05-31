@@ -1,22 +1,23 @@
-/**
- * Inline type definitions for the minimal subset of @earendil-works/pi-ai types
- * needed by the faux provider. Using inline types avoids a direct dependency on
- * @earendil-works/pi-ai which is nested under pi-coding-agent's node_modules.
- */
-
-/* ─── Minimal pi-ai type subset ─── */
-
-/* ─── Descriptor types ─── */
+import * as piAi from "@earendil-works/pi-ai";
+import type {
+  AssistantMessage,
+  Context,
+  Model,
+  SimpleStreamOptions,
+} from "@earendil-works/pi-ai";
 
 import type { ResponseDescriptor } from "./descriptors.js";
 import { ReactionEngine } from "./reaction-engine.js";
 
+const registrations = new WeakMap<
+  FauxProvider,
+  piAi.FauxProviderRegistration
+>();
+
 export const FAUX_PROVIDER = "supergsd-test";
 
-export const FAUX_MODEL_ID = "deterministic";
-
-export const FAUX_MODEL: Model = {
-  id: FAUX_MODEL_ID,
+export const FAUX_MODEL: Model<string> = {
+  id: "deterministic",
   name: "Deterministic Test Model",
   api: "supergsd-test-api",
   provider: FAUX_PROVIDER,
@@ -30,9 +31,33 @@ export const FAUX_MODEL: Model = {
 };
 
 export class FauxProvider {
-  constructor(private readonly engine: ReactionEngine) {}
+  constructor(private readonly engine: ReactionEngine) {
+    registrations.set(
+      this,
+      piAi.registerFauxProvider({
+        api: FAUX_MODEL.api,
+        provider: FAUX_PROVIDER,
+        tokenSize: { min: 999999, max: 999999 },
+        models: [
+          {
+            id: FAUX_MODEL.id,
+            name: FAUX_MODEL.name,
+            reasoning: FAUX_MODEL.reasoning,
+            input: [...FAUX_MODEL.input],
+            cost: FAUX_MODEL.cost,
+            contextWindow: FAUX_MODEL.contextWindow,
+            maxTokens: FAUX_MODEL.maxTokens,
+          },
+        ],
+      }),
+    );
+  }
 
-  stream = (_model: Model, context: Context): FauxEventStream => {
+  stream(
+    model: Model<string>,
+    context: Context,
+    options?: SimpleStreamOptions,
+  ) {
     const lastUser = [...context.messages]
       .reverse()
       .find((message) => message.role === "user");
@@ -45,337 +70,67 @@ export class FauxProvider {
       );
     }
 
-    const stream = new FauxEventStream();
-    queueMicrotask(() => {
-      emitPromptResponses(stream, responses);
-    });
-
-    return stream;
-  };
-}
-
-/**
- * Minimal event stream that satisfies the AssistantMessageEventStream interface
- * (push, end, [Symbol.asyncIterator], result) without importing from
- * @earendil-works/pi-ai at runtime.
- */
-export class FauxEventStream {
-  constructor() {
-    this.resultPromise = new Promise<AssistantMessage>((resolve) => {
-      this.resolveResult = resolve;
-    });
-  }
-
-  private readonly resultPromise: Promise<AssistantMessage>;
-  private resolveResult!: (result: AssistantMessage) => void;
-  private readonly queue: AssistantMessageEvent[] = [];
-  private waiting: Array<(event: AssistantMessageEvent) => void> = [];
-  private done = false;
-  private finalResult: AssistantMessage | undefined;
-
-  push(event: AssistantMessageEvent): void {
-    if (this.waiting.length > 0) {
-      const resolve = this.waiting.shift()!;
-      resolve(event);
-    } else {
-      this.queue.push(event);
+    const registration = registrations.get(this);
+    if (!registration) {
+      throw new Error("Faux provider registration missing.");
     }
+
+    registration.setResponses([makeAssistantMessage(responses)]);
+    return piAi.streamSimple(model, context, options);
   }
 
-  end(result: AssistantMessage): void {
-    this.done = true;
-    this.finalResult = result;
-    this.resolveResult(result);
-    for (const resolve of this.waiting) {
-      resolve({
-        type: "done",
-        reason: result.stopReason === "toolUse" ? "toolUse" : "stop",
-        message: result,
-      } as AssistantMessageEvent);
-    }
-    this.waiting = [];
-  }
-
-  async *[Symbol.asyncIterator](): AsyncIterator<AssistantMessageEvent> {
-    while (!this.done || this.queue.length > 0) {
-      if (this.queue.length > 0) {
-        yield this.queue.shift()!;
-      } else if (this.done) {
-        break;
-      } else {
-        yield await new Promise<AssistantMessageEvent>((resolve) => {
-          this.waiting.push(resolve);
-        });
-      }
-    }
-  }
-
-  async result(): Promise<AssistantMessage> {
-    if (this.finalResult) return this.finalResult;
-    return this.resultPromise;
+  unregister(): void {
+    const registration = registrations.get(this);
+    if (!registration) return;
+    registration.unregister();
+    registrations.delete(this);
   }
 }
 
-interface Context {
-  systemPrompt?: string;
-  messages: { role: string; content: string | TextContent[] }[];
-}
-
-type AssistantMessageEvent =
-  | { type: "start"; partial: AssistantMessage }
-  | { type: "text_start"; contentIndex: number; partial: AssistantMessage }
-  | {
-      type: "text_delta";
-      contentIndex: number;
-      delta: string;
-      partial: AssistantMessage;
-    }
-  | {
-      type: "text_end";
-      contentIndex: number;
-      content: string;
-      partial: AssistantMessage;
-    }
-  | { type: "thinking_start"; contentIndex: number; partial: AssistantMessage }
-  | {
-      type: "thinking_delta";
-      contentIndex: number;
-      delta: string;
-      partial: AssistantMessage;
-    }
-  | {
-      type: "thinking_end";
-      contentIndex: number;
-      content: string;
-      partial: AssistantMessage;
-    }
-  | { type: "toolcall_start"; contentIndex: number; partial: AssistantMessage }
-  | {
-      type: "toolcall_delta";
-      contentIndex: number;
-      delta: string;
-      partial: AssistantMessage;
-    }
-  | {
-      type: "toolcall_end";
-      contentIndex: number;
-      toolCall: ToolCall;
-      partial: AssistantMessage;
-    }
-  | {
-      type: "done";
-      reason: Extract<StopReason, "stop" | "length" | "toolUse">;
-      message: AssistantMessage;
-    }
-  | {
-      type: "error";
-      reason: Extract<StopReason, "aborted" | "error">;
-      error: AssistantMessage;
-    };
-
-type StopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
-
-interface Model {
-  id: string;
-  name: string;
-  api: Api;
-  provider: string;
-  baseUrl: string;
-  reasoning: boolean;
-  thinkingLevelMap?: Record<string, string | null>;
-  input: ("text" | "image")[];
-  cost: {
-    input: number;
-    output: number;
-    cacheRead: number;
-    cacheWrite: number;
-  };
-  contextWindow: number;
-  maxTokens: number;
-}
-
-function readUserText(content: string | TextContent[]): string {
+function readUserText(
+  content: string | Context["messages"][number]["content"],
+): string {
   if (typeof content === "string") return content;
   return content
-    .filter((block): block is TextContent => block.type === "text")
+    .filter((block) => block.type === "text")
     .map((block) => block.text)
     .join("\n");
 }
 
-function emitPromptResponses(
-  stream: FauxEventStream,
+function makeAssistantMessage(
   responses: ResponseDescriptor[],
-): void {
+): AssistantMessage {
   if (responses.length === 1 && responses[0].type === "response:aborted") {
     const descriptor = responses[0];
-    const message = makeAssistantMessage(
-      [{ type: "text", text: descriptor.text }],
-      "aborted",
-      "Aborted by test descriptor",
-    );
-    stream.push({ type: "start", partial: message });
-    stream.push({ type: "error", reason: "aborted", error: message });
-    stream.end(message);
-    return;
+    return piAi.fauxAssistantMessage(descriptor.text, {
+      stopReason: "aborted",
+      errorMessage: "Aborted by test descriptor",
+    });
   }
 
   const content = responses.map((descriptor, index) => {
     if (descriptor.type === "response:text") {
-      return { type: "text" as const, text: descriptor.text };
+      return piAi.fauxText(descriptor.text);
     }
     if (descriptor.type === "response:thinking") {
-      return { type: "thinking" as const, thinking: descriptor.text };
+      return piAi.fauxThinking(descriptor.text);
     }
     if (descriptor.type === "response:push-task") {
-      return {
-        type: "toolCall" as const,
-        id: `call-${index + 1}`,
-        name: "push-task",
-        arguments: {
+      return piAi.fauxToolCall(
+        "push-task",
+        {
           prompt: descriptor.prompt,
           inherit_context: descriptor.inherit_context,
         },
-      };
+        { id: `call-${index + 1}` },
+      );
     }
     throw new Error("aborts(...) must be the only descriptor in onPrompt(...)");
   });
 
-  const stopReason = content.some((block) => block.type === "toolCall")
-    ? "toolUse"
-    : "stop";
-  const message = makeAssistantMessage(content, stopReason);
-
-  stream.push({ type: "start", partial: message });
-
-  for (const [index, block] of content.entries()) {
-    if (block.type === "text") {
-      stream.push({
-        type: "text_start",
-        contentIndex: index,
-        partial: message,
-      });
-      stream.push({
-        type: "text_delta",
-        contentIndex: index,
-        delta: block.text,
-        partial: message,
-      });
-      stream.push({
-        type: "text_end",
-        contentIndex: index,
-        content: block.text,
-        partial: message,
-      });
-      continue;
-    }
-
-    if (block.type === "thinking") {
-      stream.push({
-        type: "thinking_start",
-        contentIndex: index,
-        partial: message,
-      });
-      stream.push({
-        type: "thinking_delta",
-        contentIndex: index,
-        delta: block.thinking,
-        partial: message,
-      });
-      stream.push({
-        type: "thinking_end",
-        contentIndex: index,
-        content: block.thinking,
-        partial: message,
-      });
-      continue;
-    }
-
-    stream.push({
-      type: "toolcall_start",
-      contentIndex: index,
-      partial: message,
-    });
-    stream.push({
-      type: "toolcall_end",
-      contentIndex: index,
-      toolCall: block,
-      partial: message,
-    });
-  }
-
-  stream.push({ type: "done", reason: stopReason, message });
-  stream.end(message);
+  return piAi.fauxAssistantMessage(content, {
+    stopReason: content.some((block) => block.type === "toolCall")
+      ? "toolUse"
+      : "stop",
+  });
 }
-
-function makeAssistantMessage(
-  content: AssistantMessage["content"],
-  stopReason: string,
-  errorMessage?: string,
-): AssistantMessage {
-  return {
-    role: "assistant",
-    content,
-    api: FAUX_MODEL.api,
-    provider: FAUX_PROVIDER,
-    model: FAUX_MODEL_ID,
-    usage: TEST_USAGE,
-    stopReason,
-    ...(errorMessage ? { errorMessage } : {}),
-    timestamp: Date.now(),
-  } as AssistantMessage;
-}
-
-interface AssistantMessage {
-  role: "assistant";
-  content: (TextContent | ThinkingContent | ToolCall)[];
-  api: Api;
-  provider: string;
-  model: string;
-  usage: Usage;
-  stopReason: string;
-  errorMessage?: string;
-  timestamp: number;
-}
-
-type Api = string;
-
-interface TextContent {
-  type: "text";
-  text: string;
-}
-
-interface ThinkingContent {
-  type: "thinking";
-  thinking: string;
-}
-
-interface ToolCall {
-  type: "toolCall";
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
-}
-
-interface Usage {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  totalTokens: number;
-  cost: {
-    input: number;
-    output: number;
-    cacheRead: number;
-    cacheWrite: number;
-    total: number;
-  };
-}
-
-const TEST_USAGE: Usage = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-};

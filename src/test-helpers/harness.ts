@@ -28,6 +28,7 @@ export class TestHarness {
     private readonly session: AgentSession,
     private readonly sessionManager: SessionManager,
     private readonly ui: TestUI,
+    private readonly fauxProvider: FauxProvider,
   ) {
     this.cancelNextNav = false;
   }
@@ -75,8 +76,8 @@ export class TestHarness {
             api: FAUX_MODEL.api,
             baseUrl: FAUX_MODEL.baseUrl,
             apiKey: "test-key",
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- inline types don't match pi-ai ProviderConfig
-            streamSimple: fauxProvider.stream as any,
+            streamSimple: (model, context, options) =>
+              fauxProvider.stream(model, context, options),
             models: [
               {
                 id: FAUX_MODEL.id,
@@ -106,14 +107,19 @@ export class TestHarness {
       resourceLoader,
       sessionManager,
       settingsManager,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- inline types don't match pi-ai Model<any>
-      model: FAUX_MODEL as any,
+      model: FAUX_MODEL,
       thinkingLevel: "off" as const,
       noTools: "builtin",
     });
 
     const ui = new TestUI();
-    const harness = new TestHarness(engine, session, sessionManager, ui);
+    const harness = new TestHarness(
+      engine,
+      session,
+      sessionManager,
+      ui,
+      fauxProvider,
+    );
     await session.bindExtensions({
       uiContext: ui.context,
       commandContextActions: harness.commandContextActions(),
@@ -125,6 +131,7 @@ export class TestHarness {
   }
 
   dispose(): void {
+    this.fauxProvider.unregister();
     this.session.dispose();
   }
 
