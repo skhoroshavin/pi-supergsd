@@ -10,7 +10,6 @@ export {
   userCtrlC,
   userEsc,
   userRunsAuto,
-  notification,
   assumeCommandContext,
 } from "./descriptors.js";
 

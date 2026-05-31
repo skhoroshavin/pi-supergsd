@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import { isDeepStrictEqual } from "node:util";
 
 import type {
   SessionEntry,
@@ -6,140 +7,98 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 import { extractTextContent } from "../text-content.js";
-import type { BranchEntry } from "./descriptors.js";
+import {
+  assistant,
+  task,
+  taskResult,
+  user,
+  type BranchEntry,
+} from "./descriptors.js";
 
 export function assertBranchHistory(
   sessionManager: SessionManager,
   expected: BranchEntry[],
 ): void {
-  const actual = sessionManager
-    .getBranch()
-    .map(stripVisibleEntry)
-    .filter((entry): entry is BranchEntry => entry !== null);
-
-  assert.deepStrictEqual(actual, expected);
+  assert.deepStrictEqual(visibleEntries(sessionManager.getBranch()), expected);
 }
 
 export function assertSessionContains(
   sessionManager: SessionManager,
   expected: BranchEntry[],
 ): void {
-  const actual = sessionManager
-    .getEntries()
-    .map(stripVisibleEntry)
-    .filter((entry): entry is BranchEntry => entry !== null);
+  const actual = visibleEntries(sessionManager.getEntries());
 
   for (const expectedEntry of expected) {
     assert.ok(
-      actual.some((entry) => entriesEqual(entry, expectedEntry)),
+      actual.some((entry) => isDeepStrictEqual(entry, expectedEntry)),
       `Expected session to contain entry: ${JSON.stringify(expectedEntry)}`,
     );
   }
 }
 
-function stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
-  if (isHiddenEntry(entry)) return null;
-
-  if (entry.type === "message") {
-    if (entry.message.role === "user") {
-      return {
-        type: "message",
-        message: {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: extractTextContent(entry.message.content, "") ?? "",
-            },
-          ],
-        },
-      };
-    }
-
-    if (entry.message.role === "assistant") {
-      return {
-        type: "message",
-        message: {
-          role: "assistant",
-          content: [
-            {
-              type: "text",
-              text: extractTextContent(entry.message.content, "") ?? "",
-            },
-          ],
-          ...(entry.message.stopReason && entry.message.stopReason !== "stop"
-            ? { stopReason: entry.message.stopReason }
-            : {}),
-        },
-      };
-    }
-
-    return null;
-  }
-
-  if (entry.type === "custom") {
-    if (entry.customType !== "task") return null;
-    const data = readTaskData(entry.data);
-    return data ? { type: "custom", customType: "task", data } : null;
-  }
-
-  if (entry.type === "custom_message") {
-    if (entry.customType !== "task-result") return null;
-    const slug = readTaskResultSlug(entry.details);
-    if (!slug) return null;
-    const text = extractTextContent(entry.content, "") ?? "";
-    return {
-      type: "custom_message",
-      customType: "task-result",
-      details: { slug },
-      ...(text !== "" ? { content: [{ type: "text", text }] } : {}),
-    };
-  }
-
-  return null;
+function visibleEntries(entries: SessionEntry[]): BranchEntry[] {
+  return entries
+    .map(toBranchEntry)
+    .filter((entry): entry is BranchEntry => entry !== null);
 }
 
-function isHiddenEntry(entry: SessionEntry): boolean {
+function toBranchEntry(entry: SessionEntry): BranchEntry | null {
   switch (entry.type) {
     case "thinking_level_change":
     case "model_change":
     case "session_info":
     case "label":
-      return true;
+      return null;
+    case "message":
+      if (entry.message.role === "user") {
+        return user(textContent(entry.message.content));
+      }
+      if (entry.message.role === "assistant") {
+        return assistant(
+          textContent(entry.message.content),
+          visibleStopReason(entry.message.stopReason),
+        );
+      }
+      return null;
     case "custom":
-      return (
-        entry.customType === "task-done" || entry.customType === "task-start"
+      return entry.customType === "task" && isTaskData(entry.data)
+        ? task(entry.data.prompt, entry.data.inherit_context)
+        : null;
+    case "custom_message":
+      if (entry.customType !== "task-result" || !hasSlug(entry.details)) {
+        return null;
+      }
+      return taskResult(
+        entry.details.slug,
+        textContent(entry.content) || undefined,
       );
     default:
-      return false;
+      return null;
   }
 }
 
-function readTaskData(
-  data: unknown,
-): { prompt: string; inherit_context: boolean } | null {
-  if (!isRecord(data)) return null;
-  if (
-    typeof data.prompt !== "string" ||
-    typeof data.inherit_context !== "boolean"
-  )
-    return null;
-  return { prompt: data.prompt, inherit_context: data.inherit_context };
+function textContent(content: unknown): string {
+  return extractTextContent(content, "") ?? "";
 }
 
-function readTaskResultSlug(details: unknown): string | null {
-  return isRecord(details) && typeof details.slug === "string"
-    ? details.slug
-    : null;
+function visibleStopReason(stopReason: unknown): string | undefined {
+  return typeof stopReason === "string" && stopReason !== "stop"
+    ? stopReason
+    : undefined;
 }
 
-function entriesEqual(actual: BranchEntry, expected: BranchEntry): boolean {
-  try {
-    assert.deepStrictEqual(actual, expected);
-    return true;
-  } catch {
-    return false;
-  }
+function isTaskData(
+  value: unknown,
+): value is { prompt: string; inherit_context: boolean } {
+  return (
+    isRecord(value) &&
+    typeof value.prompt === "string" &&
+    typeof value.inherit_context === "boolean"
+  );
+}
+
+function hasSlug(value: unknown): value is { slug: string } {
+  return isRecord(value) && typeof value.slug === "string";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

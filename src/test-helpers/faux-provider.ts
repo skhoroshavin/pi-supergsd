@@ -6,6 +6,7 @@ import type {
   SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 
+import { extractTextContent } from "../text-content.js";
 import type { ResponseDescriptor } from "./descriptors.js";
 import { ReactionEngine } from "./reaction-engine.js";
 
@@ -61,7 +62,7 @@ export class FauxProvider {
     const lastUser = [...context.messages]
       .reverse()
       .find((message) => message.role === "user");
-    const promptText = lastUser ? readUserText(lastUser.content) : "";
+    const promptText = extractTextContent(lastUser?.content ?? "") ?? "";
     const responses = this.engine.matchPrompt(promptText);
 
     if (responses.length === 0) {
@@ -85,16 +86,6 @@ export class FauxProvider {
     registration.unregister();
     registrations.delete(this);
   }
-}
-
-function readUserText(
-  content: string | Context["messages"][number]["content"],
-): string {
-  if (typeof content === "string") return content;
-  return content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text)
-    .join("\n");
 }
 
 function makeAssistantMessage(

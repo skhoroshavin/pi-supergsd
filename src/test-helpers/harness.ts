@@ -10,14 +10,19 @@ import {
   SettingsManager,
   type AgentSession,
   type InputSource,
+  type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 
 // eslint-disable-next-line unslop/import-control -- extension factory not available via src test-helpers import chain
 import registerSuperGsd from "../../index.js";
 import { updateTaskStatus } from "../index.js";
-import { assertBranchHistory, assertSessionContains } from "./assertions.js";
-import type { BranchEntry, ResponseDescriptor } from "./descriptors.js";
 import { extractTextContent } from "../text-content.js";
+import { assertBranchHistory, assertSessionContains } from "./assertions.js";
+import type {
+  BranchEntry,
+  ControlReactionDescriptor,
+  ResponseDescriptor,
+} from "./descriptors.js";
 import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
 import { ReactionEngine } from "./reaction-engine.js";
 import { TestUI } from "./ui.js";
@@ -29,31 +34,10 @@ export class TestHarness {
     private readonly sessionManager: SessionManager,
     private readonly ui: TestUI,
     private readonly fauxProvider: FauxProvider,
-  ) {
-    this.cancelNextNav = false;
-  }
+  ) {}
 
-  private cancelNextNav: boolean;
+  private cancelNextNav = false;
   private readonly seenReactionEntryIds = new Set<string>();
-
-  async pushTask(prompt_: string, inherit_context = false): Promise<void> {
-    this.sessionManager.appendCustomEntry("task", {
-      prompt: prompt_,
-      inherit_context,
-    });
-    updateTaskStatus(
-      this.sessionManager as Parameters<typeof updateTaskStatus>[0],
-      (key, value) => {
-        if (key === "task") this.ui.setStatus(key, value);
-      },
-      this.ui.theme,
-    );
-    this.ui.notify(
-      "Task stored. Use `/start-task` or `/auto` to start it.",
-      "info",
-    );
-    await this.session.agent.waitForIdle();
-  }
 
   static async create(engine: ReactionEngine): Promise<TestHarness> {
     const cwd = process.cwd();
@@ -112,16 +96,15 @@ export class TestHarness {
       noTools: "builtin",
     });
 
-    const ui = new TestUI();
     const harness = new TestHarness(
       engine,
       session,
       sessionManager,
-      ui,
+      new TestUI(),
       fauxProvider,
     );
     await session.bindExtensions({
-      uiContext: ui.context,
+      uiContext: harness.ui.context,
       commandContextActions: harness.commandContextActions(),
       shutdownHandler: () => {
         // No-op: we don't want extension shutdown to terminate the process.
@@ -135,8 +118,22 @@ export class TestHarness {
     this.session.dispose();
   }
 
+  async pushTask(prompt: string, inherit_context = false): Promise<void> {
+    this.sessionManager.appendCustomEntry("task", { prompt, inherit_context });
+    updateTaskStatus(
+      this.sessionManager as Parameters<typeof updateTaskStatus>[0],
+      this.ui.context.setStatus,
+      this.ui.theme,
+    );
+    this.ui.context.notify(
+      "Task stored. Use `/start-task` or `/auto` to start it.",
+      "info",
+    );
+    await this.session.agent.waitForIdle();
+  }
+
   getStatus(): string | undefined {
-    return this.ui.getStatus();
+    return this.ui.status;
   }
 
   assertBranchHistory(...expected: BranchEntry[]): void {
@@ -148,7 +145,7 @@ export class TestHarness {
   }
 
   assertNotifications(...expected: string[]): void {
-    const messages = this.ui.notifications().map((n) => n.message);
+    const messages = this.ui.notificationLog.map((entry) => entry.message);
     for (const text of expected) {
       assert.ok(
         messages.includes(text),
@@ -163,12 +160,12 @@ export class TestHarness {
       level: "error" | "warning" | "info" | undefined;
     }>,
   ): void {
-    assert.deepStrictEqual(this.ui.notifications(), expected);
+    assert.deepStrictEqual(this.ui.notificationLog, expected);
   }
 
   assertTaskStatusHistoryIncludes(expected: string | undefined): void {
     assert.ok(
-      this.ui.taskStatuses().includes(expected),
+      this.ui.taskStatusHistory.includes(expected),
       `Expected task status history to include ${JSON.stringify(expected)}`,
     );
   }
@@ -182,11 +179,6 @@ export class TestHarness {
       .getAllTools()
       .map((tool) => tool.name)
       .sort();
-  }
-
-  modelName(): string | undefined {
-    const model = this.session.model;
-    return model ? `${model.provider}/${model.id}` : undefined;
   }
 
   private commandContextActions() {
@@ -233,18 +225,13 @@ export class TestHarness {
           continue;
         }
 
-        if (entry.type === "custom" && entry.customType === "task") {
-          const data = entry.data as
-            | { prompt: string; inherit_context: boolean }
-            | undefined;
-          if (!data) continue;
-          for (const reaction of this.engine.matchQueuedTask(
-            data.prompt,
-            data.inherit_context,
-          )) {
-            await this.applyReaction(reaction);
-            reacted = true;
-          }
+        if (!isTaskEntryData(entry)) continue;
+        for (const reaction of this.engine.matchQueuedTask(
+          entry.data.prompt,
+          entry.data.inherit_context,
+        )) {
+          await this.applyReaction(reaction);
+          reacted = true;
         }
       }
 
@@ -255,39 +242,37 @@ export class TestHarness {
   }
 
   private async applyReaction(
-    reaction:
-      | ResponseDescriptor
-      | import("./descriptors.js").ControlReactionDescriptor,
+    reaction: ResponseDescriptor | ControlReactionDescriptor,
   ): Promise<void> {
-    if (reaction.type === "user-esc") {
-      this.cancelNextNav = true;
-      return;
+    switch (reaction.type) {
+      case "user-esc":
+        this.cancelNextNav = true;
+        return;
+      case "user-ctrl-c":
+        await this.session.extensionRunner.emit({
+          type: "session_shutdown",
+          reason: "quit",
+        });
+        return;
+      case "user-runs-auto":
+        await this.command("/auto");
+        return;
+      case "user-append":
+        await this.prompt(reaction.text);
+        return;
+      case "response:aborted":
+        this.appendSyntheticAssistantMessage(reaction.text, "aborted");
+        return;
+      case "response:text":
+      case "response:thinking":
+        this.appendSyntheticAssistantMessage(reaction.text);
+        return;
+      case "response:push-task":
+        this.sessionManager.appendCustomEntry("task", {
+          prompt: reaction.prompt,
+          inherit_context: reaction.inherit_context,
+        });
     }
-    if (reaction.type === "user-ctrl-c") {
-      await this.triggerSessionShutdown();
-      return;
-    }
-    if (reaction.type === "user-runs-auto") {
-      await this.command("/auto");
-      return;
-    }
-    if (reaction.type === "user-append") {
-      await this.prompt(reaction.text);
-      return;
-    }
-    if (reaction.type === "response:text") {
-      this.appendSyntheticAssistantMessage(reaction.text);
-      return;
-    }
-    if (reaction.type === "response:thinking") {
-      this.appendSyntheticAssistantMessage(reaction.text);
-      return;
-    }
-    if (reaction.type === "response:aborted") {
-      this.appendSyntheticAssistantMessage(reaction.text, "aborted");
-      return;
-    }
-    this.appendSyntheticTask(reaction.prompt, reaction.inherit_context);
   }
 
   async prompt(text: string): Promise<void> {
@@ -296,13 +281,6 @@ export class TestHarness {
 
   async command(text: string): Promise<void> {
     await this.sendPrompt(text, true);
-  }
-
-  async triggerSessionShutdown(): Promise<void> {
-    await this.session.extensionRunner.emit({
-      type: "session_shutdown",
-      reason: "quit",
-    });
   }
 
   private appendSyntheticAssistantMessage(
@@ -319,13 +297,6 @@ export class TestHarness {
       stopReason,
       timestamp: Date.now(),
     } as never);
-  }
-
-  private appendSyntheticTask(prompt_: string, inherit_context: boolean): void {
-    this.sessionManager.appendCustomEntry("task", {
-      prompt: prompt_,
-      inherit_context,
-    });
   }
 
   private async sendPrompt(
@@ -362,6 +333,24 @@ export class TestHarness {
       );
     }
   }
+}
+
+function isTaskEntryData(entry: SessionEntry): entry is SessionEntry & {
+  type: "custom";
+  customType: "task";
+  data: { prompt: string; inherit_context: boolean };
+} {
+  return (
+    entry.type === "custom" &&
+    entry.customType === "task" &&
+    isRecord(entry.data) &&
+    typeof entry.data.prompt === "string" &&
+    typeof entry.data.inherit_context === "boolean"
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function flushMicrotasks(): Promise<void> {

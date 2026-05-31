@@ -1,10 +1,20 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
-export type ControlReactionDescriptor =
-  | { type: "user-esc" }
-  | { type: "user-ctrl-c" }
-  | { type: "user-runs-auto" }
-  | { type: "user-append"; text: string }; // Append a user message as a reaction
+import type { TextBlock } from "../text-content.js";
+
+export type BranchEntry =
+  | UserEntry
+  | AssistantEntry
+  | TaskEntry
+  | TaskResultEntry;
+
+export type AssistantEntry = ReturnType<typeof assistant>;
+
+export type UserEntry = ReturnType<typeof user>;
+
+export type TaskEntry = ReturnType<typeof task>;
+
+export type TaskResultEntry = ReturnType<typeof taskResult>;
 
 export type ResponseDescriptor =
   | RespondsDescriptor
@@ -12,159 +22,81 @@ export type ResponseDescriptor =
   | AbortsDescriptor
   | PushTaskDescriptor;
 
-export type RespondsDescriptor = { type: "response:text"; text: string };
+export type RespondsDescriptor = ReturnType<typeof responds>;
 
-export type ThinksDescriptor = { type: "response:thinking"; text: string };
+export type ThinksDescriptor = ReturnType<typeof thinks>;
 
-export type AbortsDescriptor = { type: "response:aborted"; text: string };
+export type AbortsDescriptor = ReturnType<typeof aborts>;
 
-export type PushTaskDescriptor = {
-  type: "response:push-task";
-  prompt: string;
-  inherit_context: boolean;
-};
+export type PushTaskDescriptor = ReturnType<typeof pushTask>;
 
-export type BranchEntry =
-  | UserEntry
-  | AssistantEntry
-  | TaskEntry
-  | TaskResultEntry
-  | NotificationEntry;
+export type ControlReactionDescriptor =
+  | ReturnType<typeof userEsc>
+  | ReturnType<typeof userCtrlC>
+  | ReturnType<typeof userRunsAuto>
+  | { type: "user-append"; text: string };
 
-export type NotificationEntry = {
-  type: "notification";
-  text: string;
-  afterEntryId: string | null;
-};
-
-export type AssistantEntry = {
-  type: "message";
+export const assistant = (content: string, stopReason?: string) => ({
+  type: "message" as const,
   message: {
-    role: "assistant";
-    content: TextBlock[];
-    stopReason?: string;
-  };
-};
-
-export type UserEntry = {
-  type: "message";
-  message: {
-    role: "user";
-    content: TextBlock[];
-  };
-};
-
-export type TaskEntry = {
-  type: "custom";
-  customType: "task";
-  data: {
-    prompt: string;
-    inherit_context: boolean;
-  };
-};
-
-export {
-  assistant,
-  user,
-  task,
-  taskResult,
-  userEsc,
-  userCtrlC,
-  userRunsAuto,
-  notification,
-  assumeCommandContext,
-  responds,
-  thinks,
-  aborts,
-  pushTask,
-};
-
-const assistant = (content: string, stopReason?: string): AssistantEntry => ({
-  type: "message",
-  message: {
-    role: "assistant",
-    content: [{ type: "text", text: content }],
+    role: "assistant" as const,
+    content: [textBlock(content)],
     ...(stopReason ? { stopReason } : {}),
   },
 });
 
-const user = (content: string): UserEntry => ({
-  type: "message",
+export const user = (content: string) => ({
+  type: "message" as const,
   message: {
-    role: "user",
-    content: [{ type: "text", text: content }],
+    role: "user" as const,
+    content: [textBlock(content)],
   },
 });
 
-const task = (prompt: string, inherit_context = false): TaskEntry => ({
-  type: "custom",
-  customType: "task",
+export const task = (prompt: string, inherit_context = false) => ({
+  type: "custom" as const,
+  customType: "task" as const,
   data: { prompt, inherit_context },
 });
 
-const taskResult = (slug: string, content?: string): TaskResultEntry => ({
-  type: "custom_message",
-  customType: "task-result",
+export const taskResult = (slug: string, content?: string) => ({
+  type: "custom_message" as const,
+  customType: "task-result" as const,
   details: { slug },
-  ...(content !== undefined
-    ? { content: [{ type: "text", text: content }] }
-    : {}),
+  ...(content !== undefined ? { content: [textBlock(content)] } : {}),
 });
 
-type TaskResultEntry = {
-  type: "custom_message";
-  customType: "task-result";
-  details: {
-    slug: string;
-  };
-  content?: TextBlock[];
-};
-
-type TextBlock = {
-  type: "text";
-  text: string;
-};
-
-const responds = (text: string): RespondsDescriptor => ({
-  type: "response:text",
+export const responds = (text: string) => ({
+  type: "response:text" as const,
   text,
 });
 
-const thinks = (text: string): ThinksDescriptor => ({
-  type: "response:thinking",
+export const thinks = (text: string) => ({
+  type: "response:thinking" as const,
   text,
 });
 
-const aborts = (text: string): AbortsDescriptor => ({
-  type: "response:aborted",
+export const aborts = (text: string) => ({
+  type: "response:aborted" as const,
   text,
 });
 
-const pushTask = (
-  prompt_: string,
-  inherit_context = false,
-): PushTaskDescriptor => ({
-  type: "response:push-task",
-  prompt: prompt_,
+export const pushTask = (prompt: string, inherit_context = false) => ({
+  type: "response:push-task" as const,
+  prompt,
   inherit_context,
 });
 
-const userEsc = (): { type: "user-esc" } => ({ type: "user-esc" });
+export const userEsc = () => ({ type: "user-esc" as const });
 
-const userCtrlC = (): { type: "user-ctrl-c" } => ({ type: "user-ctrl-c" });
+export const userCtrlC = () => ({ type: "user-ctrl-c" as const });
 
-const userRunsAuto = (): { type: "user-runs-auto" } => ({
-  type: "user-runs-auto",
-});
+export const userRunsAuto = () => ({ type: "user-runs-auto" as const });
 
-const notification = (text: string): NotificationEntry => ({
-  type: "notification",
-  text,
-  afterEntryId: null,
-});
-
-function assumeCommandContext<T extends object>(
+export function assumeCommandContext<T extends object>(
   value: T,
 ): ExtensionCommandContext & T {
   return value as unknown as ExtensionCommandContext & T;
 }
+
+const textBlock = (text: string): TextBlock => ({ type: "text", text });

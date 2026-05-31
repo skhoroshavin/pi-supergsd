@@ -4,9 +4,9 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 export class TestUI {
-  private readonly notificationLog: TestNotification[] = [];
-  private readonly taskStatusHistory: Array<string | undefined> = [];
-  private taskStatus: string | undefined;
+  status: string | undefined;
+  readonly notificationLog: TestNotification[] = [];
+  readonly taskStatusHistory: Array<string | undefined> = [];
 
   readonly theme = {
     fg: (_key: string, text: string) => text,
@@ -20,33 +20,11 @@ export class TestUI {
     },
     setStatus: (key: string, value: string | undefined) => {
       if (key !== "task") return;
-      this.taskStatus = value;
+      this.status = value;
       this.taskStatusHistory.push(value);
     },
     theme: this.theme,
   } as ExtensionUIContext;
-
-  notify(message: string, level?: "error" | "warning" | "info"): void {
-    this.context.notify(message, level);
-  }
-
-  setStatus(key: string, value: string | undefined): void {
-    if (key === "task") {
-      this.context.setStatus(key, value);
-    }
-  }
-
-  getStatus(): string | undefined {
-    return this.taskStatus;
-  }
-
-  notifications(): readonly TestNotification[] {
-    return this.notificationLog;
-  }
-
-  taskStatuses(): ReadonlyArray<string | undefined> {
-    return this.taskStatusHistory;
-  }
 }
 
 export type TestNotification = {
