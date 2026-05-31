@@ -29,7 +29,7 @@ export class TestUI {
 
   setStatus(key: string, value: string | undefined): void {
     if (key === 'task') {
-      (this.context as any).setStatus(key, value);
+      this.context.setStatus(key, value);
     }
   }
 

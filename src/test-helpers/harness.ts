@@ -9,6 +9,8 @@ import {
   SessionManager,
   SettingsManager,
   type AgentSession,
+  type SessionEntry,
+  type SessionMessageEntry,
 } from '@earendil-works/pi-coding-agent';
 
 // eslint-disable-next-line unslop/import-control -- extension factory not available via src test-helpers import chain
@@ -16,8 +18,7 @@ import registerSuperGsd from '../../index.js';
 import { updateTaskStatus } from '../index.js';
 import { assertBranchHistory, assertSessionContains } from './assertions.js';
 import type { AutoConfig, BranchEntry, ResponseDescriptor } from './descriptors.js';
-import { extractTextContent, taskResultTextContent } from '../text-content.js';
-import { makeSlug } from '../slug.js';
+import { extractTextContent, makeSlug, taskResultTextContent } from '../text-content.js';
 import { FAUX_MODEL, FAUX_PROVIDER, FauxResponseQueue } from './faux-provider.js';
 import { scanAndReact } from './reactions.js';
 import type { ReactionRuntime } from './reactions.js';
@@ -89,7 +90,8 @@ export class TestHarness {
     const branch = this.sessionManager.getBranch();
     const lastAssistant = this.findLastAssistantMessage(branch);
     const lastAssistantContent = lastAssistant
-      ? taskResultTextContent(lastAssistant.message.content)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AgentMessage union needs narrowing; we know this is an assistant message
+      ? taskResultTextContent((lastAssistant.message as any).content)
       : undefined;
     const taskPrompt = this.findTaskPrompt(branch);
     const slug = taskPrompt ? makeSlug(taskPrompt) : undefined;
@@ -164,14 +166,14 @@ export class TestHarness {
     const branch = this.sessionManager.getBranch();
     let skip = 0;
     for (let i = branch.length - 1; i >= 0; i--) {
-      const entry = branch[i] as any;
-      if (entry.type === 'custom' && entry.customType === 'task-start') return null;
-      if (entry.type === 'custom' && entry.customType === 'task-done') {
+      const entry = branch[i];
+      if (entry!.type === 'custom' && entry!.customType === 'task-start') return null;
+      if (entry!.type === 'custom' && entry!.customType === 'task-done') {
         skip++;
         continue;
       }
-      if (entry.type === 'custom' && entry.customType === 'task') {
-        const data = entry.data;
+      if (entry!.type === 'custom' && entry!.customType === 'task') {
+        const data = entry!.data as { prompt: string; inherit_context: boolean } | undefined;
         if (data && typeof data.prompt === 'string' && typeof data.inherit_context === 'boolean') {
           if (skip === 0) return { data };
           skip--;
@@ -185,9 +187,9 @@ export class TestHarness {
   private findCurrentTask(): { data: { returnTo: string } } | null {
     const branch = this.sessionManager.getBranch();
     for (let i = branch.length - 1; i >= 0; i--) {
-      const entry = branch[i] as any;
-      if (entry.type === 'custom' && entry.customType === 'task-start') {
-        const data = entry.data;
+      const entry = branch[i];
+      if (entry!.type === 'custom' && entry!.customType === 'task-start') {
+        const data = entry!.data as { returnTo: string } | undefined;
         if (data && typeof data.returnTo === 'string') return { data };
       }
     }
@@ -206,17 +208,17 @@ export class TestHarness {
         entry.type === 'branch_summary' ||
         entry.type === 'custom_message'
       ) {
-        return (entry as any).parentId ?? entry.id;
+        return entry.parentId ?? entry.id;
       }
     }
 
-    return (branch[0] as any).parentId ?? branch[0].id;
+    return branch[0].parentId ?? branch[0].id;
   }
 
   /** Find the last assistant message on the current branch. */
-  private findLastAssistantMessage(branch: readonly any[]): any | null {
+  private findLastAssistantMessage(branch: readonly SessionEntry[]): SessionMessageEntry | null {
     for (let i = branch.length - 1; i >= 0; i--) {
-      const entry = branch[i];
+      const entry = branch[i]!;
       if (entry.type === 'message' && entry.message?.role === 'assistant') {
         return entry;
       }
@@ -225,8 +227,8 @@ export class TestHarness {
   }
 
   /** Find the task prompt (user message after the most recent task-start). */
-  private findTaskPrompt(branch: readonly any[]): string | undefined {
-    const startIdx = this.findLastIndex(branch, (e: any) => e.type === 'custom' && e.customType === 'task-start');
+  private findTaskPrompt(branch: readonly SessionEntry[]): string | undefined {
+    const startIdx = this.findLastIndex(branch, (e) => e.type === 'custom' && e.customType === 'task-start');
     if (startIdx === -1) return undefined;
     for (let i = startIdx + 1; i < branch.length; i++) {
       const entry = branch[i];
@@ -237,7 +239,7 @@ export class TestHarness {
     return undefined;
   }
 
-  private findLastIndex(branch: readonly any[], predicate: (e: any) => boolean): number {
+  private findLastIndex(branch: readonly SessionEntry[], predicate: (e: SessionEntry) => boolean): number {
     for (let i = branch.length - 1; i >= 0; i--) {
       if (predicate(branch[i])) return i;
     }
@@ -312,56 +314,56 @@ export class TestHarness {
     return harness;
   }
 
-dispose(): void {
+  dispose(): void {
     this.session.dispose();
   }
 
-getStatus(): string | undefined {
+  getStatus(): string | undefined {
     return this.ui.getStatus();
   }
 
-assertBranchHistory(...expected: BranchEntry[]): void {
+  assertBranchHistory(...expected: BranchEntry[]): void {
     assertBranchHistory(this.sessionManager, expected);
   }
 
-assertSessionContains(...expected: BranchEntry[]): void {
+  assertSessionContains(...expected: BranchEntry[]): void {
     assertSessionContains(this.sessionManager, expected);
   }
 
-assertNotifications(...expected: string[]): void {
+  assertNotifications(...expected: string[]): void {
     for (const text of expected) {
       assert.ok(this.ui.notifications().includes(text), `Expected notification log to include: ${text}`);
     }
   }
 
-assertTaskStatusHistoryIncludes(expected: string | undefined): void {
+  assertTaskStatusHistoryIncludes(expected: string | undefined): void {
     assert.ok(
       this.ui.taskStatuses().includes(expected),
       `Expected task status history to include ${JSON.stringify(expected)}`,
     );
   }
 
-async waitForIdle(): Promise<void> {
+  async waitForIdle(): Promise<void> {
     await this.session.agent.waitForIdle();
   }
 
-registeredToolNames(): string[] {
+  registeredToolNames(): string[] {
     return this.session.getAllTools().map(tool => tool.name).sort();
   }
 
-modelName(): string | undefined {
+  modelName(): string | undefined {
     const model = this.session.model;
     return model ? `${model.provider}/${model.id}` : undefined;
   }
 
-async prompt(text: string, ...responses: ResponseDescriptor[]): Promise<void> {
+  async prompt(text: string, ...responses: ResponseDescriptor[]): Promise<void> {
     this.fauxResponses.enqueue(...responses);
     await this.session.prompt(text, { expandPromptTemplates: false, source: 'test' as never });
     await this.session.agent.waitForIdle();
     this.assertNoQueuedResponses(`prompt(${JSON.stringify(text)})`);
   }
 
-async runAuto(config: AutoConfig): Promise<void> {
+  async runAuto(config: AutoConfig): Promise<void> {
     const reactions = config.reactions ?? [];
     const seenIds = new Set<string>();
 
@@ -419,19 +421,19 @@ async runAuto(config: AutoConfig): Promise<void> {
     this.assertNoQueuedResponses('runAuto');
   }
 
-async triggerSessionShutdown(): Promise<void> {
+  async triggerSessionShutdown(): Promise<void> {
     await this.session.extensionRunner.emit({
       type: 'session_shutdown',
       reason: 'quit',
     });
   }
 
-private assertNoQueuedResponses(label: string): void {
+  private assertNoQueuedResponses(label: string): void {
     const remaining = this.fauxResponses.remaining();
     assert.deepStrictEqual(remaining, [], `${label} left unused faux responses queued`);
   }
 
-private commandContextActions() {
+  private commandContextActions() {
     return {
       waitForIdle: async () => {
         // First wait for the agent to be idle so all pending operations
@@ -477,9 +479,9 @@ const FAUX_TEST_USAGE = {
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
 
-function makeUserMessage(text: string): any {
+function makeUserMessage(text: string) {
   return {
-    role: 'user',
+    role: 'user' as const,
     content: [{ type: 'text' as const, text }],
     api: FAUX_MODEL.api,
     provider: FAUX_PROVIDER,
