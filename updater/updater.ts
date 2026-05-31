@@ -1,25 +1,25 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   applyPatches,
   superpowersUpdate,
   superpowersGetSkill,
   superpowersGetFile,
-} from './utils/index.js';
-import type { SkillDefinition, Patch } from './utils/index.js';
+} from "./utils/index.js";
+import type { SkillDefinition, Patch } from "./utils/index.js";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
-const projectDir = join(baseDir, '..');
-const skillsOutputDir = join(projectDir, 'skills');
-const commonPatchPath = join(baseDir, 'common-patch.json');
-const skillDefsDir = join(baseDir, 'skills');
+const projectDir = join(baseDir, "..");
+const skillsOutputDir = join(projectDir, "skills");
+const commonPatchPath = join(baseDir, "common-patch.json");
+const skillDefsDir = join(baseDir, "skills");
 
 function loadDefinitions(): SkillDefinition[] {
-  const files = readdirSync(skillDefsDir).filter((f) => f.endsWith('.json'));
+  const files = readdirSync(skillDefsDir).filter((f) => f.endsWith(".json"));
   return files.map((f: string) => {
-    const content = readFileSync(join(skillDefsDir, f), 'utf-8');
+    const content = readFileSync(join(skillDefsDir, f), "utf-8");
     const def: SkillDefinition = JSON.parse(content);
     return def;
   });
@@ -33,7 +33,7 @@ function getPatchesForFile(def: SkillDefinition, filePath: string): Patch[] {
 
 async function main(): Promise<void> {
   const commonPatches: Patch[] = JSON.parse(
-    readFileSync(commonPatchPath, 'utf-8'),
+    readFileSync(commonPatchPath, "utf-8"),
   );
   const definitions = loadDefinitions();
 
@@ -58,7 +58,7 @@ async function main(): Promise<void> {
       // Check excludes
       if (
         def.exclude?.some(
-          (e) => relativePath === e || relativePath.startsWith(e + '/'),
+          (e) => relativePath === e || relativePath.startsWith(e + "/"),
         )
       ) {
         console.log(`  Skipping (excluded): ${relativePath}`);

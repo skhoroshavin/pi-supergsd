@@ -1,7 +1,7 @@
 import type {
   ExtensionUIContext,
   Theme,
-} from '@earendil-works/pi-coding-agent';
+} from "@earendil-works/pi-coding-agent";
 
 export class TestUI {
   private readonly notificationLog: TestNotification[] = [];
@@ -12,26 +12,26 @@ export class TestUI {
     fg: (_key: string, text: string) => text,
     bg: (_key: string, text: string) => text,
     bold: (text: string) => text,
-  } satisfies Pick<Theme, 'fg' | 'bg' | 'bold'>;
+  } satisfies Pick<Theme, "fg" | "bg" | "bold">;
 
   readonly context: ExtensionUIContext = {
-    notify: (message: string, level?: 'error' | 'warning' | 'info') => {
+    notify: (message: string, level?: "error" | "warning" | "info") => {
       this.notificationLog.push({ message, level });
     },
     setStatus: (key: string, value: string | undefined) => {
-      if (key !== 'task') return;
+      if (key !== "task") return;
       this.taskStatus = value;
       this.taskStatusHistory.push(value);
     },
     theme: this.theme,
   } as ExtensionUIContext;
 
-  notify(message: string, level?: 'error' | 'warning' | 'info'): void {
+  notify(message: string, level?: "error" | "warning" | "info"): void {
     this.context.notify(message, level);
   }
 
   setStatus(key: string, value: string | undefined): void {
-    if (key === 'task') {
+    if (key === "task") {
       this.context.setStatus(key, value);
     }
   }
@@ -51,5 +51,5 @@ export class TestUI {
 
 export type TestNotification = {
   message: string;
-  level: 'error' | 'warning' | 'info' | undefined;
+  level: "error" | "warning" | "info" | undefined;
 };

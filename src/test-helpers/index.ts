@@ -12,9 +12,9 @@ export {
   userRunsAuto,
   notification,
   assumeCommandContext,
-} from './descriptors.js';
+} from "./descriptors.js";
 
-export { ReactionEngine } from './reaction-engine.js';
-export { TestHarness } from './harness.js';
+export { ReactionEngine } from "./reaction-engine.js";
+export { TestHarness } from "./harness.js";
 
-export { node } from './test-tree.js';
+export { node } from "./test-tree.js";

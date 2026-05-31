@@ -1,7 +1,7 @@
 import type {
   ControlReactionDescriptor,
   ResponseDescriptor,
-} from './descriptors.js';
+} from "./descriptors.js";
 
 export class ReactionEngine {
   private readonly promptRules: PromptRule[] = [];
@@ -29,7 +29,7 @@ export class ReactionEngine {
 
   matchPrompt(text: string): ResponseDescriptor[] {
     const matched = this.promptRules.find((rule) => {
-      if (rule.text === '') return text === '';
+      if (rule.text === "") return text === "";
       return text.includes(rule.text);
     });
     return matched ? [...matched.responses] : [];

@@ -1,4 +1,4 @@
-import assert from 'node:assert';
+import assert from "node:assert";
 
 import {
   AuthStorage,
@@ -10,17 +10,17 @@ import {
   SettingsManager,
   type AgentSession,
   type InputSource,
-} from '@earendil-works/pi-coding-agent';
+} from "@earendil-works/pi-coding-agent";
 
 // eslint-disable-next-line unslop/import-control -- extension factory not available via src test-helpers import chain
-import registerSuperGsd from '../../index.js';
-import { updateTaskStatus } from '../index.js';
-import { assertBranchHistory, assertSessionContains } from './assertions.js';
-import type { BranchEntry, ResponseDescriptor } from './descriptors.js';
-import { extractTextContent } from '../text-content.js';
-import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from './faux-provider.js';
-import { ReactionEngine } from './reaction-engine.js';
-import { TestUI } from './ui.js';
+import registerSuperGsd from "../../index.js";
+import { updateTaskStatus } from "../index.js";
+import { assertBranchHistory, assertSessionContains } from "./assertions.js";
+import type { BranchEntry, ResponseDescriptor } from "./descriptors.js";
+import { extractTextContent } from "../text-content.js";
+import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
+import { ReactionEngine } from "./reaction-engine.js";
+import { TestUI } from "./ui.js";
 
 export class TestHarness {
   private constructor(
@@ -36,20 +36,20 @@ export class TestHarness {
   private readonly seenReactionEntryIds = new Set<string>();
 
   async pushTask(prompt_: string, inherit_context = false): Promise<void> {
-    this.sessionManager.appendCustomEntry('task', {
+    this.sessionManager.appendCustomEntry("task", {
       prompt: prompt_,
       inherit_context,
     });
     updateTaskStatus(
       this.sessionManager as Parameters<typeof updateTaskStatus>[0],
       (key, value) => {
-        if (key === 'task') this.ui.setStatus(key, value);
+        if (key === "task") this.ui.setStatus(key, value);
       },
       this.ui.theme,
     );
     this.ui.notify(
-      'Task stored. Use `/start-task` or `/auto` to start it.',
-      'info',
+      "Task stored. Use `/start-task` or `/auto` to start it.",
+      "info",
     );
     await this.session.agent.waitForIdle();
   }
@@ -74,7 +74,7 @@ export class TestHarness {
           pi.registerProvider(FAUX_PROVIDER, {
             api: FAUX_MODEL.api,
             baseUrl: FAUX_MODEL.baseUrl,
-            apiKey: 'test-key',
+            apiKey: "test-key",
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- inline types don't match pi-ai ProviderConfig
             streamSimple: fauxProvider.stream as any,
             models: [
@@ -108,8 +108,8 @@ export class TestHarness {
       settingsManager,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- inline types don't match pi-ai Model<any>
       model: FAUX_MODEL as any,
-      thinkingLevel: 'off' as const,
-      noTools: 'builtin',
+      thinkingLevel: "off" as const,
+      noTools: "builtin",
     });
 
     const ui = new TestUI();
@@ -153,7 +153,7 @@ export class TestHarness {
   assertNotificationEntries(
     expected: Array<{
       message: string;
-      level: 'error' | 'warning' | 'info' | undefined;
+      level: "error" | "warning" | "info" | undefined;
     }>,
   ): void {
     assert.deepStrictEqual(this.ui.notifications(), expected);
@@ -189,7 +189,7 @@ export class TestHarness {
       },
       navigateTree: async (
         targetId: string,
-        options?: Parameters<AgentSession['navigateTree']>[1],
+        options?: Parameters<AgentSession["navigateTree"]>[1],
       ) => {
         if (this.cancelNextNav) {
           this.cancelNextNav = false;
@@ -217,8 +217,8 @@ export class TestHarness {
         if (this.seenReactionEntryIds.has(entry.id)) continue;
         this.seenReactionEntryIds.add(entry.id);
 
-        if (entry.type === 'message' && entry.message.role === 'assistant') {
-          const text = extractTextContent(entry.message.content, '') ?? '';
+        if (entry.type === "message" && entry.message.role === "assistant") {
+          const text = extractTextContent(entry.message.content, "") ?? "";
           for (const reaction of this.engine.matchAssistant(text)) {
             await this.applyReaction(reaction);
             reacted = true;
@@ -226,7 +226,7 @@ export class TestHarness {
           continue;
         }
 
-        if (entry.type === 'custom' && entry.customType === 'task') {
+        if (entry.type === "custom" && entry.customType === "task") {
           const data = entry.data as
             | { prompt: string; inherit_context: boolean }
             | undefined;
@@ -250,34 +250,34 @@ export class TestHarness {
   private async applyReaction(
     reaction:
       | ResponseDescriptor
-      | import('./descriptors.js').ControlReactionDescriptor,
+      | import("./descriptors.js").ControlReactionDescriptor,
   ): Promise<void> {
-    if (reaction.type === 'user-esc') {
+    if (reaction.type === "user-esc") {
       this.cancelNextNav = true;
       return;
     }
-    if (reaction.type === 'user-ctrl-c') {
+    if (reaction.type === "user-ctrl-c") {
       await this.triggerSessionShutdown();
       return;
     }
-    if (reaction.type === 'user-runs-auto') {
-      await this.command('/auto');
+    if (reaction.type === "user-runs-auto") {
+      await this.command("/auto");
       return;
     }
-    if (reaction.type === 'user-append') {
+    if (reaction.type === "user-append") {
       await this.prompt(reaction.text);
       return;
     }
-    if (reaction.type === 'response:text') {
+    if (reaction.type === "response:text") {
       this.appendSyntheticAssistantMessage(reaction.text);
       return;
     }
-    if (reaction.type === 'response:thinking') {
+    if (reaction.type === "response:thinking") {
       this.appendSyntheticAssistantMessage(reaction.text);
       return;
     }
-    if (reaction.type === 'response:aborted') {
-      this.appendSyntheticAssistantMessage(reaction.text, 'aborted');
+    if (reaction.type === "response:aborted") {
+      this.appendSyntheticAssistantMessage(reaction.text, "aborted");
       return;
     }
     this.appendSyntheticTask(reaction.prompt, reaction.inherit_context);
@@ -293,18 +293,18 @@ export class TestHarness {
 
   async triggerSessionShutdown(): Promise<void> {
     await this.session.extensionRunner.emit({
-      type: 'session_shutdown',
-      reason: 'quit',
+      type: "session_shutdown",
+      reason: "quit",
     });
   }
 
   private appendSyntheticAssistantMessage(
     text: string,
-    stopReason: 'stop' | 'aborted' = 'stop',
+    stopReason: "stop" | "aborted" = "stop",
   ): void {
     this.sessionManager.appendMessage({
-      role: 'assistant',
-      content: [{ type: 'text' as const, text }],
+      role: "assistant",
+      content: [{ type: "text" as const, text }],
       api: FAUX_MODEL.api,
       provider: FAUX_PROVIDER,
       model: FAUX_MODEL.id,
@@ -315,7 +315,7 @@ export class TestHarness {
   }
 
   private appendSyntheticTask(prompt_: string, inherit_context: boolean): void {
-    this.sessionManager.appendCustomEntry('task', {
+    this.sessionManager.appendCustomEntry("task", {
       prompt: prompt_,
       inherit_context,
     });
@@ -330,7 +330,7 @@ export class TestHarness {
     );
     await this.session.prompt(text, {
       expandPromptTemplates,
-      source: 'test' as InputSource,
+      source: "test" as InputSource,
     });
     await this.session.agent.waitForIdle();
     this.throwIfNewAssistantError(knownEntryIds);
@@ -340,18 +340,18 @@ export class TestHarness {
     const assistantError = this.sessionManager.getEntries().find((entry) => {
       if (knownEntryIds.has(entry.id)) return false;
       return (
-        entry.type === 'message' &&
-        entry.message.role === 'assistant' &&
-        entry.message.stopReason === 'error'
+        entry.type === "message" &&
+        entry.message.role === "assistant" &&
+        entry.message.stopReason === "error"
       );
     });
 
     if (
-      assistantError?.type === 'message' &&
-      assistantError.message.role === 'assistant'
+      assistantError?.type === "message" &&
+      assistantError.message.role === "assistant"
     ) {
       throw new Error(
-        assistantError.message.errorMessage ?? 'Assistant turn failed.',
+        assistantError.message.errorMessage ?? "Assistant turn failed.",
       );
     }
   }

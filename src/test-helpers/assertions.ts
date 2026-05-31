@@ -1,12 +1,12 @@
-import assert from 'node:assert';
+import assert from "node:assert";
 
 import type {
   SessionEntry,
   SessionManager,
-} from '@earendil-works/pi-coding-agent';
+} from "@earendil-works/pi-coding-agent";
 
-import { extractTextContent } from '../text-content.js';
-import type { BranchEntry } from './descriptors.js';
+import { extractTextContent } from "../text-content.js";
+import type { BranchEntry } from "./descriptors.js";
 
 export function assertBranchHistory(
   sessionManager: SessionManager,
@@ -40,34 +40,34 @@ export function assertSessionContains(
 function stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
   if (isHiddenEntry(entry)) return null;
 
-  if (entry.type === 'message') {
-    if (entry.message.role === 'user') {
+  if (entry.type === "message") {
+    if (entry.message.role === "user") {
       return {
-        type: 'message',
+        type: "message",
         message: {
-          role: 'user',
+          role: "user",
           content: [
             {
-              type: 'text',
-              text: extractTextContent(entry.message.content, '') ?? '',
+              type: "text",
+              text: extractTextContent(entry.message.content, "") ?? "",
             },
           ],
         },
       };
     }
 
-    if (entry.message.role === 'assistant') {
+    if (entry.message.role === "assistant") {
       return {
-        type: 'message',
+        type: "message",
         message: {
-          role: 'assistant',
+          role: "assistant",
           content: [
             {
-              type: 'text',
-              text: extractTextContent(entry.message.content, '') ?? '',
+              type: "text",
+              text: extractTextContent(entry.message.content, "") ?? "",
             },
           ],
-          ...(entry.message.stopReason && entry.message.stopReason !== 'stop'
+          ...(entry.message.stopReason && entry.message.stopReason !== "stop"
             ? { stopReason: entry.message.stopReason }
             : {}),
         },
@@ -77,22 +77,22 @@ function stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
     return null;
   }
 
-  if (entry.type === 'custom') {
-    if (entry.customType !== 'task') return null;
+  if (entry.type === "custom") {
+    if (entry.customType !== "task") return null;
     const data = readTaskData(entry.data);
-    return data ? { type: 'custom', customType: 'task', data } : null;
+    return data ? { type: "custom", customType: "task", data } : null;
   }
 
-  if (entry.type === 'custom_message') {
-    if (entry.customType !== 'task-result') return null;
+  if (entry.type === "custom_message") {
+    if (entry.customType !== "task-result") return null;
     const slug = readTaskResultSlug(entry.details);
     if (!slug) return null;
-    const text = extractTextContent(entry.content, '') ?? '';
+    const text = extractTextContent(entry.content, "") ?? "";
     return {
-      type: 'custom_message',
-      customType: 'task-result',
+      type: "custom_message",
+      customType: "task-result",
       details: { slug },
-      ...(text !== '' ? { content: [{ type: 'text', text }] } : {}),
+      ...(text !== "" ? { content: [{ type: "text", text }] } : {}),
     };
   }
 
@@ -101,14 +101,14 @@ function stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
 
 function isHiddenEntry(entry: SessionEntry): boolean {
   switch (entry.type) {
-    case 'thinking_level_change':
-    case 'model_change':
-    case 'session_info':
-    case 'label':
+    case "thinking_level_change":
+    case "model_change":
+    case "session_info":
+    case "label":
       return true;
-    case 'custom':
+    case "custom":
       return (
-        entry.customType === 'task-done' || entry.customType === 'task-start'
+        entry.customType === "task-done" || entry.customType === "task-start"
       );
     default:
       return false;
@@ -120,15 +120,15 @@ function readTaskData(
 ): { prompt: string; inherit_context: boolean } | null {
   if (!isRecord(data)) return null;
   if (
-    typeof data.prompt !== 'string' ||
-    typeof data.inherit_context !== 'boolean'
+    typeof data.prompt !== "string" ||
+    typeof data.inherit_context !== "boolean"
   )
     return null;
   return { prompt: data.prompt, inherit_context: data.inherit_context };
 }
 
 function readTaskResultSlug(details: unknown): string | null {
-  return isRecord(details) && typeof details.slug === 'string'
+  return isRecord(details) && typeof details.slug === "string"
     ? details.slug
     : null;
 }
@@ -143,5 +143,5 @@ function entriesEqual(actual: BranchEntry, expected: BranchEntry): boolean {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === "object" && value !== null;
 }

@@ -1,7 +1,7 @@
-import { it } from 'node:test';
+import { it } from "node:test";
 
-import { ReactionEngine } from './reaction-engine.js';
-import { TestHarness } from './harness.js';
+import { ReactionEngine } from "./reaction-engine.js";
+import { TestHarness } from "./harness.js";
 
 export function node(name: string, fn: NodeFn) {
   return new TestNode(name, fn);
@@ -35,7 +35,7 @@ class TestNode {
     this.registered = true;
 
     const chain = [...ancestors, this];
-    const name = chain.map((node) => node.name).join(' → ');
+    const name = chain.map((node) => node.name).join(" → ");
 
     it(name, async () => {
       const h = await TestHarness.create(new ReactionEngine());

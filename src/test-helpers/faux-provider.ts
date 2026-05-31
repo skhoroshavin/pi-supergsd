@@ -8,22 +8,22 @@
 
 /* ─── Descriptor types ─── */
 
-import type { ResponseDescriptor } from './descriptors.js';
-import { ReactionEngine } from './reaction-engine.js';
+import type { ResponseDescriptor } from "./descriptors.js";
+import { ReactionEngine } from "./reaction-engine.js";
 
-export const FAUX_PROVIDER = 'supergsd-test';
+export const FAUX_PROVIDER = "supergsd-test";
 
-export const FAUX_MODEL_ID = 'deterministic';
+export const FAUX_MODEL_ID = "deterministic";
 
 export const FAUX_MODEL: Model = {
   id: FAUX_MODEL_ID,
-  name: 'Deterministic Test Model',
-  api: 'supergsd-test-api',
+  name: "Deterministic Test Model",
+  api: "supergsd-test-api",
   provider: FAUX_PROVIDER,
-  baseUrl: 'memory://supergsd-test',
+  baseUrl: "memory://supergsd-test",
   reasoning: true,
-  thinkingLevelMap: { off: null, low: 'low', medium: 'medium', high: 'high' },
-  input: ['text'],
+  thinkingLevelMap: { off: null, low: "low", medium: "medium", high: "high" },
+  input: ["text"],
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   contextWindow: 200000,
   maxTokens: 4096,
@@ -35,13 +35,13 @@ export class FauxProvider {
   stream = (_model: Model, context: Context): FauxEventStream => {
     const lastUser = [...context.messages]
       .reverse()
-      .find((message) => message.role === 'user');
-    const promptText = lastUser ? readUserText(lastUser.content) : '';
+      .find((message) => message.role === "user");
+    const promptText = lastUser ? readUserText(lastUser.content) : "";
     const responses = this.engine.matchPrompt(promptText);
 
     if (responses.length === 0) {
       throw new Error(
-        `No reaction engine rule matched provider prompt: ${promptText || '<empty prompt>'}`,
+        `No reaction engine rule matched provider prompt: ${promptText || "<empty prompt>"}`,
       );
     }
 
@@ -88,8 +88,8 @@ export class FauxEventStream {
     this.resolveResult(result);
     for (const resolve of this.waiting) {
       resolve({
-        type: 'done',
-        reason: result.stopReason === 'toolUse' ? 'toolUse' : 'stop',
+        type: "done",
+        reason: result.stopReason === "toolUse" ? "toolUse" : "stop",
         message: result,
       } as AssistantMessageEvent);
     }
@@ -122,58 +122,58 @@ interface Context {
 }
 
 type AssistantMessageEvent =
-  | { type: 'start'; partial: AssistantMessage }
-  | { type: 'text_start'; contentIndex: number; partial: AssistantMessage }
+  | { type: "start"; partial: AssistantMessage }
+  | { type: "text_start"; contentIndex: number; partial: AssistantMessage }
   | {
-      type: 'text_delta';
+      type: "text_delta";
       contentIndex: number;
       delta: string;
       partial: AssistantMessage;
     }
   | {
-      type: 'text_end';
+      type: "text_end";
       contentIndex: number;
       content: string;
       partial: AssistantMessage;
     }
-  | { type: 'thinking_start'; contentIndex: number; partial: AssistantMessage }
+  | { type: "thinking_start"; contentIndex: number; partial: AssistantMessage }
   | {
-      type: 'thinking_delta';
+      type: "thinking_delta";
       contentIndex: number;
       delta: string;
       partial: AssistantMessage;
     }
   | {
-      type: 'thinking_end';
+      type: "thinking_end";
       contentIndex: number;
       content: string;
       partial: AssistantMessage;
     }
-  | { type: 'toolcall_start'; contentIndex: number; partial: AssistantMessage }
+  | { type: "toolcall_start"; contentIndex: number; partial: AssistantMessage }
   | {
-      type: 'toolcall_delta';
+      type: "toolcall_delta";
       contentIndex: number;
       delta: string;
       partial: AssistantMessage;
     }
   | {
-      type: 'toolcall_end';
+      type: "toolcall_end";
       contentIndex: number;
       toolCall: ToolCall;
       partial: AssistantMessage;
     }
   | {
-      type: 'done';
-      reason: Extract<StopReason, 'stop' | 'length' | 'toolUse'>;
+      type: "done";
+      reason: Extract<StopReason, "stop" | "length" | "toolUse">;
       message: AssistantMessage;
     }
   | {
-      type: 'error';
-      reason: Extract<StopReason, 'aborted' | 'error'>;
+      type: "error";
+      reason: Extract<StopReason, "aborted" | "error">;
       error: AssistantMessage;
     };
 
-type StopReason = 'stop' | 'length' | 'toolUse' | 'error' | 'aborted';
+type StopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
 
 interface Model {
   id: string;
@@ -183,7 +183,7 @@ interface Model {
   baseUrl: string;
   reasoning: boolean;
   thinkingLevelMap?: Record<string, string | null>;
-  input: ('text' | 'image')[];
+  input: ("text" | "image")[];
   cost: {
     input: number;
     output: number;
@@ -195,73 +195,73 @@ interface Model {
 }
 
 function readUserText(content: string | TextContent[]): string {
-  if (typeof content === 'string') return content;
+  if (typeof content === "string") return content;
   return content
-    .filter((block): block is TextContent => block.type === 'text')
+    .filter((block): block is TextContent => block.type === "text")
     .map((block) => block.text)
-    .join('\n');
+    .join("\n");
 }
 
 function emitPromptResponses(
   stream: FauxEventStream,
   responses: ResponseDescriptor[],
 ): void {
-  if (responses.length === 1 && responses[0].type === 'response:aborted') {
+  if (responses.length === 1 && responses[0].type === "response:aborted") {
     const descriptor = responses[0];
     const message = makeAssistantMessage(
-      [{ type: 'text', text: descriptor.text }],
-      'aborted',
-      'Aborted by test descriptor',
+      [{ type: "text", text: descriptor.text }],
+      "aborted",
+      "Aborted by test descriptor",
     );
-    stream.push({ type: 'start', partial: message });
-    stream.push({ type: 'error', reason: 'aborted', error: message });
+    stream.push({ type: "start", partial: message });
+    stream.push({ type: "error", reason: "aborted", error: message });
     stream.end(message);
     return;
   }
 
   const content = responses.map((descriptor, index) => {
-    if (descriptor.type === 'response:text') {
-      return { type: 'text' as const, text: descriptor.text };
+    if (descriptor.type === "response:text") {
+      return { type: "text" as const, text: descriptor.text };
     }
-    if (descriptor.type === 'response:thinking') {
-      return { type: 'thinking' as const, thinking: descriptor.text };
+    if (descriptor.type === "response:thinking") {
+      return { type: "thinking" as const, thinking: descriptor.text };
     }
-    if (descriptor.type === 'response:push-task') {
+    if (descriptor.type === "response:push-task") {
       return {
-        type: 'toolCall' as const,
+        type: "toolCall" as const,
         id: `call-${index + 1}`,
-        name: 'push-task',
+        name: "push-task",
         arguments: {
           prompt: descriptor.prompt,
           inherit_context: descriptor.inherit_context,
         },
       };
     }
-    throw new Error('aborts(...) must be the only descriptor in onPrompt(...)');
+    throw new Error("aborts(...) must be the only descriptor in onPrompt(...)");
   });
 
-  const stopReason = content.some((block) => block.type === 'toolCall')
-    ? 'toolUse'
-    : 'stop';
+  const stopReason = content.some((block) => block.type === "toolCall")
+    ? "toolUse"
+    : "stop";
   const message = makeAssistantMessage(content, stopReason);
 
-  stream.push({ type: 'start', partial: message });
+  stream.push({ type: "start", partial: message });
 
   for (const [index, block] of content.entries()) {
-    if (block.type === 'text') {
+    if (block.type === "text") {
       stream.push({
-        type: 'text_start',
+        type: "text_start",
         contentIndex: index,
         partial: message,
       });
       stream.push({
-        type: 'text_delta',
+        type: "text_delta",
         contentIndex: index,
         delta: block.text,
         partial: message,
       });
       stream.push({
-        type: 'text_end',
+        type: "text_end",
         contentIndex: index,
         content: block.text,
         partial: message,
@@ -269,20 +269,20 @@ function emitPromptResponses(
       continue;
     }
 
-    if (block.type === 'thinking') {
+    if (block.type === "thinking") {
       stream.push({
-        type: 'thinking_start',
+        type: "thinking_start",
         contentIndex: index,
         partial: message,
       });
       stream.push({
-        type: 'thinking_delta',
+        type: "thinking_delta",
         contentIndex: index,
         delta: block.thinking,
         partial: message,
       });
       stream.push({
-        type: 'thinking_end',
+        type: "thinking_end",
         contentIndex: index,
         content: block.thinking,
         partial: message,
@@ -291,29 +291,29 @@ function emitPromptResponses(
     }
 
     stream.push({
-      type: 'toolcall_start',
+      type: "toolcall_start",
       contentIndex: index,
       partial: message,
     });
     stream.push({
-      type: 'toolcall_end',
+      type: "toolcall_end",
       contentIndex: index,
       toolCall: block,
       partial: message,
     });
   }
 
-  stream.push({ type: 'done', reason: stopReason, message });
+  stream.push({ type: "done", reason: stopReason, message });
   stream.end(message);
 }
 
 function makeAssistantMessage(
-  content: AssistantMessage['content'],
+  content: AssistantMessage["content"],
   stopReason: string,
   errorMessage?: string,
 ): AssistantMessage {
   return {
-    role: 'assistant',
+    role: "assistant",
     content,
     api: FAUX_MODEL.api,
     provider: FAUX_PROVIDER,
@@ -326,7 +326,7 @@ function makeAssistantMessage(
 }
 
 interface AssistantMessage {
-  role: 'assistant';
+  role: "assistant";
   content: (TextContent | ThinkingContent | ToolCall)[];
   api: Api;
   provider: string;
@@ -340,17 +340,17 @@ interface AssistantMessage {
 type Api = string;
 
 interface TextContent {
-  type: 'text';
+  type: "text";
   text: string;
 }
 
 interface ThinkingContent {
-  type: 'thinking';
+  type: "thinking";
   thinking: string;
 }
 
 interface ToolCall {
-  type: 'toolCall';
+  type: "toolCall";
   id: string;
   name: string;
   arguments: Record<string, unknown>;

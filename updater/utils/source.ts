@@ -1,12 +1,12 @@
-import { execFile } from 'node:child_process';
+import { execFile } from "node:child_process";
 
-import { promisify } from 'node:util';
+import { promisify } from "node:util";
 
-import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 
-import { join } from 'node:path';
+import { join } from "node:path";
 
-import { tmpdir } from 'node:os';
+import { tmpdir } from "node:os";
 
 export async function superpowersUpdate(): Promise<void> {
   const dir = cacheDir();
@@ -15,11 +15,11 @@ export async function superpowersUpdate(): Promise<void> {
     statSync(dir);
   } catch {
     // Directory does not exist — clone fresh
-    await execFileAsync('git', [
-      'clone',
-      '--depth',
-      '1',
-      '--branch',
+    await execFileAsync("git", [
+      "clone",
+      "--depth",
+      "1",
+      "--branch",
       REF,
       `https://github.com/${REPO}.git`,
       dir,
@@ -29,20 +29,20 @@ export async function superpowersUpdate(): Promise<void> {
 
   // Directory exists — try to update
   try {
-    await execFileAsync('git', ['fetch', '--depth', '1', 'origin', REF], {
+    await execFileAsync("git", ["fetch", "--depth", "1", "origin", REF], {
       cwd: dir,
     });
-    await execFileAsync('git', ['reset', '--hard', `origin/${REF}`], {
+    await execFileAsync("git", ["reset", "--hard", `origin/${REF}`], {
       cwd: dir,
     });
   } catch {
     // Update failed — wipe and re-clone
     rmSync(dir, { recursive: true, force: true });
-    await execFileAsync('git', [
-      'clone',
-      '--depth',
-      '1',
-      '--branch',
+    await execFileAsync("git", [
+      "clone",
+      "--depth",
+      "1",
+      "--branch",
       REF,
       `https://github.com/${REPO}.git`,
       dir,
@@ -52,7 +52,7 @@ export async function superpowersUpdate(): Promise<void> {
 
 export function superpowersGetSkill(name: string): string[] {
   const dir = cacheDir();
-  const skillPath = join(dir, 'skills', name);
+  const skillPath = join(dir, "skills", name);
   const results: string[] = [];
 
   try {
@@ -74,23 +74,23 @@ export function superpowersGetSkill(name: string): string[] {
     }
   }
 
-  walk(skillPath, '');
+  walk(skillPath, "");
   return results;
 }
 
 export function superpowersGetFile(filePath: string): string {
   const dir = cacheDir();
-  return readFileSync(join(dir, filePath), 'utf-8');
+  return readFileSync(join(dir, filePath), "utf-8");
 }
 
-const REPO = 'obra/superpowers';
+const REPO = "obra/superpowers";
 
-const REF = 'main';
+const REF = "main";
 
 function cacheDir(): string {
   return process.env.PI_SUPERGSD_CACHE_DIR || CACHE_DIR;
 }
 
-const CACHE_DIR = join(tmpdir(), 'pi-supergsd-updater', 'superpowers-main');
+const CACHE_DIR = join(tmpdir(), "pi-supergsd-updater", "superpowers-main");
 
 const execFileAsync = promisify(execFile);
