@@ -8,7 +8,6 @@ import {
   task,
   taskResult,
   user,
-  TestHarness,
 } from "./test-helpers/index.js";
 
 import { describe } from "node:test";
@@ -39,7 +38,8 @@ describe("manual workflow", () => {
         h.assertNotifications("Task discarded.");
       }),
       node("start AAA", async (h) => {
-        onTaskResponse(h, "Task AAA", "Done.");
+        h.llm.onPrompt("Task AAA", responds("Done."));
+        h.llm.onPrompt("Done.", responds("Great!"));
         await h.prompt("/start-task");
         assert.strictEqual(h.getStatus(), "current task: task-aaa");
         h.assertBranchHistory(user("Task AAA"), assistant("Done."));
@@ -118,7 +118,8 @@ describe("manual workflow", () => {
           );
         }).children(
           node("start AAA", async (h) => {
-            onTaskResponse(h, "Task AAA", "Done.");
+            h.llm.onPrompt("Task AAA", responds("Done."));
+            h.llm.onPrompt("Done.", responds("Great!"));
             await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-aaa");
             h.assertBranchHistory(user("Task AAA"), assistant("Done."));
@@ -183,7 +184,8 @@ describe("manual workflow", () => {
             }),
           ),
           node("start BBB", async (h) => {
-            onTaskResponse(h, "Task BBB", "inner done");
+            h.llm.onPrompt("Task BBB", responds("inner done"));
+            h.llm.onPrompt("inner done", responds("Great!"));
             await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-bbb");
             h.assertBranchHistory(user("Task BBB"), assistant("inner done"));
@@ -292,7 +294,8 @@ describe("manual workflow", () => {
             }),
           ),
           node("start BBB [inherit]", async (h) => {
-            onTaskResponse(h, "Task BBB", "inner done");
+            h.llm.onPrompt("Task BBB", responds("inner done"));
+            h.llm.onPrompt("inner done", responds("Great!"));
             await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-bbb");
             h.assertBranchHistory(
@@ -396,7 +399,8 @@ describe("manual workflow", () => {
         h.assertNotifications("Task discarded.");
       }),
       node("start AAA", async (h) => {
-        onTaskResponse(h, "Task AAA", "Done.");
+        h.llm.onPrompt("Task AAA", responds("Done."));
+        h.llm.onPrompt("Done.", responds("Great!"));
         await h.prompt("/start-task");
         assert.strictEqual(h.getStatus(), "current task: task-aaa");
         h.assertBranchHistory(
@@ -481,7 +485,8 @@ describe("manual workflow", () => {
           );
         }).children(
           node("start AAA", async (h) => {
-            onTaskResponse(h, "Task AAA", "Done.");
+            h.llm.onPrompt("Task AAA", responds("Done."));
+            h.llm.onPrompt("Done.", responds("Great!"));
             await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-aaa");
             h.assertBranchHistory(
@@ -558,7 +563,8 @@ describe("manual workflow", () => {
             }),
           ),
           node("start BBB", async (h) => {
-            onTaskResponse(h, "Task BBB", "inner done");
+            h.llm.onPrompt("Task BBB", responds("inner done"));
+            h.llm.onPrompt("inner done", responds("Great!"));
             await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-bbb");
             h.assertBranchHistory(user("Task BBB"), assistant("inner done"));
@@ -679,7 +685,8 @@ describe("manual workflow", () => {
             }),
           ),
           node("start BBB [inherit]", async (h) => {
-            onTaskResponse(h, "Task BBB", "inner done");
+            h.llm.onPrompt("Task BBB", responds("inner done"));
+            h.llm.onPrompt("inner done", responds("Great!"));
             await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-bbb");
             h.assertBranchHistory(
@@ -799,16 +806,3 @@ describe("manual workflow", () => {
     h.assertNotifications("Not inside task, nothing to abort.");
   }).run();
 });
-
-// Helper: register prompt rules for a task prompt and the follow-up turn
-// triggered when /finish-task replays that response onto the parent branch.
-function onTaskResponse(
-  h: TestHarness,
-  taskPrompt: string,
-  response: string,
-): void {
-  h.llm.onPrompt(taskPrompt, responds(response));
-  // When finish-task replays this response on the parent branch, the LLM
-  // sees it and should respond meaningfully.
-  h.llm.onPrompt(response, responds("Great!"));
-}
