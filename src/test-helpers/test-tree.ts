@@ -1,6 +1,6 @@
-import { it } from 'node:test';
+import { it } from "node:test";
 
-import { TestHarness } from './test-harness.js';
+import { TestHarness } from "./test-harness.js";
 
 export function node(name: string, fn: NodeFn) {
   return new TestNode(name, fn);
@@ -34,7 +34,7 @@ class TestNode {
     this.registered = true;
 
     const chain = [...ancestors, this];
-    const name = chain.map(node => node.name).join(' → ');
+    const name = chain.map((node) => node.name).join(" → ");
 
     it(name, async () => {
       const h = new TestHarness();

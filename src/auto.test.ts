@@ -1,15 +1,10 @@
-import assert from 'node:assert';
+import assert from "node:assert";
 
-import { describe, it } from 'node:test';
+import { describe, it } from "node:test";
 
-import {
-  SessionManager,
-  type Theme,
-} from '@earendil-works/pi-coding-agent';
+import { SessionManager, type Theme } from "@earendil-works/pi-coding-agent";
 
-import {
-  cmdAuto,
-} from './index.js';
+import { cmdAuto } from "./index.js";
 
 import {
   assistant,
@@ -22,93 +17,95 @@ import {
   userCtrlC,
   userEsc,
   userRunsAuto,
-} from './test-helpers/index.js';
+} from "./test-helpers/index.js";
 
-describe('automated workflow', () => {
-  it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
+describe("automated workflow", () => {
+  it("completes push-task -> /auto -> finish-task and injects the branch result", async () => {
     const h = new TestHarness();
 
-    h.appendUserMessage('main work');
-    h.appendAssistantMessage('working on main...');
-    await h.runPushTask('Analyze performance.');
-    assert.strictEqual(h.getStatus(), 'pending task: analyze-performance');
+    h.appendUserMessage("main work");
+    h.appendAssistantMessage("working on main...");
+    await h.runPushTask("Analyze performance.");
+    assert.strictEqual(h.getStatus(), "pending task: analyze-performance");
     h.assertBranchHistory(
-      user('main work'),
-      assistant('working on main...'),
-      task('Analyze performance.'),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      user("main work"),
+      assistant("working on main..."),
+      task("Analyze performance."),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
     );
 
     await h.runAuto({
-      reactions: [[user('Analyze performance'), assistant('Found 3 bottlenecks: ...')]],
+      reactions: [
+        [user("Analyze performance"), assistant("Found 3 bottlenecks: ...")],
+      ],
     });
 
-    h.assertTaskStatusHistoryIncludes('[auto] pending task: analyze-performance');
+    h.assertTaskStatusHistoryIncludes(
+      "[auto] pending task: analyze-performance",
+    );
     h.assertBranchHistory(
-      user('main work'),
-      assistant('working on main...'),
-      task('Analyze performance.'),
-      taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
-      notification('Task finished. Last response attached.'),
+      user("main work"),
+      assistant("working on main..."),
+      task("Analyze performance."),
+      taskResult("analyze-performance", "Found 3 bottlenecks: ..."),
+      notification("Task finished. Last response attached."),
     );
     assert.strictEqual(h.getStatus(), undefined);
   });
 
-  it('returns the branch result to the original leaf for branch-context tasks', async () => {
+  it("returns the branch result to the original leaf for branch-context tasks", async () => {
     const h = new TestHarness();
 
-    h.appendUserMessage('main work');
-    h.appendAssistantMessage('working...');
-    await h.runPushTask('Quick fix.', true);
-    assert.strictEqual(h.getStatus(), 'pending task: quick-fix');
+    h.appendUserMessage("main work");
+    h.appendAssistantMessage("working...");
+    await h.runPushTask("Quick fix.", true);
+    assert.strictEqual(h.getStatus(), "pending task: quick-fix");
     h.assertBranchHistory(
-      user('main work'),
-      assistant('working...'),
-      task('Quick fix.', true),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      user("main work"),
+      assistant("working..."),
+      task("Quick fix.", true),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
     );
 
     await h.runAuto({
-      reactions: [[user('Quick fix'), assistant('Fixed the bug.')]],
+      reactions: [[user("Quick fix"), assistant("Fixed the bug.")]],
     });
 
     h.assertBranchHistory(
-      user('main work'),
-      assistant('working...'),
-      task('Quick fix.', true),
-      taskResult('quick-fix', 'Fixed the bug.'),
-      notification('Task finished. Last response attached.'),
+      user("main work"),
+      assistant("working..."),
+      task("Quick fix.", true),
+      taskResult("quick-fix", "Fixed the bug."),
+      notification("Task finished. Last response attached."),
     );
   });
 
-  it('stops when navigation is cancelled and does not mark the task done', async () => {
+  it("stops when navigation is cancelled and does not mark the task done", async () => {
     const h = new TestHarness();
 
-    h.appendUserMessage('main work');
-    await h.runPushTask('Analyze performance.');
+    h.appendUserMessage("main work");
+    await h.runPushTask("Analyze performance.");
 
     await h.runAuto({
-      reactions: [[task('Analyze performance.'), userEsc()]],
+      reactions: [[task("Analyze performance."), userEsc()]],
     });
 
     h.assertBranchHistory(
-      user('main work'),
-      task('Analyze performance.'),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      user("main work"),
+      task("Analyze performance."),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
     );
   });
 
-  it('notifies and exits when started with no pending tasks', async () => {
+  it("notifies and exits when started with no pending tasks", async () => {
     const h = new TestHarness();
     await h.runAuto({ reactions: [] });
-    h.assertBranchHistory(
-      notification('No pending tasks to run.'),
-    );
+    h.assertBranchHistory(notification("No pending tasks to run."));
   });
 
-  it('still enters the auto loop after a prior session shutdown event', async () => {
+  it("still enters the auto loop after a prior session shutdown event", async () => {
     const sm = SessionManager.inMemory();
-    sm.appendThinkingLevelChange('off');
+    sm.appendThinkingLevelChange("off");
 
     const idleWaiters: Array<() => void> = [];
     const sessionShutdownHandlers: Array<() => unknown> = [];
@@ -119,7 +116,8 @@ describe('automated workflow', () => {
       sendUserMessage() {},
       sendMessage() {},
       on(eventName: string, handler: () => unknown) {
-        if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
+        if (eventName === "session_shutdown")
+          sessionShutdownHandlers.push(handler);
       },
     } satisfies Parameters<typeof cmdAuto>[0];
 
@@ -141,7 +139,7 @@ describe('automated workflow', () => {
           fg: (_key: string, text: string) => text,
           bg: (_key: string, text: string) => text,
           bold: (text: string) => text,
-        } satisfies Pick<Theme, 'fg' | 'bg' | 'bold'>,
+        } satisfies Pick<Theme, "fg" | "bg" | "bold">,
       },
       navigateTree: async () => ({ cancelled: false }),
     });
@@ -152,7 +150,7 @@ describe('automated workflow', () => {
     }
 
     let settled = false;
-    const autoPromise = auto.handler('', ctx).finally(() => {
+    const autoPromise = auto.handler("", ctx).finally(() => {
       settled = true;
     });
 
@@ -166,99 +164,99 @@ describe('automated workflow', () => {
     waiter();
 
     await autoPromise;
-    assert.deepStrictEqual(notifications, ['No pending tasks to run.']);
+    assert.deepStrictEqual(notifications, ["No pending tasks to run."]);
   });
 
-  it('warns and returns when /auto is already running', async () => {
+  it("warns and returns when /auto is already running", async () => {
     const h = new TestHarness();
 
-    h.appendUserMessage('start');
-    await h.runPushTask('first task');
+    h.appendUserMessage("start");
+    await h.runPushTask("first task");
 
     await h.runAuto({
       reactions: [
-        [user('first task'), assistant('done')],
-        [assistant('done'), userRunsAuto()],
+        [user("first task"), assistant("done")],
+        [assistant("done"), userRunsAuto()],
       ],
     });
 
-    h.assertNotifications('Auto is already running.');
+    h.assertNotifications("Auto is already running.");
     h.assertBranchHistory(
-      user('start'),
-      task('first task'),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-      taskResult('first-task', 'done'),
-      notification('Task finished. Last response attached.'),
+      user("start"),
+      task("first task"),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      taskResult("first-task", "done"),
+      notification("Task finished. Last response attached."),
     );
     assert.strictEqual(h.getStatus(), undefined);
   });
 
-  it('stops when the last assistant message was aborted', async () => {
+  it("stops when the last assistant message was aborted", async () => {
     const h = new TestHarness();
 
-    h.appendUserMessage('start');
-    await h.runPushTask('Implement phase 1.', true);
+    h.appendUserMessage("start");
+    await h.runPushTask("Implement phase 1.", true);
 
     await h.runAuto({
       reactions: [
-        [user('Implement phase 1'), assistant('Stopped by user.', 'aborted')],
+        [user("Implement phase 1"), assistant("Stopped by user.", "aborted")],
       ],
     });
 
     h.assertBranchHistory(
-      user('start'),
-      task('Implement phase 1.', true),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-      user('Implement phase 1.'),
-      assistant('Stopped by user.', 'aborted'),
+      user("start"),
+      task("Implement phase 1.", true),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      user("Implement phase 1."),
+      assistant("Stopped by user.", "aborted"),
     );
-    assert.strictEqual(h.getStatus(), 'current task: implement-phase-1');
+    assert.strictEqual(h.getStatus(), "current task: implement-phase-1");
   });
 
-  it('processes a subtask pushed during a task', async () => {
+  it("processes a subtask pushed during a task", async () => {
     const h = new TestHarness();
 
-    h.appendUserMessage('main work');
-    h.appendAssistantMessage('working...');
-    await h.runPushTask('parent task');
+    h.appendUserMessage("main work");
+    h.appendAssistantMessage("working...");
+    await h.runPushTask("parent task");
 
     await h.runAuto({
       reactions: [
-        [user('parent task'), assistant('working on parent...')],
-        [assistant('working on parent...'), task('subtask')],
-        [user('subtask'), assistant('sub done')],
+        [user("parent task"), assistant("working on parent...")],
+        [assistant("working on parent..."), task("subtask")],
+        [user("subtask"), assistant("sub done")],
       ],
     });
 
     h.assertSessionContains(
-      user('subtask'),
-      assistant('sub done'),
-      taskResult('subtask', 'sub done'),
+      user("subtask"),
+      assistant("sub done"),
+      taskResult("subtask", "sub done"),
     );
 
     // Parent finishes last. Only original-branch entries appear on the final
     // branch (subtask entries live elsewhere in the session tree).
     h.assertBranchHistory(
-      user('main work'),
-      assistant('working...'),
-      task('parent task'),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-      taskResult('parent-task', 'working on parent...'),
-      notification('Task finished. Last response attached.'),
+      user("main work"),
+      assistant("working..."),
+      task("parent task"),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      taskResult("parent-task", "working on parent..."),
+      notification("Task finished. Last response attached."),
     );
   });
 
-  it('continues processing when user queues a steering message during auto', async () => {
+  it("continues processing when user queues a steering message during auto", async () => {
     const h = new TestHarness();
 
-    h.appendUserMessage('start');
-    await h.runPushTask('Quick fix.', true);
+    h.appendUserMessage("start");
+    await h.runPushTask("Quick fix.", true);
 
     await h.runAuto({
       reactions: [
-        [user('Quick fix'), assistant('thinking...')],
-        [assistant('thinking...'), user('steer it')],
-        [user('steer it'), assistant('adjusted response')],
+        [user("Quick fix"), assistant("thinking...")],
+        [assistant("thinking..."), user("steer it")],
+        [user("steer it"), assistant("adjusted response")],
       ],
     });
 
@@ -266,24 +264,24 @@ describe('automated workflow', () => {
     // assistant adjusts → finish task with final response.
     // Only original-branch entries appear (same pattern as test #2).
     h.assertBranchHistory(
-      user('start'),
-      task('Quick fix.', true),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-      taskResult('quick-fix', 'adjusted response'),
-      notification('Task finished. Last response attached.'),
+      user("start"),
+      task("Quick fix.", true),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      taskResult("quick-fix", "adjusted response"),
+      notification("Task finished. Last response attached."),
     );
   });
 
-  it('stops when session is shut down during auto', async () => {
+  it("stops when session is shut down during auto", async () => {
     const h = new TestHarness();
 
-    h.appendUserMessage('start');
-    await h.runPushTask('Shutdown task', true);
+    h.appendUserMessage("start");
+    await h.runPushTask("Shutdown task", true);
 
     await h.runAuto({
       reactions: [
-        [user('Shutdown task'), assistant('working...')],
-        [assistant('working...'), userCtrlC()],
+        [user("Shutdown task"), assistant("working...")],
+        [assistant("working..."), userCtrlC()],
       ],
     });
 
@@ -291,12 +289,12 @@ describe('automated workflow', () => {
     // then session shutdown fired. No navigation back — task-branch
     // entries remain visible. No taskResult — task was never finished.
     h.assertBranchHistory(
-      user('start'),
-      task('Shutdown task', true),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-      user('Shutdown task'),
-      assistant('working...'),
+      user("start"),
+      task("Shutdown task", true),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      user("Shutdown task"),
+      assistant("working..."),
     );
-    assert.strictEqual(h.getStatus(), 'current task: shutdown-task');
+    assert.strictEqual(h.getStatus(), "current task: shutdown-task");
   });
 });

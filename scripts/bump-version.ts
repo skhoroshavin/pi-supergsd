@@ -1,12 +1,12 @@
-import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { execSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..');
-const packageJsonPath = join(rootDir, 'package.json');
-const packageLockPath = join(rootDir, 'package-lock.json');
-const BUMP_ARGS = ['major', 'minor', 'patch'] as const;
+const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJsonPath = join(rootDir, "package.json");
+const packageLockPath = join(rootDir, "package-lock.json");
+const BUMP_ARGS = ["major", "minor", "patch"] as const;
 
 type BumpArg = (typeof BUMP_ARGS)[number];
 
@@ -24,45 +24,54 @@ interface PackageLockFile extends PackageJsonFile {
   packages?: Record<string, { version?: string } & Record<string, unknown>>;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main();
 }
 
 function main(): void {
   const args = process.argv.slice(2);
   const command = args.find(isBumpArg);
-  const noGit = args.includes('--no-git');
+  const noGit = args.includes("--no-git");
 
   if (!command) {
-    throw new Error(`Missing command. Valid: ${BUMP_ARGS.join(', ')}`);
+    throw new Error(`Missing command. Valid: ${BUMP_ARGS.join(", ")}`);
   }
 
-  if (args.some((arg) => arg !== command && arg !== '--no-git')) {
-    throw new Error(`Unknown argument. Valid: ${BUMP_ARGS.join(', ')}, --no-git`);
+  if (args.some((arg) => arg !== command && arg !== "--no-git")) {
+    throw new Error(
+      `Unknown argument. Valid: ${BUMP_ARGS.join(", ")}, --no-git`,
+    );
   }
 
   if (!noGit) {
-    const status = execSync('git status --porcelain', {
+    const status = execSync("git status --porcelain", {
       cwd: rootDir,
-      encoding: 'utf8',
+      encoding: "utf8",
     }).trim();
 
     if (status) {
-      throw new Error('Working tree is not clean. Commit or stash changes first.');
+      throw new Error(
+        "Working tree is not clean. Commit or stash changes first.",
+      );
     }
   }
 
   const packageJson = readJson<PackageJsonFile>(packageJsonPath);
   const currentVersion = packageJson.version;
-  const nextVersion = formatVersion(computeNext(parseVersion(currentVersion), command));
+  const nextVersion = formatVersion(
+    computeNext(parseVersion(currentVersion), command),
+  );
 
   packageJson.version = nextVersion;
   writeJson(packageJsonPath, packageJson);
 
   const packageLock = readJson<PackageLockFile>(packageLockPath);
   packageLock.version = nextVersion;
-  if (packageLock.packages?.['']) {
-    packageLock.packages[''].version = nextVersion;
+  if (packageLock.packages?.[""]) {
+    packageLock.packages[""].version = nextVersion;
   }
   writeJson(packageLockPath, packageLock);
 
@@ -71,18 +80,24 @@ function main(): void {
     return;
   }
 
-  execSync('git add package.json package-lock.json', { cwd: rootDir, stdio: 'inherit' });
-  execSync(`git commit -m "Bump version to ${nextVersion}"`, { cwd: rootDir, stdio: 'inherit' });
+  execSync("git add package.json package-lock.json", {
+    cwd: rootDir,
+    stdio: "inherit",
+  });
+  execSync(`git commit -m "Bump version to ${nextVersion}"`, {
+    cwd: rootDir,
+    stdio: "inherit",
+  });
 
   console.log(`\nBumped ${currentVersion} → ${nextVersion}`);
 }
 
 function readJson<T>(path: string): T {
-  return JSON.parse(readFileSync(path, 'utf8')) as T;
+  return JSON.parse(readFileSync(path, "utf8")) as T;
 }
 
 function writeJson(path: string, value: unknown): void {
-  writeFileSync(path, JSON.stringify(value, undefined, 2) + '\n');
+  writeFileSync(path, JSON.stringify(value, undefined, 2) + "\n");
 }
 
 function isBumpArg(value: string): value is BumpArg {
@@ -103,14 +118,21 @@ export function parseVersion(version: string): ParsedVersion {
   };
 }
 
-export function computeNext(current: ParsedVersion, command: BumpArg): ParsedVersion {
+export function computeNext(
+  current: ParsedVersion,
+  command: BumpArg,
+): ParsedVersion {
   switch (command) {
-    case 'major':
+    case "major":
       return { major: current.major + 1, minor: 0, patch: 0 };
-    case 'minor':
+    case "minor":
       return { major: current.major, minor: current.minor + 1, patch: 0 };
-    case 'patch':
-      return { major: current.major, minor: current.minor, patch: current.patch + 1 };
+    case "patch":
+      return {
+        major: current.major,
+        minor: current.minor,
+        patch: current.patch + 1,
+      };
   }
 }
 

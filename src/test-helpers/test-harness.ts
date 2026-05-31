@@ -1,4 +1,4 @@
-import assert from 'node:assert';
+import assert from "node:assert";
 
 import {
   AuthStorage,
@@ -10,7 +10,7 @@ import {
   type ExtensionUIContext,
   type SessionEntry,
   type Theme,
-} from '@earendil-works/pi-coding-agent';
+} from "@earendil-works/pi-coding-agent";
 
 import {
   toolPushTask,
@@ -19,7 +19,7 @@ import {
   cmdFinishTask,
   cmdDiscardTask,
   cmdAbortTask,
-} from '../index.js';
+} from "../index.js";
 
 import {
   notification,
@@ -27,14 +27,14 @@ import {
   type BranchEntry,
   type MatchDescriptor,
   type ReactionDescriptor,
-} from './common.js';
-import { extractContentText, makeUserMessage, PiStub } from './pi-stub.js';
+} from "./common.js";
+import { extractContentText, makeUserMessage, PiStub } from "./pi-stub.js";
 
 export class TestHarness {
   constructor() {
     // Seed a non-visible root entry so findFreshTargetId can escape past user messages.
     // Pi always inserts thinking_level_change at session creation (main.js:471).
-    this.sm.appendThinkingLevelChange('off');
+    this.sm.appendThinkingLevelChange("off");
 
     this.pi = new PiStub(this.sm);
 
@@ -56,11 +56,14 @@ export class TestHarness {
 
     runner.setUIContext({
       notify: (message: string) => {
-        this.trackedHints.push({ text: message, afterEntryId: this.sm.getLeafId() });
+        this.trackedHints.push({
+          text: message,
+          afterEntryId: this.sm.getLeafId(),
+        });
         this.notificationLog.push(message);
       },
       setStatus: (key: string, value: string | undefined) => {
-        if (key === 'task') {
+        if (key === "task") {
           this.taskStatus = value;
           this.taskStatusHistory.push(value);
         }
@@ -69,7 +72,7 @@ export class TestHarness {
         fg: (_key: string, text: string) => text,
         bg: (_key: string, text: string) => text,
         bold: (text: string) => text,
-      } satisfies Pick<Theme, 'fg' | 'bg' | 'bold'>,
+      } satisfies Pick<Theme, "fg" | "bg" | "bold">,
     } as ExtensionUIContext);
 
     runner.bindCommandContext({
@@ -97,14 +100,17 @@ export class TestHarness {
 
   private readonly sm = SessionManager.inMemory();
   private readonly idleWaiters: Array<() => void> = [];
-  private readonly trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
+  private readonly trackedHints: Array<{
+    text: string;
+    afterEntryId: string | null;
+  }> = [];
   private readonly notificationLog: string[] = [];
   private readonly taskStatusHistory: Array<string | undefined> = [];
   private cancelNextNav = false;
   private taskStatus: string | undefined;
   private readonly pi: PiStub;
   private readonly ctx: ExtensionCommandContext;
-  private readonly autoHandler: ReturnType<typeof cmdAuto>['handler'];
+  private readonly autoHandler: ReturnType<typeof cmdAuto>["handler"];
 
   isLlmTriggered(): boolean {
     const branch = this.sm.getBranch();
@@ -114,11 +120,14 @@ export class TestHarness {
       const entry = branch[i];
 
       switch (entry.type) {
-        case 'custom':
+        case "custom":
           continue;
-        case 'message':
-          return entry.message.role === 'user' && this.pi.isTriggeredUserMessage(entry.id);
-        case 'custom_message':
+        case "message":
+          return (
+            entry.message.role === "user" &&
+            this.pi.isTriggeredUserMessage(entry.id)
+          );
+        case "custom_message":
           return this.pi.isTriggeredCustomMessage(entry.id);
         default:
           return false;
@@ -179,13 +188,14 @@ export class TestHarness {
   }
 
   assertSessionContains(...expected: BranchEntry[]): void {
-    const actual = this.sm.getEntries()
-      .map(entry => this.stripVisibleEntry(entry))
+    const actual = this.sm
+      .getEntries()
+      .map((entry) => this.stripVisibleEntry(entry))
       .filter((entry): entry is BranchEntry => entry !== null);
 
     for (const expectedEntry of expected) {
       assert.ok(
-        actual.some(entry => this.entriesEqual(entry, expectedEntry)),
+        actual.some((entry) => this.entriesEqual(entry, expectedEntry)),
         `Expected session to contain entry: ${JSON.stringify(expectedEntry)}`,
       );
     }
@@ -193,7 +203,10 @@ export class TestHarness {
 
   assertNotifications(...expected: string[]): void {
     for (const text of expected) {
-      assert.ok(this.notificationLog.includes(text), `Expected notification log to include: ${text}`);
+      assert.ok(
+        this.notificationLog.includes(text),
+        `Expected notification log to include: ${text}`,
+      );
     }
   }
 
@@ -206,7 +219,13 @@ export class TestHarness {
 
   async runPushTask(prompt: string, inherit_context?: boolean): Promise<void> {
     const tool = toolPushTask(this.pi);
-    await tool.execute('call-1', { prompt, inherit_context }, undefined, undefined, this.ctx);
+    await tool.execute(
+      "call-1",
+      { prompt, inherit_context },
+      undefined,
+      undefined,
+      this.ctx,
+    );
   }
 
   async runStartTask(): Promise<void> {
@@ -233,7 +252,7 @@ export class TestHarness {
     // This is needed for user-esc tests where the task entry exists before auto runs.
     const seenIds = new Set<string>();
 
-    const handlerPromise = this.autoHandler('', this.ctx).finally(() => {
+    const handlerPromise = this.autoHandler("", this.ctx).finally(() => {
       settled = true;
     });
 
@@ -278,23 +297,23 @@ export class TestHarness {
       return null;
     }
 
-    if (entry.type === 'message') {
-      if (entry.message.role === 'user') {
-        const text = extractContentText(entry.message.content) ?? '';
+    if (entry.type === "message") {
+      if (entry.message.role === "user") {
+        const text = extractContentText(entry.message.content) ?? "";
         return {
-          type: 'message',
-          message: { role: 'user', content: [{ type: 'text', text }] },
+          type: "message",
+          message: { role: "user", content: [{ type: "text", text }] },
         };
       }
 
-      if (entry.message.role === 'assistant') {
-        const text = extractContentText(entry.message.content) ?? '';
+      if (entry.message.role === "assistant") {
+        const text = extractContentText(entry.message.content) ?? "";
         return {
-          type: 'message',
+          type: "message",
           message: {
-            role: 'assistant',
-            content: [{ type: 'text', text }],
-            ...(entry.message.stopReason && entry.message.stopReason !== 'stop'
+            role: "assistant",
+            content: [{ type: "text", text }],
+            ...(entry.message.stopReason && entry.message.stopReason !== "stop"
               ? { stopReason: entry.message.stopReason }
               : {}),
           },
@@ -304,27 +323,27 @@ export class TestHarness {
       return null;
     }
 
-    if (entry.type === 'custom') {
-      if (entry.customType !== 'task') return null;
+    if (entry.type === "custom") {
+      if (entry.customType !== "task") return null;
       const data = readTaskData(entry.data);
       if (!data) return null;
       return {
-        type: 'custom',
-        customType: 'task',
+        type: "custom",
+        customType: "task",
         data,
       };
     }
 
-    if (entry.type === 'custom_message') {
-      if (entry.customType !== 'task-result') return null;
+    if (entry.type === "custom_message") {
+      if (entry.customType !== "task-result") return null;
       const slug = readTaskResultSlug(entry.details);
       if (!slug) return null;
       const text = extractContentText(entry.content);
       return {
-        type: 'custom_message',
-        customType: 'task-result',
+        type: "custom_message",
+        customType: "task-result",
         details: { slug },
-        ...(text !== null ? { content: [{ type: 'text', text }] } : {}),
+        ...(text !== null ? { content: [{ type: "text", text }] } : {}),
       };
     }
 
@@ -341,9 +360,9 @@ export class TestHarness {
   }
 
   private async runTaskCommand(command: TaskCommand): Promise<void> {
-    const handlerP = command.handler('', this.ctx);
+    const handlerP = command.handler("", this.ctx);
     const next = this.idleWaiters.shift();
-    assert.ok(next, 'Expected a pending waitForIdle call.');
+    assert.ok(next, "Expected a pending waitForIdle call.");
     next();
     await flushMicrotasks();
     await handlerP;
@@ -367,22 +386,30 @@ export class TestHarness {
   }
 
   private entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
-    if (match.type === 'message') {
-      if (entry.type !== 'message') return false;
-      if (entry.message.role !== 'user' && entry.message.role !== 'assistant') return false;
+    if (match.type === "message") {
+      if (entry.type !== "message") return false;
+      if (entry.message.role !== "user" && entry.message.role !== "assistant")
+        return false;
       if (entry.message.role !== match.message.role) return false;
 
       const matchText = extractContentText(match.message.content);
       const entryText = extractContentText(entry.message.content);
-      return matchText !== null && entryText !== null && entryText.includes(matchText);
+      return (
+        matchText !== null &&
+        entryText !== null &&
+        entryText.includes(matchText)
+      );
     }
 
-    if (match.type === 'custom') {
-      if (entry.type !== 'custom' || entry.customType !== match.customType) return false;
+    if (match.type === "custom") {
+      if (entry.type !== "custom" || entry.customType !== match.customType)
+        return false;
       const entryData = readTaskData(entry.data);
-      return entryData !== null
-        && entryData.prompt.includes(match.data.prompt)
-        && entryData.inherit_context === match.data.inherit_context;
+      return (
+        entryData !== null &&
+        entryData.prompt.includes(match.data.prompt) &&
+        entryData.inherit_context === match.data.inherit_context
+      );
     }
 
     return false;
@@ -390,32 +417,35 @@ export class TestHarness {
 
   private applyReaction(reaction: ReactionDescriptor): void {
     switch (reaction.type) {
-      case 'user-esc':
+      case "user-esc":
         this.cancelNextNav = true;
         return;
-      case 'user-ctrl-c':
+      case "user-ctrl-c":
         this.pi.triggerSessionShutdown();
         return;
-      case 'user-runs-auto':
+      case "user-runs-auto":
         // Fire-and-forget: the running guard and notification happen before the first await.
-        this.autoHandler('', this.ctx).catch(() => {});
+        this.autoHandler("", this.ctx).catch(() => {});
         return;
-      case 'message': {
-        const text = extractContentText(reaction.message.content) ?? '';
-        const message = reaction.message.role === 'assistant'
-          ? makeAssistantMessage(text, reaction.message.stopReason)
-          : makeUserMessage(text);
+      case "message": {
+        const text = extractContentText(reaction.message.content) ?? "";
+        const message =
+          reaction.message.role === "assistant"
+            ? makeAssistantMessage(text, reaction.message.stopReason)
+            : makeUserMessage(text);
 
         this.sm.appendMessage(message);
         return;
       }
-      case 'custom':
-        this.sm.appendCustomEntry('task', reaction.data);
+      case "custom":
+        this.sm.appendCustomEntry("task", reaction.data);
     }
   }
 }
 
-type TaskCommand = { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> };
+type TaskCommand = {
+  handler: (args: string, ctx: ExtensionCommandContext) => Promise<void>;
+};
 
 async function flushMicrotasks(): Promise<void> {
   for (let i = 0; i < 10; i++) {
@@ -425,13 +455,15 @@ async function flushMicrotasks(): Promise<void> {
 
 function isHiddenEntry(entry: SessionEntry): boolean {
   switch (entry.type) {
-    case 'thinking_level_change':
-    case 'model_change':
-    case 'session_info':
-    case 'label':
+    case "thinking_level_change":
+    case "model_change":
+    case "session_info":
+    case "label":
       return true;
-    case 'custom':
-      return entry.customType === 'task-done' || entry.customType === 'task-start';
+    case "custom":
+      return (
+        entry.customType === "task-done" || entry.customType === "task-start"
+      );
     default:
       return false;
   }
@@ -442,11 +474,11 @@ function makeAssistantMessage(
   stopReason?: string,
 ): AssistantAppendedMessage {
   return {
-    role: 'assistant',
-    content: [{ type: 'text', text }],
-    api: 'test',
-    provider: 'test',
-    model: 'test',
+    role: "assistant",
+    content: [{ type: "text", text }],
+    api: "test",
+    provider: "test",
+    model: "test",
     usage: TEST_USAGE,
     stopReason: normalizeStopReason(stopReason),
     timestamp: 0,
@@ -468,32 +500,42 @@ const TEST_USAGE = {
   },
 };
 
-type AssistantAppendedMessage = Extract<AppendedMessage, { role: 'assistant' }>;
+type AssistantAppendedMessage = Extract<AppendedMessage, { role: "assistant" }>;
 
-type AppendedMessage = Parameters<SessionManager['appendMessage']>[0];
+type AppendedMessage = Parameters<SessionManager["appendMessage"]>[0];
 
-function readTaskData(data: unknown): { prompt: string; inherit_context: boolean } | null {
+function readTaskData(
+  data: unknown,
+): { prompt: string; inherit_context: boolean } | null {
   if (!isRecord(data)) return null;
-  if (typeof data.prompt !== 'string' || typeof data.inherit_context !== 'boolean') return null;
+  if (
+    typeof data.prompt !== "string" ||
+    typeof data.inherit_context !== "boolean"
+  )
+    return null;
   return { prompt: data.prompt, inherit_context: data.inherit_context };
 }
 
 function readTaskResultSlug(details: unknown): string | null {
-  return isRecord(details) && typeof details.slug === 'string' ? details.slug : null;
+  return isRecord(details) && typeof details.slug === "string"
+    ? details.slug
+    : null;
 }
 
-function normalizeStopReason(stopReason?: string): AssistantAppendedMessage['stopReason'] {
+function normalizeStopReason(
+  stopReason?: string,
+): AssistantAppendedMessage["stopReason"] {
   switch (stopReason) {
-    case 'length':
-    case 'toolUse':
-    case 'error':
-    case 'aborted':
+    case "length":
+    case "toolUse":
+    case "error":
+    case "aborted":
       return stopReason;
     default:
-      return 'stop';
+      return "stop";
   }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === "object" && value !== null;
 }
