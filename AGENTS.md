@@ -77,9 +77,7 @@ Custom skills coexist with updater-generated ones. The updater only touches skil
   "files": [
     {
       "path": "SKILL.md",
-      "patches": [
-        { "op": "replace", "find": "Claude Code", "replace": "Pi" }
-      ]
+      "patches": [{ "op": "replace", "find": "Claude Code", "replace": "Pi" }]
     }
   ],
   "exclude": ["optional-file-to-skip.md"]
@@ -88,14 +86,14 @@ Custom skills coexist with updater-generated ones. The updater only touches skil
 
 ### Patch operations
 
-| Op | Behavior |
-|---|---|
-| `replace` | Exact string replacement, all occurrences |
-| `regex-replace` | Regex replacement with capture groups (`$1`, …) |
-| `delete-line` | Delete lines containing `find` |
-| `delete-block` | Delete from `findStart` through `findEnd` (inclusive) |
-| `prepend` | Add text at start of file |
-| `append` | Add text at end of file |
+| Op              | Behavior                                              |
+| --------------- | ----------------------------------------------------- |
+| `replace`       | Exact string replacement, all occurrences             |
+| `regex-replace` | Regex replacement with capture groups (`$1`, …)       |
+| `delete-line`   | Delete lines containing `find`                        |
+| `delete-block`  | Delete from `findStart` through `findEnd` (inclusive) |
+| `prepend`       | Add text at start of file                             |
+| `append`        | Add text at end of file                               |
 
 ## Gotchas
 
