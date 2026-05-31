@@ -24,17 +24,23 @@ updater/
 ## Commands
 
 ```bash
-npm run lint          # Lint TypeScript sources
-npm run fix           # Lint + autofix
+npm run fix           # Prettier then ESLint autofix
 npm test              # All tests (updater/ + scripts/)
 npm run updater       # Regenerate skills from upstream + patches
 npx tsc --noEmit      # Type-check updater/ + scripts/
-npm run verify        # Full gate: lint → tsc → test → updater → skill drift → pack
+npm run verify        # Full gate: tsc → eslint → test → updater → prettier --check
 ```
 
 The updater exits non-zero if any patch fails to match — intentional drift detection.
 
-**Commit sequence:** `fix` first to autofix what it can, then `verify` for the full gate (lint → tsc → test → updater → skill drift → pack). Never skip `fix`.
+**Commit sequence:** `fix` first to autofix what it can, then `verify` for the full gate (tsc → eslint → test → updater → prettier --check). Never skip `fix`.
+
+## Formatting
+
+- **Prettier** formats all `.ts` files. Default config except `singleQuote: true` to match codebase conventions.
+- Generated `skills/` directory is ignored via `.prettierignore`.
+- `npm run fix` runs Prettier write then ESLint autofix.
+- `npm run verify` includes `prettier --check` to enforce formatting in CI.
 
 ## Testing policy
 

@@ -17,9 +17,9 @@ export interface SkillFile {
 export type Patch = PatchOp;
 
 export type PatchOp =
-  | { op: 'replace'; find: string; replace: string }
-  | { op: 'regex-replace'; find: string; replace: string }
-  | { op: 'delete-line'; find: string }
-  | { op: 'delete-block'; findStart: string; findEnd: string }
-  | { op: 'prepend'; text: string }
-  | { op: 'append'; text: string };
+  | { op: "replace"; find: string; replace: string }
+  | { op: "regex-replace"; find: string; replace: string }
+  | { op: "delete-line"; find: string }
+  | { op: "delete-block"; findStart: string; findEnd: string }
+  | { op: "prepend"; text: string }
+  | { op: "append"; text: string };
