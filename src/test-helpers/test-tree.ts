@@ -1,6 +1,7 @@
 import { it } from 'node:test';
 
-import { TestHarness } from './test-harness.js';
+import { ReactionEngine } from './reaction-engine.js';
+import { TestHarness } from './harness.js';
 
 export function node(name: string, fn: NodeFn) {
   return new TestNode(name, fn);
@@ -37,10 +38,13 @@ class TestNode {
     const name = chain.map(node => node.name).join(' → ');
 
     it(name, async () => {
-      const h = new TestHarness();
-
-      for (const node of chain) {
-        await node.fn?.(h);
+      const h = await TestHarness.create(new ReactionEngine());
+      try {
+        for (const node of chain) {
+          await node.fn?.(h);
+        }
+      } finally {
+        h.dispose();
       }
     });
 

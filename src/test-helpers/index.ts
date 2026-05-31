@@ -1,15 +1,20 @@
 export {
+  aborts,
   assistant,
-  user,
+  pushTask,
+  responds,
   task,
   taskResult,
-  userEsc,
+  thinks,
+  user,
   userCtrlC,
+  userEsc,
   userRunsAuto,
   notification,
   assumeCommandContext,
-} from './common.js';
+} from './descriptors.js';
 
-export { TestHarness } from './test-harness.js';
+export { ReactionEngine } from './reaction-engine.js';
+export { TestHarness } from './harness.js';
 
 export { node } from './test-tree.js';
