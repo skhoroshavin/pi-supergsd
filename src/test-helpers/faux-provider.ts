@@ -7,8 +7,7 @@ import type {
 } from "@earendil-works/pi-ai";
 
 import { extractTextContent } from "../text-content.js";
-import type { ResponseDescriptor } from "./descriptors.js";
-import { ReactionEngine } from "./reaction-engine.js";
+import type { MockLLM, MockLLMDescriptor } from "./mock-llm.js";
 
 const registrations = new WeakMap<
   FauxProvider,
@@ -32,7 +31,7 @@ export const FAUX_MODEL: Model<string> = {
 };
 
 export class FauxProvider {
-  constructor(private readonly engine: ReactionEngine) {
+  constructor(private readonly llm: MockLLM) {
     registrations.set(
       this,
       piAi.registerFauxProvider({
@@ -63,18 +62,10 @@ export class FauxProvider {
       .reverse()
       .find((message) => message.role === "user");
     const promptText = extractTextContent(lastUser?.content ?? "") ?? "";
-    const responses = this.engine.matchPrompt(promptText);
-
-    if (responses.length === 0) {
-      throw new Error(
-        `No reaction engine rule matched provider prompt: ${promptText || "<empty prompt>"}`,
-      );
-    }
+    const responses = this.llm.matchPrompt(promptText);
 
     const registration = registrations.get(this);
-    if (!registration) {
-      throw new Error("Faux provider registration missing.");
-    }
+    if (!registration) throw new Error("Faux provider registration missing.");
 
     registration.setResponses([makeAssistantMessage(responses)]);
     return piAi.streamSimple(model, context, options);
@@ -89,7 +80,7 @@ export class FauxProvider {
 }
 
 function makeAssistantMessage(
-  responses: ResponseDescriptor[],
+  responses: MockLLMDescriptor[],
 ): AssistantMessage {
   if (responses.length === 1 && responses[0].type === "response:aborted") {
     const descriptor = responses[0];

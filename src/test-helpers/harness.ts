@@ -18,18 +18,16 @@ import registerSuperGsd from "../../index.js";
 import { updateTaskStatus } from "../index.js";
 import { extractTextContent } from "../text-content.js";
 import { assertBranchHistory, assertSessionContains } from "./assertions.js";
-import type {
-  BranchEntry,
-  ControlReactionDescriptor,
-  ResponseDescriptor,
-} from "./descriptors.js";
+import type { BranchEntry } from "./descriptors.js";
 import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
-import { ReactionEngine } from "./reaction-engine.js";
+import { MockLLM } from "./mock-llm.js";
+import { MockUser, type MockUserAction } from "./mock-user.js";
 import { TestUI } from "./ui.js";
 
 export class TestHarness {
   private constructor(
-    readonly engine: ReactionEngine,
+    readonly llm: MockLLM,
+    readonly user: MockUser,
     private readonly session: AgentSession,
     private readonly sessionManager: SessionManager,
     private readonly ui: TestUI,
@@ -39,7 +37,7 @@ export class TestHarness {
   private cancelNextNav = false;
   private readonly seenReactionEntryIds = new Set<string>();
 
-  static async create(engine: ReactionEngine): Promise<TestHarness> {
+  static async create(): Promise<TestHarness> {
     const cwd = process.cwd();
     const agentDir = getAgentDir();
     const authStorage = AuthStorage.inMemory();
@@ -49,7 +47,9 @@ export class TestHarness {
       retry: { enabled: false },
     });
     const sessionManager = SessionManager.inMemory(cwd);
-    const fauxProvider = new FauxProvider(engine);
+    const llm = new MockLLM();
+    const user = new MockUser();
+    const fauxProvider = new FauxProvider(llm);
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir,
@@ -97,7 +97,8 @@ export class TestHarness {
     });
 
     const harness = new TestHarness(
-      engine,
+      llm,
+      user,
       session,
       sessionManager,
       new TestUI(),
@@ -116,20 +117,6 @@ export class TestHarness {
   dispose(): void {
     this.fauxProvider.unregister();
     this.session.dispose();
-  }
-
-  async pushTask(prompt: string, inherit_context = false): Promise<void> {
-    this.sessionManager.appendCustomEntry("task", { prompt, inherit_context });
-    updateTaskStatus(
-      this.sessionManager as Parameters<typeof updateTaskStatus>[0],
-      this.ui.context.setStatus,
-      this.ui.theme,
-    );
-    this.ui.context.notify(
-      "Task stored. Use `/start-task` or `/auto` to start it.",
-      "info",
-    );
-    await this.session.agent.waitForIdle();
   }
 
   getStatus(): string | undefined {
@@ -205,6 +192,19 @@ export class TestHarness {
     };
   }
 
+  async prompt(text: string): Promise<void> {
+    const knownEntryIds = new Set(
+      this.sessionManager.getEntries().map((entry) => entry.id),
+    );
+
+    await this.session.prompt(text, {
+      expandPromptTemplates: true,
+      source: "test" as InputSource,
+    });
+    await this.session.agent.waitForIdle();
+    this.throwIfNewAssistantError(knownEntryIds);
+  }
+
   private async scanAndReactLoop(): Promise<void> {
     await flushMicrotasks();
     await this.session.agent.waitForIdle();
@@ -218,19 +218,16 @@ export class TestHarness {
 
         if (entry.type === "message" && entry.message.role === "assistant") {
           const text = extractTextContent(entry.message.content, "") ?? "";
-          for (const reaction of this.engine.matchAssistant(text)) {
-            await this.applyReaction(reaction);
+          for (const action of this.user.matchAssistant(text)) {
+            await this.applyUserAction(action);
             reacted = true;
           }
           continue;
         }
 
         if (!isTaskEntryData(entry)) continue;
-        for (const reaction of this.engine.matchQueuedTask(
-          entry.data.prompt,
-          entry.data.inherit_context,
-        )) {
-          await this.applyReaction(reaction);
+        for (const action of this.user.matchQueuedTask(entry.data.prompt)) {
+          await this.applyUserAction(action);
           reacted = true;
         }
       }
@@ -241,10 +238,8 @@ export class TestHarness {
     } while (reacted);
   }
 
-  private async applyReaction(
-    reaction: ResponseDescriptor | ControlReactionDescriptor,
-  ): Promise<void> {
-    switch (reaction.type) {
+  private async applyUserAction(action: MockUserAction): Promise<void> {
+    switch (action.type) {
       case "user-esc":
         this.cancelNextNav = true;
         return;
@@ -254,64 +249,10 @@ export class TestHarness {
           reason: "quit",
         });
         return;
-      case "user-runs-auto":
-        await this.command("/auto");
+      case "user-prompts":
+        await this.prompt(action.text);
         return;
-      case "user-append":
-        await this.prompt(reaction.text);
-        return;
-      case "response:aborted":
-        this.appendSyntheticAssistantMessage(reaction.text, "aborted");
-        return;
-      case "response:text":
-      case "response:thinking":
-        this.appendSyntheticAssistantMessage(reaction.text);
-        return;
-      case "response:push-task":
-        this.sessionManager.appendCustomEntry("task", {
-          prompt: reaction.prompt,
-          inherit_context: reaction.inherit_context,
-        });
     }
-  }
-
-  async prompt(text: string): Promise<void> {
-    await this.sendPrompt(text, false);
-  }
-
-  async command(text: string): Promise<void> {
-    await this.sendPrompt(text, true);
-  }
-
-  private appendSyntheticAssistantMessage(
-    text: string,
-    stopReason: "stop" | "aborted" = "stop",
-  ): void {
-    this.sessionManager.appendMessage({
-      role: "assistant",
-      content: [{ type: "text" as const, text }],
-      api: FAUX_MODEL.api,
-      provider: FAUX_PROVIDER,
-      model: FAUX_MODEL.id,
-      usage: FAUX_TEST_USAGE,
-      stopReason,
-      timestamp: Date.now(),
-    } as never);
-  }
-
-  private async sendPrompt(
-    text: string,
-    expandPromptTemplates: boolean,
-  ): Promise<void> {
-    const knownEntryIds = new Set(
-      this.sessionManager.getEntries().map((entry) => entry.id),
-    );
-    await this.session.prompt(text, {
-      expandPromptTemplates,
-      source: "test" as InputSource,
-    });
-    await this.session.agent.waitForIdle();
-    this.throwIfNewAssistantError(knownEntryIds);
   }
 
   private throwIfNewAssistantError(knownEntryIds: ReadonlySet<string>): void {
@@ -356,12 +297,3 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function flushMicrotasks(): Promise<void> {
   return new Promise((resolve) => queueMicrotask(resolve));
 }
-
-const FAUX_TEST_USAGE = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-};

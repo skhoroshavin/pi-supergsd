@@ -1,6 +1,5 @@
 import { it } from "node:test";
 
-import { ReactionEngine } from "./reaction-engine.js";
 import { TestHarness } from "./harness.js";
 
 export function node(name: string, fn: NodeFn) {
@@ -38,7 +37,7 @@ class TestNode {
     const name = chain.map((node) => node.name).join(" → ");
 
     it(name, async () => {
-      const h = await TestHarness.create(new ReactionEngine());
+      const h = await TestHarness.create();
       try {
         for (const node of chain) {
           await node.fn?.(h);

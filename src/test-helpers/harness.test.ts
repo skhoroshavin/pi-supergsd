@@ -10,8 +10,11 @@ import {
   task,
   thinks,
   user,
+  userCtrlC,
+  userEsc,
+  userPrompts,
+  TestHarness,
 } from "./index.js";
-import { ReactionEngine, TestHarness } from "./index.js";
 
 describe("AgentSession-backed TestHarness foundation", () => {
   it("creates a real session and registers push-task through the extension", async (t) => {
@@ -20,33 +23,30 @@ describe("AgentSession-backed TestHarness foundation", () => {
     assert.strictEqual(h.getStatus(), undefined);
   });
 
-  it("uses ReactionEngine prompt rules for h.prompt()", async (t) => {
-    const engine = new ReactionEngine();
-    engine.onPrompt("main work", responds("working..."));
+  it("uses MockLLM prompt rules for h.prompt()", async (t) => {
+    const h = await makeHarness(t);
+    h.llm.onPrompt("main work", responds("working..."));
 
-    const h = await makeHarness(t, engine);
     await h.prompt("main work");
     h.assertBranchHistory(user("main work"), assistant("working..."));
   });
 
-  it("treats slash-prefixed prompts literally by default", async (t) => {
-    const engine = new ReactionEngine();
-    engine.onPrompt("/start-task", responds("literal slash prompt"));
+  it("slash-prefixed prompts go through the real slash pipeline", async (t) => {
+    const h = await makeHarness(t);
+    h.llm.onPrompt("/start-task", responds("literal slash prompt"));
 
-    const h = await makeHarness(t, engine);
     await h.prompt("/start-task");
-    h.assertBranchHistory(
-      user("/start-task"),
-      assistant("literal slash prompt"),
-    );
+
+    h.assertNotificationEntries([
+      { message: "No pending task. Use push-task first.", level: "warning" },
+    ]);
   });
 
   it("supports thinking and aborted response descriptors", async (t) => {
-    const engine = new ReactionEngine();
-    engine.onPrompt("think", thinks("checking context"));
-    engine.onPrompt("stop", aborts("Stopped by user."));
+    const h = await makeHarness(t);
+    h.llm.onPrompt("think", thinks("checking context"));
+    h.llm.onPrompt("stop", aborts("Stopped by user."));
 
-    const h = await makeHarness(t, engine);
     await h.prompt("think");
     h.assertBranchHistory(user("think"), assistant(""));
 
@@ -58,10 +58,9 @@ describe("AgentSession-backed TestHarness foundation", () => {
   });
 
   it("calls the real push-task tool from a faux provider tool call", async (t) => {
-    const engine = new ReactionEngine();
-    engine.onPrompt("delegate work", pushTask("subtask", true));
+    const h = await makeHarness(t);
+    h.llm.onPrompt("delegate work", pushTask("subtask", true));
 
-    const h = await makeHarness(t, engine);
     await h.prompt("delegate work");
     h.assertSessionContains(user("delegate work"), task("subtask", true));
     h.assertNotifications(
@@ -70,42 +69,42 @@ describe("AgentSession-backed TestHarness foundation", () => {
   });
 
   it("fails when the faux provider receives an unmatched prompt", async (t) => {
-    const h = await makeHarness(t, new ReactionEngine());
+    const h = await makeHarness(t);
     await assert.rejects(
       async () => h.prompt("unmatched prompt"),
-      /No reaction engine rule matched provider prompt: unmatched prompt/,
+      /No MockLLM rule matched provider prompt: unmatched prompt/,
     );
   });
 
   it("fails loudly when /start-task hits an unmatched provider prompt", async (t) => {
-    const h = await makeHarness(t, new ReactionEngine());
-    await h.pushTask("Task AAA");
+    const h = await makeHarness(t);
+    h.llm.onPrompt("queue AAA", pushTask("Task AAA"));
+
+    await h.prompt("queue AAA");
     await assert.rejects(
-      async () => h.command("/start-task"),
-      /No reaction engine rule matched provider prompt: Task AAA/,
+      async () => h.prompt("/start-task"),
+      /No MockLLM rule matched provider prompt: Task AAA/,
     );
   });
 
   it("treats empty prompt rules as exact matches", async (t) => {
-    const engine = new ReactionEngine();
-    engine.onPrompt("", responds(""));
+    const h = await makeHarness(t);
+    h.llm.onPrompt("", responds(""));
 
-    const h = await makeHarness(t, engine);
     await assert.rejects(
       async () => h.prompt("non-empty prompt"),
-      /No reaction engine rule matched provider prompt: non-empty prompt/,
+      /No MockLLM rule matched provider prompt: non-empty prompt/,
     );
   });
 
   it("builds one assistant turn from multiple prompt descriptors", async (t) => {
-    const engine = new ReactionEngine();
-    engine.onPrompt(
+    const h = await makeHarness(t);
+    h.llm.onPrompt(
       "Analyze X",
       responds("preparing subagent"),
       pushTask("Detailed X analysis"),
     );
 
-    const h = await makeHarness(t, engine);
     await h.prompt("Analyze X");
     h.assertSessionContains(
       user("Analyze X"),
@@ -115,20 +114,21 @@ describe("AgentSession-backed TestHarness foundation", () => {
   });
 
   it("records notification levels", async (t) => {
-    const h = await makeHarness(t, new ReactionEngine());
-    await h.command("/start-task");
+    const h = await makeHarness(t);
+    await h.prompt("/start-task");
     h.assertNotificationEntries([
       { message: "No pending task. Use push-task first.", level: "warning" },
     ]);
   });
 
-  it("fires assistant and queued-task reactions once per new entry", async (t) => {
-    const engine = new ReactionEngine();
-    engine.onPrompt("main work", responds("working..."));
-    engine.onAssistant("working...", pushTask("follow-up"));
-    engine.onQueuedTask("follow-up", false, responds("queued response"));
+  it("fires assistant and queued-task user actions once per new entry", async (t) => {
+    const h = await makeHarness(t);
+    h.llm.onPrompt("main work", responds("working..."));
+    h.user.onAssistant("working...", userPrompts("queue follow-up"));
+    h.llm.onPrompt("queue follow-up", pushTask("follow-up"));
+    h.user.onQueuedTask("follow-up", userPrompts("answer follow-up"));
+    h.llm.onPrompt("answer follow-up", responds("queued response"));
 
-    const h = await makeHarness(t, engine);
     await h.prompt("main work");
     await h.waitForIdle();
     await h.waitForIdle();
@@ -136,17 +136,27 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.assertSessionContains(
       user("main work"),
       assistant("working..."),
+      user("queue follow-up"),
+      assistant("", "toolUse"),
       task("follow-up"),
+      user("answer follow-up"),
       assistant("queued response"),
     );
   });
 });
 
-async function makeHarness(
-  t: TestContext,
-  engine = new ReactionEngine(),
-): Promise<TestHarness> {
-  const h = await TestHarness.create(engine);
+if (false as boolean) {
+  const h = {} as TestHarness;
+
+  // @ts-expect-error MockLLM only accepts LLM descriptors.
+  h.llm.onPrompt("bad", userPrompts("/auto"));
+
+  // @ts-expect-error MockUser only accepts user actions.
+  h.user.onAssistant("bad", responds("nope"));
+}
+
+async function makeHarness(t: TestContext): Promise<TestHarness> {
+  const h = await TestHarness.create();
   t.after(() => {
     h.dispose();
   });

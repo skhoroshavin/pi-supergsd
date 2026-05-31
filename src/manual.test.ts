@@ -4,6 +4,7 @@ import {
   assistant,
   node,
   responds,
+  pushTask,
   task,
   taskResult,
   user,
@@ -14,13 +15,16 @@ import { describe } from "node:test";
 
 describe("manual workflow", () => {
   node("push AAA", async (h) => {
-    h.engine.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("queue AAA", pushTask("Task AAA"));
     await h.prompt("main work");
-    await h.pushTask("Task AAA");
+    await h.prompt("queue AAA");
     assert.strictEqual(h.getStatus(), "pending task: task-aaa");
     h.assertBranchHistory(
       user("main work"),
       assistant("working..."),
+      user("queue AAA"),
+      assistant("", "toolUse"),
       task("Task AAA"),
     );
     h.assertNotifications(
@@ -29,27 +33,31 @@ describe("manual workflow", () => {
   })
     .children(
       node("discard AAA", async (h) => {
-        await h.command("/discard-task");
+        await h.prompt("/discard-task");
         assert.strictEqual(h.getStatus(), undefined);
         h.assertBranchHistory(
           user("main work"),
           assistant("working..."),
+          user("queue AAA"),
+          assistant("", "toolUse"),
           task("Task AAA"),
         );
         h.assertNotifications("Task discarded.");
       }),
       node("start AAA", async (h) => {
         onTaskResponse(h, "Task AAA", "Done.");
-        await h.command("/start-task");
+        await h.prompt("/start-task");
         assert.strictEqual(h.getStatus(), "current task: task-aaa");
         h.assertBranchHistory(user("Task AAA"), assistant("Done."));
       }).children(
         node("finish AAA", async (h) => {
-          await h.command("/finish-task");
+          await h.prompt("/finish-task");
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user("main work"),
             assistant("working..."),
+            user("queue AAA"),
+            assistant("", "toolUse"),
             task("Task AAA"),
             taskResult("task-aaa", "Done."),
             assistant(""),
@@ -57,11 +65,13 @@ describe("manual workflow", () => {
           h.assertNotifications("Task finished. Last response attached.");
         }).children(
           node("start [no task]", async (h) => {
-            await h.command("/start-task");
+            await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA"),
+              assistant("", "toolUse"),
               task("Task AAA"),
               taskResult("task-aaa", "Done."),
               assistant(""),
@@ -69,11 +79,13 @@ describe("manual workflow", () => {
             h.assertNotifications("No pending task. Use push-task first.");
           }),
           node("discard [no task]", async (h) => {
-            await h.command("/discard-task");
+            await h.prompt("/discard-task");
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA"),
+              assistant("", "toolUse"),
               task("Task AAA"),
               taskResult("task-aaa", "Done."),
               assistant(""),
@@ -81,11 +93,13 @@ describe("manual workflow", () => {
             h.assertNotifications("No pending task to discard.");
           }),
           node("finish [no task]", async (h) => {
-            await h.command("/finish-task");
+            await h.prompt("/finish-task");
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA"),
+              assistant("", "toolUse"),
               task("Task AAA"),
               taskResult("task-aaa", "Done."),
               assistant(""),
@@ -93,11 +107,13 @@ describe("manual workflow", () => {
             h.assertNotifications("Not inside task, nothing to finish.");
           }),
           node("abort [no task]", async (h) => {
-            await h.command("/abort-task");
+            await h.prompt("/abort-task");
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA"),
+              assistant("", "toolUse"),
               task("Task AAA"),
               taskResult("task-aaa", "Done."),
               assistant(""),
@@ -106,11 +122,13 @@ describe("manual workflow", () => {
           }),
         ),
         node("abort AAA", async (h) => {
-          await h.command("/abort-task");
+          await h.prompt("/abort-task");
           assert.strictEqual(h.getStatus(), "pending task: task-aaa");
           h.assertBranchHistory(
             user("main work"),
             assistant("working..."),
+            user("queue AAA"),
+            assistant("", "toolUse"),
             task("Task AAA"),
           );
           h.assertNotifications(
@@ -119,16 +137,18 @@ describe("manual workflow", () => {
         }).children(
           node("start AAA", async (h) => {
             onTaskResponse(h, "Task AAA", "Done.");
-            await h.command("/start-task");
+            await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-aaa");
             h.assertBranchHistory(user("Task AAA"), assistant("Done."));
           }).children(
             node("finish AAA", async (h) => {
-              await h.command("/finish-task");
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA"),
+                assistant("", "toolUse"),
                 task("Task AAA"),
                 taskResult("task-aaa", "Done."),
                 assistant(""),
@@ -138,11 +158,14 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB", async (h) => {
-          await h.pushTask("Task BBB");
+          h.llm.onPrompt("queue BBB", pushTask("Task BBB"));
+          await h.prompt("queue BBB");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
             user("Task AAA"),
             assistant("Done."),
+            user("queue BBB"),
+            assistant("", "toolUse"),
             task("Task BBB"),
           );
           h.assertNotifications(
@@ -150,23 +173,28 @@ describe("manual workflow", () => {
           );
         }).children(
           node("discard BBB", async (h) => {
-            await h.command("/discard-task");
+            await h.prompt("/discard-task");
             assert.strictEqual(h.getStatus(), "current task: task-aaa");
             h.assertBranchHistory(
               user("Task AAA"),
               assistant("Done."),
+              user("queue BBB"),
+              assistant("", "toolUse"),
               task("Task BBB"),
             );
             h.assertNotifications("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
-              await h.command("/finish-task");
+              expectBlankPrompt(h);
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA"),
+                assistant("", "toolUse"),
                 task("Task AAA"),
-                taskResult("task-aaa", "Done."),
+                taskResult("task-aaa"),
                 assistant(""),
               );
               h.assertNotifications("Task finished. Last response attached.");
@@ -174,16 +202,18 @@ describe("manual workflow", () => {
           ),
           node("start BBB", async (h) => {
             onTaskResponse(h, "Task BBB", "inner done");
-            await h.command("/start-task");
+            await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-bbb");
             h.assertBranchHistory(user("Task BBB"), assistant("inner done"));
           }).children(
             node("finish BBB", async (h) => {
-              await h.command("/finish-task");
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), "current task: task-aaa");
               h.assertBranchHistory(
                 user("Task AAA"),
                 assistant("Done."),
+                user("queue BBB"),
+                assistant("", "toolUse"),
                 task("Task BBB"),
                 taskResult("task-bbb", "inner done"),
                 assistant(""),
@@ -192,24 +222,30 @@ describe("manual workflow", () => {
             }).children(
               node("finish AAA", async (h) => {
                 expectBlankPrompt(h);
-                await h.command("/finish-task");
+                await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working..."),
+                  user("queue AAA"),
+                  assistant("", "toolUse"),
                   task("Task AAA"),
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications("Task finished. Last response attached.");
+                h.assertNotifications(
+                  "Task finished. Last response attached.",
+                );
               }),
             ),
             node("abort BBB", async (h) => {
-              await h.command("/abort-task");
+              await h.prompt("/abort-task");
               assert.strictEqual(h.getStatus(), "pending task: task-bbb");
               h.assertBranchHistory(
                 user("Task AAA"),
                 assistant("Done."),
+                user("queue BBB"),
+                assistant("", "toolUse"),
                 task("Task BBB"),
               );
               h.assertNotifications(
@@ -217,26 +253,37 @@ describe("manual workflow", () => {
               );
             }).children(
               node("finish AAA", async (h) => {
-                await h.command("/finish-task");
+                expectBlankPrompt(h);
+                await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working..."),
+                  user("queue AAA"),
+                  assistant("", "toolUse"),
                   task("Task AAA"),
-                  taskResult("task-aaa", "Done."),
+                  taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications("Task finished. Last response attached.");
+                h.assertNotifications(
+                  "Task finished. Last response attached.",
+                );
               }),
             ),
           ),
         ),
         node("push BBB [inherit]", async (h) => {
-          await h.pushTask("Task BBB", true);
+          h.llm.onPrompt(
+            "queue BBB [inherit]",
+            pushTask("Task BBB", true),
+          );
+          await h.prompt("queue BBB [inherit]");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
             user("Task AAA"),
             assistant("Done."),
+            user("queue BBB [inherit]"),
+            assistant("", "toolUse"),
             task("Task BBB", true),
           );
           h.assertNotifications(
@@ -244,72 +291,91 @@ describe("manual workflow", () => {
           );
         }).children(
           node("discard BBB [inherit]", async (h) => {
-            await h.command("/discard-task");
+            await h.prompt("/discard-task");
             assert.strictEqual(h.getStatus(), "current task: task-aaa");
             h.assertBranchHistory(
               user("Task AAA"),
               assistant("Done."),
+              user("queue BBB [inherit]"),
+              assistant("", "toolUse"),
               task("Task BBB", true),
             );
             h.assertNotifications("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
-              await h.command("/finish-task");
+              expectBlankPrompt(h);
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA"),
+                assistant("", "toolUse"),
                 task("Task AAA"),
-                taskResult("task-aaa", "Done."),
+                taskResult("task-aaa"),
                 assistant(""),
               );
-              h.assertNotifications("Task finished. Last response attached.");
+              h.assertNotifications(
+                "Task finished. Last response attached.",
+              );
             }),
           ),
           node("start BBB [inherit]", async (h) => {
             onTaskResponse(h, "Task BBB", "inner done");
-            await h.command("/start-task");
+            await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-bbb");
             h.assertBranchHistory(
               user("Task AAA"),
               assistant("Done."),
+              user("queue BBB [inherit]"),
+              assistant("", "toolUse"),
               task("Task BBB", true),
               user("Task BBB"),
               assistant("inner done"),
             );
           }).children(
             node("finish BBB [inherit]", async (h) => {
-              await h.command("/finish-task");
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), "current task: task-aaa");
               h.assertBranchHistory(
                 user("Task AAA"),
                 assistant("Done."),
+                user("queue BBB [inherit]"),
+                assistant("", "toolUse"),
                 task("Task BBB", true),
                 taskResult("task-bbb", "inner done"),
                 assistant(""),
               );
-              h.assertNotifications("Task finished. Last response attached.");
+              h.assertNotifications(
+                "Task finished. Last response attached.",
+              );
             }).children(
               node("finish AAA", async (h) => {
                 expectBlankPrompt(h);
-                await h.command("/finish-task");
+                await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working..."),
+                  user("queue AAA"),
+                  assistant("", "toolUse"),
                   task("Task AAA"),
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications("Task finished. Last response attached.");
+                h.assertNotifications(
+                  "Task finished. Last response attached.",
+                );
               }),
             ),
             node("abort BBB [inherit]", async (h) => {
-              await h.command("/abort-task");
+              await h.prompt("/abort-task");
               assert.strictEqual(h.getStatus(), "pending task: task-bbb");
               h.assertBranchHistory(
                 user("Task AAA"),
                 assistant("Done."),
+                user("queue BBB [inherit]"),
+                assistant("", "toolUse"),
                 task("Task BBB", true),
               );
               h.assertNotifications(
@@ -317,16 +383,21 @@ describe("manual workflow", () => {
               );
             }).children(
               node("finish AAA", async (h) => {
-                await h.command("/finish-task");
+                expectBlankPrompt(h);
+                await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working..."),
+                  user("queue AAA"),
+                  assistant("", "toolUse"),
                   task("Task AAA"),
-                  taskResult("task-aaa", "Done."),
+                  taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications("Task finished. Last response attached.");
+                h.assertNotifications(
+                  "Task finished. Last response attached.",
+                );
               }),
             ),
           ),
@@ -336,13 +407,16 @@ describe("manual workflow", () => {
     .run();
 
   node("push AAA [inherit]", async (h) => {
-    h.engine.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("queue AAA [inherit]", pushTask("Task AAA", true));
     await h.prompt("main work");
-    await h.pushTask("Task AAA", true);
+    await h.prompt("queue AAA [inherit]");
     assert.strictEqual(h.getStatus(), "pending task: task-aaa");
     h.assertBranchHistory(
       user("main work"),
       assistant("working..."),
+      user("queue AAA [inherit]"),
+      assistant("", "toolUse"),
       task("Task AAA", true),
     );
     h.assertNotifications(
@@ -351,33 +425,39 @@ describe("manual workflow", () => {
   })
     .children(
       node("discard AAA", async (h) => {
-        await h.command("/discard-task");
+        await h.prompt("/discard-task");
         assert.strictEqual(h.getStatus(), undefined);
         h.assertBranchHistory(
           user("main work"),
           assistant("working..."),
+          user("queue AAA [inherit]"),
+          assistant("", "toolUse"),
           task("Task AAA", true),
         );
         h.assertNotifications("Task discarded.");
       }),
       node("start AAA", async (h) => {
         onTaskResponse(h, "Task AAA", "Done.");
-        await h.command("/start-task");
+        await h.prompt("/start-task");
         assert.strictEqual(h.getStatus(), "current task: task-aaa");
         h.assertBranchHistory(
           user("main work"),
           assistant("working..."),
+          user("queue AAA [inherit]"),
+          assistant("", "toolUse"),
           task("Task AAA", true),
           user("Task AAA"),
           assistant("Done."),
         );
       }).children(
         node("finish AAA", async (h) => {
-          await h.command("/finish-task");
+          await h.prompt("/finish-task");
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user("main work"),
             assistant("working..."),
+            user("queue AAA [inherit]"),
+            assistant("", "toolUse"),
             task("Task AAA", true),
             taskResult("task-aaa", "Done."),
             assistant(""),
@@ -385,11 +465,13 @@ describe("manual workflow", () => {
           h.assertNotifications("Task finished. Last response attached.");
         }).children(
           node("start [no task]", async (h) => {
-            await h.command("/start-task");
+            await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA [inherit]"),
+              assistant("", "toolUse"),
               task("Task AAA", true),
               taskResult("task-aaa", "Done."),
               assistant(""),
@@ -397,11 +479,13 @@ describe("manual workflow", () => {
             h.assertNotifications("No pending task. Use push-task first.");
           }),
           node("discard [no task]", async (h) => {
-            await h.command("/discard-task");
+            await h.prompt("/discard-task");
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA [inherit]"),
+              assistant("", "toolUse"),
               task("Task AAA", true),
               taskResult("task-aaa", "Done."),
               assistant(""),
@@ -409,11 +493,13 @@ describe("manual workflow", () => {
             h.assertNotifications("No pending task to discard.");
           }),
           node("finish [no task]", async (h) => {
-            await h.command("/finish-task");
+            await h.prompt("/finish-task");
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA [inherit]"),
+              assistant("", "toolUse"),
               task("Task AAA", true),
               taskResult("task-aaa", "Done."),
               assistant(""),
@@ -421,11 +507,13 @@ describe("manual workflow", () => {
             h.assertNotifications("Not inside task, nothing to finish.");
           }),
           node("abort [no task]", async (h) => {
-            await h.command("/abort-task");
+            await h.prompt("/abort-task");
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA [inherit]"),
+              assistant("", "toolUse"),
               task("Task AAA", true),
               taskResult("task-aaa", "Done."),
               assistant(""),
@@ -434,11 +522,13 @@ describe("manual workflow", () => {
           }),
         ),
         node("abort AAA", async (h) => {
-          await h.command("/abort-task");
+          await h.prompt("/abort-task");
           assert.strictEqual(h.getStatus(), "pending task: task-aaa");
           h.assertBranchHistory(
             user("main work"),
             assistant("working..."),
+            user("queue AAA [inherit]"),
+            assistant("", "toolUse"),
             task("Task AAA", true),
           );
           h.assertNotifications(
@@ -447,39 +537,50 @@ describe("manual workflow", () => {
         }).children(
           node("start AAA", async (h) => {
             onTaskResponse(h, "Task AAA", "Done.");
-            await h.command("/start-task");
+            await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-aaa");
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA [inherit]"),
+              assistant("", "toolUse"),
               task("Task AAA", true),
               user("Task AAA"),
               assistant("Done."),
             );
           }).children(
             node("finish AAA", async (h) => {
-              await h.command("/finish-task");
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA [inherit]"),
+                assistant("", "toolUse"),
                 task("Task AAA", true),
                 taskResult("task-aaa", "Done."),
                 assistant(""),
               );
-              h.assertNotifications("Task finished. Last response attached.");
+              h.assertNotifications(
+                "Task finished. Last response attached.",
+              );
             }),
           ),
         ),
         node("push BBB", async (h) => {
-          await h.pushTask("Task BBB");
+          h.llm.onPrompt("queue BBB", pushTask("Task BBB"));
+          await h.prompt("queue BBB");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
             user("main work"),
             assistant("working..."),
+            user("queue AAA [inherit]"),
+            assistant("", "toolUse"),
             task("Task AAA", true),
             user("Task AAA"),
             assistant("Done."),
+            user("queue BBB"),
+            assistant("", "toolUse"),
             task("Task BBB"),
           );
           h.assertNotifications(
@@ -487,75 +588,98 @@ describe("manual workflow", () => {
           );
         }).children(
           node("discard BBB", async (h) => {
-            await h.command("/discard-task");
+            await h.prompt("/discard-task");
             assert.strictEqual(h.getStatus(), "current task: task-aaa");
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA [inherit]"),
+              assistant("", "toolUse"),
               task("Task AAA", true),
               user("Task AAA"),
               assistant("Done."),
+              user("queue BBB"),
+              assistant("", "toolUse"),
               task("Task BBB"),
             );
             h.assertNotifications("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
-              await h.command("/finish-task");
+              expectBlankPrompt(h);
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA [inherit]"),
+                assistant("", "toolUse"),
                 task("Task AAA", true),
-                taskResult("task-aaa", "Done."),
+                taskResult("task-aaa"),
                 assistant(""),
               );
-              h.assertNotifications("Task finished. Last response attached.");
+              h.assertNotifications(
+                "Task finished. Last response attached.",
+              );
             }),
           ),
           node("start BBB", async (h) => {
             onTaskResponse(h, "Task BBB", "inner done");
-            await h.command("/start-task");
+            await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-bbb");
             h.assertBranchHistory(user("Task BBB"), assistant("inner done"));
           }).children(
             node("finish BBB", async (h) => {
-              await h.command("/finish-task");
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), "current task: task-aaa");
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA [inherit]"),
+                assistant("", "toolUse"),
                 task("Task AAA", true),
                 user("Task AAA"),
                 assistant("Done."),
+                user("queue BBB"),
+                assistant("", "toolUse"),
                 task("Task BBB"),
                 taskResult("task-bbb", "inner done"),
                 assistant(""),
               );
-              h.assertNotifications("Task finished. Last response attached.");
+              h.assertNotifications(
+                "Task finished. Last response attached.",
+              );
             }).children(
               node("finish AAA", async (h) => {
                 expectBlankPrompt(h);
-                await h.command("/finish-task");
+                await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working..."),
+                  user("queue AAA [inherit]"),
+                  assistant("", "toolUse"),
                   task("Task AAA", true),
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications("Task finished. Last response attached.");
+                h.assertNotifications(
+                  "Task finished. Last response attached.",
+                );
               }),
             ),
             node("abort BBB", async (h) => {
-              await h.command("/abort-task");
+              await h.prompt("/abort-task");
               assert.strictEqual(h.getStatus(), "pending task: task-bbb");
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA [inherit]"),
+                assistant("", "toolUse"),
                 task("Task AAA", true),
                 user("Task AAA"),
                 assistant("Done."),
+                user("queue BBB"),
+                assistant("", "toolUse"),
                 task("Task BBB"),
               );
               h.assertNotifications(
@@ -563,29 +687,42 @@ describe("manual workflow", () => {
               );
             }).children(
               node("finish AAA", async (h) => {
-                await h.command("/finish-task");
+                expectBlankPrompt(h);
+                await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working..."),
+                  user("queue AAA [inherit]"),
+                  assistant("", "toolUse"),
                   task("Task AAA", true),
-                  taskResult("task-aaa", "Done."),
+                  taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications("Task finished. Last response attached.");
+                h.assertNotifications(
+                  "Task finished. Last response attached.",
+                );
               }),
             ),
           ),
         ),
         node("push BBB [inherit]", async (h) => {
-          await h.pushTask("Task BBB", true);
+          h.llm.onPrompt(
+            "queue BBB [inherit]",
+            pushTask("Task BBB", true),
+          );
+          await h.prompt("queue BBB [inherit]");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
             user("main work"),
             assistant("working..."),
+            user("queue AAA [inherit]"),
+            assistant("", "toolUse"),
             task("Task AAA", true),
             user("Task AAA"),
             assistant("Done."),
+            user("queue BBB [inherit]"),
+            assistant("", "toolUse"),
             task("Task BBB", true),
           );
           h.assertNotifications(
@@ -593,84 +730,111 @@ describe("manual workflow", () => {
           );
         }).children(
           node("discard BBB [inherit]", async (h) => {
-            await h.command("/discard-task");
+            await h.prompt("/discard-task");
             assert.strictEqual(h.getStatus(), "current task: task-aaa");
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA [inherit]"),
+              assistant("", "toolUse"),
               task("Task AAA", true),
               user("Task AAA"),
               assistant("Done."),
+              user("queue BBB [inherit]"),
+              assistant("", "toolUse"),
               task("Task BBB", true),
             );
             h.assertNotifications("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
-              await h.command("/finish-task");
+              expectBlankPrompt(h);
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA [inherit]"),
+                assistant("", "toolUse"),
                 task("Task AAA", true),
-                taskResult("task-aaa", "Done."),
+                taskResult("task-aaa"),
                 assistant(""),
               );
-              h.assertNotifications("Task finished. Last response attached.");
+              h.assertNotifications(
+                "Task finished. Last response attached.",
+              );
             }),
           ),
           node("start BBB [inherit]", async (h) => {
             onTaskResponse(h, "Task BBB", "inner done");
-            await h.command("/start-task");
+            await h.prompt("/start-task");
             assert.strictEqual(h.getStatus(), "current task: task-bbb");
             h.assertBranchHistory(
               user("main work"),
               assistant("working..."),
+              user("queue AAA [inherit]"),
+              assistant("", "toolUse"),
               task("Task AAA", true),
               user("Task AAA"),
               assistant("Done."),
+              user("queue BBB [inherit]"),
+              assistant("", "toolUse"),
               task("Task BBB", true),
               user("Task BBB"),
               assistant("inner done"),
             );
           }).children(
             node("finish BBB [inherit]", async (h) => {
-              await h.command("/finish-task");
+              await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), "current task: task-aaa");
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA [inherit]"),
+                assistant("", "toolUse"),
                 task("Task AAA", true),
                 user("Task AAA"),
                 assistant("Done."),
+                user("queue BBB [inherit]"),
+                assistant("", "toolUse"),
                 task("Task BBB", true),
                 taskResult("task-bbb", "inner done"),
                 assistant(""),
               );
-              h.assertNotifications("Task finished. Last response attached.");
+              h.assertNotifications(
+                "Task finished. Last response attached.",
+              );
             }).children(
               node("finish AAA", async (h) => {
                 expectBlankPrompt(h);
-                await h.command("/finish-task");
+                await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working..."),
+                  user("queue AAA [inherit]"),
+                  assistant("", "toolUse"),
                   task("Task AAA", true),
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications("Task finished. Last response attached.");
+                h.assertNotifications(
+                  "Task finished. Last response attached.",
+                );
               }),
             ),
             node("abort BBB [inherit]", async (h) => {
-              await h.command("/abort-task");
+              await h.prompt("/abort-task");
               assert.strictEqual(h.getStatus(), "pending task: task-bbb");
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working..."),
+                user("queue AAA [inherit]"),
+                assistant("", "toolUse"),
                 task("Task AAA", true),
                 user("Task AAA"),
                 assistant("Done."),
+                user("queue BBB [inherit]"),
+                assistant("", "toolUse"),
                 task("Task BBB", true),
               );
               h.assertNotifications(
@@ -678,16 +842,21 @@ describe("manual workflow", () => {
               );
             }).children(
               node("finish AAA", async (h) => {
-                await h.command("/finish-task");
+                expectBlankPrompt(h);
+                await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working..."),
+                  user("queue AAA [inherit]"),
+                  assistant("", "toolUse"),
                   task("Task AAA", true),
-                  taskResult("task-aaa", "Done."),
+                  taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications("Task finished. Last response attached.");
+                h.assertNotifications(
+                  "Task finished. Last response attached.",
+                );
               }),
             ),
           ),
@@ -697,36 +866,36 @@ describe("manual workflow", () => {
     .run();
 
   node("start [no task]", async (h) => {
-    h.engine.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("main work", responds("working..."));
     await h.prompt("main work");
-    await h.command("/start-task");
+    await h.prompt("/start-task");
     assert.strictEqual(h.getStatus(), undefined);
     h.assertBranchHistory(user("main work"), assistant("working..."));
     h.assertNotifications("No pending task. Use push-task first.");
   }).run();
 
   node("discard [no task]", async (h) => {
-    h.engine.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("main work", responds("working..."));
     await h.prompt("main work");
-    await h.command("/discard-task");
+    await h.prompt("/discard-task");
     assert.strictEqual(h.getStatus(), undefined);
     h.assertBranchHistory(user("main work"), assistant("working..."));
     h.assertNotifications("No pending task to discard.");
   }).run();
 
   node("finish [no task]", async (h) => {
-    h.engine.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("main work", responds("working..."));
     await h.prompt("main work");
-    await h.command("/finish-task");
+    await h.prompt("/finish-task");
     assert.strictEqual(h.getStatus(), undefined);
     h.assertBranchHistory(user("main work"), assistant("working..."));
     h.assertNotifications("Not inside task, nothing to finish.");
   }).run();
 
   node("abort [no task]", async (h) => {
-    h.engine.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("main work", responds("working..."));
     await h.prompt("main work");
-    await h.command("/abort-task");
+    await h.prompt("/abort-task");
     assert.strictEqual(h.getStatus(), undefined);
     h.assertBranchHistory(user("main work"), assistant("working..."));
     h.assertNotifications("Not inside task, nothing to abort.");
@@ -740,10 +909,10 @@ function onTaskResponse(
   taskPrompt: string,
   response: string,
 ): void {
-  h.engine.onPrompt(taskPrompt, responds(response));
-  h.engine.onPrompt(response, responds(""));
+  h.llm.onPrompt(taskPrompt, responds(response));
+  h.llm.onPrompt(response, responds(""));
 }
 
 function expectBlankPrompt(h: TestHarness): void {
-  h.engine.onPrompt("", responds(""));
+  h.llm.onPrompt("", responds(""));
 }
