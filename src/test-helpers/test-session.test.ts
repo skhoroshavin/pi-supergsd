@@ -63,10 +63,7 @@ describe("TestSession", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
-    session.context.setStatus(
-      "task",
-      session.context.theme.fg("dim", "pending task: task-aaa"),
-    );
+    session.context.setStatus("task", session.context.theme.fg("dim", "pending task: task-aaa"));
     session.context.notify(session.context.theme.fg("warning", "warn once"), "warning");
 
     assert.deepStrictEqual(session.entries(), [status("pending task: task-aaa")]);
