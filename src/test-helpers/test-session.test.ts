@@ -2,7 +2,7 @@ import assert from "node:assert";
 
 import { describe, it } from "node:test";
 
-import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { SessionManager, Theme } from "@earendil-works/pi-coding-agent";
 
 import { TestSession, assistant, assumeCommandContext, notification, task, user } from "./index.js";
 
@@ -75,6 +75,33 @@ describe("TestSession", () => {
     session.context.notify("warn once", "warning");
 
     assert.deepStrictEqual(session.entries(), [user("main work"), notification("warn once")]);
+  });
+
+  it("stores plain notification text when given themed output", () => {
+    const sm = SessionManager.inMemory();
+    const session = new TestSession(sm);
+
+    appendUser(sm, "main work");
+    session.context.notify(session.context.theme.fg("warning", "warn once"), "warning");
+
+    assert.deepStrictEqual(session.entries(), [user("main work"), notification("warn once")]);
+  });
+
+  it("stores plain task status text when given themed output", () => {
+    const sm = SessionManager.inMemory();
+    const session = new TestSession(sm);
+
+    session.context.setStatus("task", session.context.theme.fg("dim", "pending task: task-aaa"));
+
+    assert.strictEqual(session.status, "pending task: task-aaa");
+    assert.deepStrictEqual(session.taskStatusHistory, ["pending task: task-aaa"]);
+  });
+
+  it("exposes a real Theme on the UI context", () => {
+    const sm = SessionManager.inMemory();
+    const session = new TestSession(sm);
+
+    assert.ok(session.context.theme instanceof Theme);
   });
 
   it("keeps assumeCommandContext available from the new module", () => {
