@@ -43,16 +43,16 @@ export class TestSession {
     bold: (text: string) => text,
   } satisfies Pick<Theme, "fg" | "bg" | "bold">;
 
-  #notifications: TrackedNotification[] = [];
+  #lastNotification: TrackedNotification | undefined;
 
   #status: string | undefined;
 
   readonly context: ExtensionUIContext = {
     notify: (message: string) => {
-      this.#notifications.push({
+      this.#lastNotification = {
         message,
         anchorEntryId: this.sessionManager.getLeafId(),
-      });
+      };
     },
     setStatus: (key: string, value: string | undefined) => {
       if (key !== "task") return;
@@ -63,21 +63,28 @@ export class TestSession {
   } as ExtensionUIContext;
 
   entries(): SessionEntry[] {
-    // Group tracked notifications by their anchor entry id.
-    const notificationsByAnchor = new Map<string | null, NotificationEntry[]>();
-    for (const item of this.#notifications) {
-      const list = notificationsByAnchor.get(item.anchorEntryId) ?? [];
-      list.push(notification(item.message));
-      notificationsByAnchor.set(item.anchorEntryId, list);
-    }
-
-    // Merge: null-anchor notifications first, then branch entries with their
-    // anchored notifications interleaved.
-    const merged: SessionEntry[] = [...(notificationsByAnchor.get(null) ?? [])];
-    for (const rawEntry of this.sessionManager.getBranch()) {
-      const visible = toDurableEntry(rawEntry);
-      if (visible) merged.push(visible);
-      merged.push(...(notificationsByAnchor.get(rawEntry.id) ?? []));
+    const branch = this.sessionManager.getBranch();
+    const merged: SessionEntry[] = durableEntries(branch);
+    if (this.#lastNotification) {
+      const anchorId = this.#lastNotification.anchorEntryId;
+      if (anchorId === null) {
+        // Null anchor: notification emitted before any entries.
+        // Only show if the branch is still empty.
+        if (branch.length === 0) {
+          merged.push(notification(this.#lastNotification.message));
+        }
+      } else {
+        // Named anchor: only show if no durable entries exist after it.
+        const anchorIdx = branch.findIndex((e) => e.id === anchorId);
+        if (anchorIdx >= 0) {
+          const hasLaterVisible = branch
+            .slice(anchorIdx + 1)
+            .some((e) => toDurableEntry(e) !== null);
+          if (!hasLaterVisible) {
+            merged.push(notification(this.#lastNotification.message));
+          }
+        }
+      }
     }
     return merged;
   }
