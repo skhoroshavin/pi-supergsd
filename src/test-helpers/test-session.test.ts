@@ -7,7 +7,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { TestSession, assistant, assumeCommandContext, notification, task, user } from "./index.js";
 
 describe("TestSession", () => {
-  it("places a notification immediately after its visible anchor", () => {
+  it("shows a notification when it is the last log event", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
@@ -25,7 +25,7 @@ describe("TestSession", () => {
     ]);
   });
 
-  it("keeps notifications anchored to hidden entries in the right visible slot", () => {
+  it("hides a notification after a later visible entry is appended", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
@@ -38,12 +38,11 @@ describe("TestSession", () => {
     assert.deepStrictEqual(session.entries(), [
       user("Task AAA"),
       assistant("Done."),
-      notification("Task finished. Last response attached."),
       assistant("Great!"),
     ]);
   });
 
-  it("preserves emission order for multiple notifications on one anchor", () => {
+  it("keeps only the last notification for one anchor", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
@@ -51,11 +50,7 @@ describe("TestSession", () => {
     session.context.notify("first");
     session.context.notify("second");
 
-    assert.deepStrictEqual(session.entries(), [
-      user("main work"),
-      notification("first"),
-      notification("second"),
-    ]);
+    assert.deepStrictEqual(session.entries(), [user("main work"), notification("second")]);
   });
 
   it("omits notifications anchored to entries outside the current branch", () => {
@@ -72,14 +67,23 @@ describe("TestSession", () => {
     assert.deepStrictEqual(session.entries(), [user("main work"), assistant("branch B")]);
   });
 
-  it("prepends null-anchor notifications before branch content", () => {
+  it("shows a null-anchor notification when it is the last log event", () => {
+    const sm = SessionManager.inMemory();
+    const session = new TestSession(sm);
+
+    session.context.notify("bootstrap");
+
+    assert.deepStrictEqual(session.entries(), [notification("bootstrap")]);
+  });
+
+  it("hides a null-anchor notification once later branch content exists", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
     session.context.notify("bootstrap");
     appendUser(sm, "main work");
 
-    assert.deepStrictEqual(session.entries(), [notification("bootstrap"), user("main work")]);
+    assert.deepStrictEqual(session.entries(), [user("main work")]);
   });
 
   it("accepts notification levels without exposing them in visible assertions", () => {
