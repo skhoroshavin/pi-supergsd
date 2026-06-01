@@ -50,18 +50,18 @@ export class TestSession {
 
   entries(): SessionEntry[] {
     const branch = this.sessionManager.getBranch();
-    const merged: SessionEntry[] = durableEntries(branch);
-    if (!this.#lastNotification) return merged;
+    const visible: SessionEntry[] = durableEntries(branch);
+    if (!this.#lastNotification) return visible;
 
     const { anchorEntryId, message } = this.#lastNotification;
 
-    // Only show if no durable entries exist after the anchor.
+    // Only show notification if no durable entries exist after the anchor.
     const anchorIdx = branch.findIndex((e) => e.id === anchorEntryId);
-    if (anchorIdx < 0) return merged;
+    if (anchorIdx < 0) return visible;
 
     const hasLaterVisible = branch.slice(anchorIdx + 1).some((e) => toDurableEntry(e) !== null);
-    if (!hasLaterVisible) merged.push(notification(message));
-    return merged;
+    if (!hasLaterVisible) visible.push(notification(message));
+    return visible;
   }
 
   get status(): string | undefined {
@@ -132,10 +132,6 @@ export const notification = (message: string): NotificationEntry => ({
 // ---------------------------------------------------------------------------
 
 export type NotificationEntry = { type: "notification"; message: string };
-
-// ---------------------------------------------------------------------------
-// Tracked notification (internal, not exported)
-// ---------------------------------------------------------------------------
 
 type TrackedNotification = {
   message: string;
