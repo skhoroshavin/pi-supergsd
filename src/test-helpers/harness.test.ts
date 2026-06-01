@@ -36,9 +36,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
     await h.prompt("/start-task");
 
-    h.assertSession(
-      notification("No pending task. Use push-task first."),
-    );
+    h.assertSession(notification("No pending task. Use push-task first."));
   });
 
   it("supports thinking and aborted response descriptors", async (t) => {
@@ -65,9 +63,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("delegate work"),
       assistant("", "toolUse"),
       task("subtask", true),
-      notification(
-        "Task stored. Use `/start-task` or `/auto` to start it.",
-      ),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
     );
   });
 
@@ -113,19 +109,13 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("Analyze X"),
       assistant("preparing subagent", "toolUse"),
       task("Detailed X analysis"),
-      notification(
-        "Task stored. Use `/start-task` or `/auto` to start it.",
-      ),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
     );
   });
 
   it("assertSessionContains still scans durable whole-session entries across branches", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt(
-      "main work",
-      responds("working..."),
-      pushTask("Task AAA"),
-    );
+    h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
     h.llm.onPrompt("Task AAA", responds("Done."));
 
     await h.prompt("main work");
@@ -156,9 +146,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("queue follow-up"),
       assistant("", "toolUse"),
       task("follow-up"),
-      notification(
-        "Task stored. Use `/start-task` or `/auto` to start it.",
-      ),
+      notification("Task stored. Use `/start-task` or `/auto` to start it."),
       user("answer follow-up"),
       assistant("queued response"),
     );

@@ -147,27 +147,6 @@ export class TestHarness {
     );
   }
 
-  // Temporary wrappers until src/auto.test.ts and src/manual.test.ts are
-  // migrated.
-  assertBranchHistory(...expected: DurableSessionEntry[]): void {
-    const visible = this.testSession
-      .entries()
-      .filter(
-        (entry): entry is DurableSessionEntry => entry.type !== "notification",
-      );
-    assert.deepStrictEqual(visible, expected);
-  }
-
-  assertNotifications(...expected: string[]): void {
-    const actual = this.testSession.notificationMessages;
-    for (const text of expected) {
-      assert.ok(
-        actual.includes(text),
-        `Expected notification log to include: ${text}`,
-      );
-    }
-  }
-
   async waitForIdle(): Promise<void> {
     await this.scanAndReactLoop();
   }

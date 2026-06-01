@@ -49,9 +49,7 @@ describe("automated workflow", () => {
         user("queue analyze"),
         assistant("", "toolUse"),
         task("Analyze performance."),
-        notification(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-        ),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
         notification("Task finished. Last response attached."),
         taskResult("analyze-performance", "Found 3 bottlenecks: ..."),
         assistant(""),
@@ -82,9 +80,7 @@ describe("automated workflow", () => {
         user("queue quick-fix"),
         assistant("", "toolUse"),
         task("Quick fix.", true),
-        notification(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-        ),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
         notification("Task finished. Last response attached."),
         taskResult("quick-fix", "Fixed the bug."),
         assistant(""),
@@ -111,9 +107,7 @@ describe("automated workflow", () => {
         user("queue analyze"),
         assistant("", "toolUse"),
         task("Analyze performance."),
-        notification(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-        ),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
       );
     } finally {
       h.dispose();
@@ -213,9 +207,7 @@ describe("automated workflow", () => {
         user("queue first"),
         assistant("", "toolUse"),
         task("first task"),
-        notification(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-        ),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
         notification("Task finished. Last response attached."),
         taskResult("first-task", "done"),
         assistant(""),
@@ -244,9 +236,7 @@ describe("automated workflow", () => {
         user("queue implement"),
         assistant("", "toolUse"),
         task("Implement phase 1.", true),
-        notification(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-        ),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
         user("Implement phase 1."),
         assistant("Stopped by user.", "aborted"),
       );
@@ -282,9 +272,7 @@ describe("automated workflow", () => {
         user("queue parent"),
         assistant("", "toolUse"),
         task("parent task"),
-        notification(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-        ),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
         notification("Task finished. Last response attached."),
         taskResult("parent-task"),
         assistant(""),
@@ -321,9 +309,7 @@ describe("automated workflow", () => {
         user("queue quick-fix"),
         assistant("", "toolUse"),
         task("Quick fix.", true),
-        notification(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-        ),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
         notification("Task finished. Last response attached."),
         taskResult("quick-fix", "adjusted response"),
         assistant(""),
@@ -352,9 +338,7 @@ describe("automated workflow", () => {
         user("queue shutdown"),
         assistant("", "toolUse"),
         task("Shutdown task", true),
-        notification(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-        ),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
         user("Shutdown task"),
         assistant("working..."),
       );

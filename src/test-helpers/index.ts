@@ -5,6 +5,7 @@ export {
   task,
   taskResult,
   user,
+  TestSession,
 } from "./test-session.js";
 
 export { MockLLM, aborts, pushTask, responds, thinks } from "./mock-llm.js";
