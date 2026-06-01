@@ -208,10 +208,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-// ---------------------------------------------------------------------------
-// TestSession — canonical visible-session model
-// ---------------------------------------------------------------------------
-
 const noOpContext: ExtensionUIContext = {
   async select() {
     return undefined;
