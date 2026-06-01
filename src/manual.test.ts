@@ -1,11 +1,8 @@
-import assert from "node:assert";
-
 import {
   assistant,
   node,
   responds,
   pushTask,
-  status,
   TestNode,
   task,
   taskResult,
@@ -26,138 +23,101 @@ describe("manual workflow", () => {
       h.llm.onPrompt("Task BBB", responds("inner done"));
       h.llm.onPrompt("inner done", responds("Great!"));
       await h.prompt("main work");
-      h.assertSession(
-        user("main work"),
-        assistant("working...", "toolUse"),
-        task("Task AAA"),
-        status("pending task: task-aaa"),
-      );
+      h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
+      h.assertStatus("pending task: task-aaa");
     }).children(
       node("discard AAA", async (h) => {
         await h.prompt("/discard-task");
-        h.assertSession(
-          user("main work"),
-          assistant("working...", "toolUse"),
-          task("Task AAA"),
-          status("pending task: task-aaa"),
-          status(),
-        );
-        assert.strictEqual(h.lastNotification(), "Task discarded.");
+        h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
+        h.assertStatus();
+        h.assertLastNotification("Task discarded.");
       }),
       node("start AAA", async (h) => {
         await h.prompt("/start-task");
-        h.assertSession(
-          status(),
-          user("Task AAA"),
-          assistant("Done."),
-          status("current task: task-aaa"),
-        );
+        h.assertSession(user("Task AAA"), assistant("Done."));
+        h.assertStatus("current task: task-aaa");
       }).children(
         node("finish AAA", async (h) => {
           await h.prompt("/finish-task");
           h.assertSession(
-            status(),
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA"),
-            status("pending task: task-aaa"),
-            status(),
             taskResult("task-aaa", "Done."),
             assistant("Great!"),
           );
+          h.assertStatus();
         }).children(
           node("start [no task]", async (h) => {
             await h.prompt("/start-task");
             h.assertSession(
-              status(),
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              status("pending task: task-aaa"),
-              status(),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
             );
-            assert.strictEqual(h.lastNotification(), "No pending task. Use push-task first.");
+            h.assertStatus();
+            h.assertLastNotification("No pending task. Use push-task first.");
           }),
           node("discard [no task]", async (h) => {
             await h.prompt("/discard-task");
             h.assertSession(
-              status(),
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              status("pending task: task-aaa"),
-              status(),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
             );
-            assert.strictEqual(h.lastNotification(), "No pending task to discard.");
+            h.assertStatus();
+            h.assertLastNotification("No pending task to discard.");
           }),
           node("finish [no task]", async (h) => {
             await h.prompt("/finish-task");
             h.assertSession(
-              status(),
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              status("pending task: task-aaa"),
-              status(),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
             );
-            assert.strictEqual(h.lastNotification(), "Not inside task, nothing to finish.");
+            h.assertStatus();
+            h.assertLastNotification("Not inside task, nothing to finish.");
           }),
           node("abort [no task]", async (h) => {
             await h.prompt("/abort-task");
             h.assertSession(
-              status(),
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              status("pending task: task-aaa"),
-              status(),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
             );
-            assert.strictEqual(h.lastNotification(), "Not inside task, nothing to abort.");
+            h.assertStatus();
+            h.assertLastNotification("Not inside task, nothing to abort.");
           }),
         ),
         node("abort AAA", async (h) => {
           await h.prompt("/abort-task");
-          h.assertSession(
-            status(),
-            user("main work"),
-            assistant("working...", "toolUse"),
-            task("Task AAA"),
-            status("pending task: task-aaa"),
-          );
-          assert.strictEqual(
-            h.lastNotification(),
-            "Task aborted. Branch abandoned without summary.",
-          );
+          h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
+          h.assertStatus("pending task: task-aaa");
+          h.assertLastNotification("Task aborted. Branch abandoned without summary.");
         }).children(
           node("start AAA", async (h) => {
             await h.prompt("/start-task");
-            h.assertSession(
-              status(),
-              user("Task AAA"),
-              assistant("Done."),
-              status("current task: task-aaa"),
-            );
+            h.assertSession(user("Task AAA"), assistant("Done."));
+            h.assertStatus("current task: task-aaa");
           }).children(
             node("finish AAA", async (h) => {
               await h.prompt("/finish-task");
               h.assertSession(
-                status(),
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                status("pending task: task-aaa"),
-                status(),
                 taskResult("task-aaa", "Done."),
                 assistant("Great!"),
               );
+              h.assertStatus();
             }),
           ),
         ),
@@ -165,113 +125,90 @@ describe("manual workflow", () => {
           h.llm.onPrompt("some more work", responds("okay"), pushTask("Task BBB"));
           await h.prompt("some more work");
           h.assertSession(
-            status(),
             user("Task AAA"),
             assistant("Done."),
-            status("current task: task-aaa"),
             user("some more work"),
             assistant("okay", "toolUse"),
             task("Task BBB"),
-            status("pending task: task-bbb"),
           );
+          h.assertStatus("pending task: task-bbb");
         }).children(
           node("discard BBB", async (h) => {
             await h.prompt("/discard-task");
             h.assertSession(
-              status(),
               user("Task AAA"),
               assistant("Done."),
-              status("current task: task-aaa"),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB"),
-              status("pending task: task-bbb"),
-              status("current task: task-aaa"),
             );
-            assert.strictEqual(h.lastNotification(), "Task discarded.");
+            h.assertStatus("current task: task-aaa");
+            h.assertLastNotification("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
               await h.prompt("/finish-task");
               h.assertSession(
-                status(),
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                status("pending task: task-aaa"),
-                status(),
                 taskResult("task-aaa", "okay"),
                 assistant("Great!"),
               );
+              h.assertStatus();
             }),
           ),
           node("start BBB", async (h) => {
             await h.prompt("/start-task");
-            h.assertSession(
-              status(),
-              user("Task BBB"),
-              assistant("inner done"),
-              status("current task: task-bbb"),
-            );
+            h.assertSession(user("Task BBB"), assistant("inner done"));
+            h.assertStatus("current task: task-bbb");
           }).children(
             node("finish BBB", async (h) => {
               await h.prompt("/finish-task");
               h.assertSession(
-                status(),
                 user("Task AAA"),
                 assistant("Done."),
-                status("current task: task-aaa"),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                status("pending task: task-bbb"),
-                status("current task: task-aaa"),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
               );
+              h.assertStatus("current task: task-aaa");
             }).children(
               node("finish AAA", async (h) => {
                 await h.prompt("/finish-task");
                 h.assertSession(
-                  status(),
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  status("pending task: task-aaa"),
-                  status(),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
                 );
+                h.assertStatus();
               }),
             ),
             node("abort BBB", async (h) => {
               await h.prompt("/abort-task");
               h.assertSession(
-                status(),
                 user("Task AAA"),
                 assistant("Done."),
-                status("current task: task-aaa"),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                status("pending task: task-bbb"),
               );
-              assert.strictEqual(
-                h.lastNotification(),
-                "Task aborted. Branch abandoned without summary.",
-              );
+              h.assertStatus("pending task: task-bbb");
+              h.assertLastNotification("Task aborted. Branch abandoned without summary.");
             }).children(
               node("finish AAA", async (h) => {
                 await h.prompt("/finish-task");
                 h.assertSession(
-                  status(),
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  status("pending task: task-aaa"),
-                  status(),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
                 );
+                h.assertStatus();
               }),
             ),
           ),
@@ -280,120 +217,98 @@ describe("manual workflow", () => {
           h.llm.onPrompt("some more work", responds("okay"), pushTask("Task BBB", true));
           await h.prompt("some more work");
           h.assertSession(
-            status(),
             user("Task AAA"),
             assistant("Done."),
-            status("current task: task-aaa"),
             user("some more work"),
             assistant("okay", "toolUse"),
             task("Task BBB", true),
-            status("pending task: task-bbb"),
           );
+          h.assertStatus("pending task: task-bbb");
         }).children(
           node("discard BBB [inherit]", async (h) => {
             await h.prompt("/discard-task");
             h.assertSession(
-              status(),
               user("Task AAA"),
               assistant("Done."),
-              status("current task: task-aaa"),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB", true),
-              status("pending task: task-bbb"),
-              status("current task: task-aaa"),
             );
-            assert.strictEqual(h.lastNotification(), "Task discarded.");
+            h.assertStatus("current task: task-aaa");
+            h.assertLastNotification("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
               await h.prompt("/finish-task");
               h.assertSession(
-                status(),
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                status("pending task: task-aaa"),
-                status(),
                 taskResult("task-aaa", "okay"),
                 assistant("Great!"),
               );
+              h.assertStatus();
             }),
           ),
           node("start BBB [inherit]", async (h) => {
             await h.prompt("/start-task");
             h.assertSession(
-              status(),
               user("Task AAA"),
               assistant("Done."),
-              status("current task: task-aaa"),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB", true),
-              status("pending task: task-bbb"),
               user("Task BBB"),
               assistant("inner done"),
-              status("current task: task-bbb"),
             );
+            h.assertStatus("current task: task-bbb");
           }).children(
             node("finish BBB [inherit]", async (h) => {
               await h.prompt("/finish-task");
               h.assertSession(
-                status(),
                 user("Task AAA"),
                 assistant("Done."),
-                status("current task: task-aaa"),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                status("pending task: task-bbb"),
-                status("current task: task-aaa"),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
               );
+              h.assertStatus("current task: task-aaa");
             }).children(
               node("finish AAA", async (h) => {
                 await h.prompt("/finish-task");
                 h.assertSession(
-                  status(),
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  status("pending task: task-aaa"),
-                  status(),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
                 );
+                h.assertStatus();
               }),
             ),
             node("abort BBB [inherit]", async (h) => {
               await h.prompt("/abort-task");
               h.assertSession(
-                status(),
                 user("Task AAA"),
                 assistant("Done."),
-                status("current task: task-aaa"),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                status("pending task: task-bbb"),
               );
-              assert.strictEqual(
-                h.lastNotification(),
-                "Task aborted. Branch abandoned without summary.",
-              );
+              h.assertStatus("pending task: task-bbb");
+              h.assertLastNotification("Task aborted. Branch abandoned without summary.");
             }).children(
               node("finish AAA", async (h) => {
                 await h.prompt("/finish-task");
                 h.assertSession(
-                  status(),
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  status("pending task: task-aaa"),
-                  status(),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
                 );
+                h.assertStatus();
               }),
             ),
           ),
@@ -414,8 +329,8 @@ describe("manual workflow", () => {
         user("main work"),
         assistant("working...", "toolUse"),
         task("Task AAA", true),
-        status("pending task: task-aaa"),
       );
+      h.assertStatus("pending task: task-aaa");
     }).children(
       node("discard AAA", async (h) => {
         await h.prompt("/discard-task");
@@ -423,10 +338,9 @@ describe("manual workflow", () => {
           user("main work"),
           assistant("working...", "toolUse"),
           task("Task AAA", true),
-          status("pending task: task-aaa"),
-          status(),
         );
-        assert.strictEqual(h.lastNotification(), "Task discarded.");
+        h.assertStatus();
+        h.assertLastNotification("Task discarded.");
       }),
       node("start AAA", async (h) => {
         await h.prompt("/start-task");
@@ -434,11 +348,10 @@ describe("manual workflow", () => {
           user("main work"),
           assistant("working...", "toolUse"),
           task("Task AAA", true),
-          status("pending task: task-aaa"),
           user("Task AAA"),
           assistant("Done."),
-          status("current task: task-aaa"),
         );
+        h.assertStatus("current task: task-aaa");
       }).children(
         node("finish AAA", async (h) => {
           await h.prompt("/finish-task");
@@ -446,11 +359,10 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA", true),
-            status("pending task: task-aaa"),
-            status(),
             taskResult("task-aaa", "Done."),
             assistant("Great!"),
           );
+          h.assertStatus();
         }).children(
           node("start [no task]", async (h) => {
             await h.prompt("/start-task");
@@ -458,12 +370,11 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              status("pending task: task-aaa"),
-              status(),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
             );
-            assert.strictEqual(h.lastNotification(), "No pending task. Use push-task first.");
+            h.assertStatus();
+            h.assertLastNotification("No pending task. Use push-task first.");
           }),
           node("discard [no task]", async (h) => {
             await h.prompt("/discard-task");
@@ -471,12 +382,11 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              status("pending task: task-aaa"),
-              status(),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
             );
-            assert.strictEqual(h.lastNotification(), "No pending task to discard.");
+            h.assertStatus();
+            h.assertLastNotification("No pending task to discard.");
           }),
           node("finish [no task]", async (h) => {
             await h.prompt("/finish-task");
@@ -484,12 +394,11 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              status("pending task: task-aaa"),
-              status(),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
             );
-            assert.strictEqual(h.lastNotification(), "Not inside task, nothing to finish.");
+            h.assertStatus();
+            h.assertLastNotification("Not inside task, nothing to finish.");
           }),
           node("abort [no task]", async (h) => {
             await h.prompt("/abort-task");
@@ -497,12 +406,11 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              status("pending task: task-aaa"),
-              status(),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
             );
-            assert.strictEqual(h.lastNotification(), "Not inside task, nothing to abort.");
+            h.assertStatus();
+            h.assertLastNotification("Not inside task, nothing to abort.");
           }),
         ),
         node("abort AAA", async (h) => {
@@ -511,12 +419,9 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA", true),
-            status("pending task: task-aaa"),
           );
-          assert.strictEqual(
-            h.lastNotification(),
-            "Task aborted. Branch abandoned without summary.",
-          );
+          h.assertStatus("pending task: task-aaa");
+          h.assertLastNotification("Task aborted. Branch abandoned without summary.");
         }).children(
           node("start AAA", async (h) => {
             await h.prompt("/start-task");
@@ -524,11 +429,10 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              status("pending task: task-aaa"),
               user("Task AAA"),
               assistant("Done."),
-              status("current task: task-aaa"),
             );
+            h.assertStatus("current task: task-aaa");
           }).children(
             node("finish AAA", async (h) => {
               await h.prompt("/finish-task");
@@ -536,11 +440,10 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                status("pending task: task-aaa"),
-                status(),
                 taskResult("task-aaa", "Done."),
                 assistant("Great!"),
               );
+              h.assertStatus();
             }),
           ),
         ),
@@ -551,15 +454,13 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA", true),
-            status("pending task: task-aaa"),
             user("Task AAA"),
             assistant("Done."),
-            status("current task: task-aaa"),
             user("some more work"),
             assistant("okay", "toolUse"),
             task("Task BBB"),
-            status("pending task: task-bbb"),
           );
+          h.assertStatus("pending task: task-bbb");
         }).children(
           node("discard BBB", async (h) => {
             await h.prompt("/discard-task");
@@ -567,17 +468,14 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              status("pending task: task-aaa"),
               user("Task AAA"),
               assistant("Done."),
-              status("current task: task-aaa"),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB"),
-              status("pending task: task-bbb"),
-              status("current task: task-aaa"),
             );
-            assert.strictEqual(h.lastNotification(), "Task discarded.");
+            h.assertStatus("current task: task-aaa");
+            h.assertLastNotification("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
               await h.prompt("/finish-task");
@@ -585,89 +483,70 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                status("pending task: task-aaa"),
-                status(),
                 taskResult("task-aaa", "okay"),
                 assistant("Great!"),
               );
+              h.assertStatus();
             }),
           ),
           node("start BBB", async (h) => {
             await h.prompt("/start-task");
-            h.assertSession(
-              status(),
-              user("Task BBB"),
-              assistant("inner done"),
-              status("current task: task-bbb"),
-            );
+            h.assertSession(user("Task BBB"), assistant("inner done"));
+            h.assertStatus("current task: task-bbb");
           }).children(
             node("finish BBB", async (h) => {
               await h.prompt("/finish-task");
               h.assertSession(
-                status(),
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                status("pending task: task-aaa"),
                 user("Task AAA"),
                 assistant("Done."),
-                status("current task: task-aaa"),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                status("pending task: task-bbb"),
-                status("current task: task-aaa"),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
               );
+              h.assertStatus("current task: task-aaa");
             }).children(
               node("finish AAA", async (h) => {
                 await h.prompt("/finish-task");
                 h.assertSession(
-                  status(),
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  status("pending task: task-aaa"),
-                  status(),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
                 );
+                h.assertStatus();
               }),
             ),
             node("abort BBB", async (h) => {
               await h.prompt("/abort-task");
               h.assertSession(
-                status(),
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                status("pending task: task-aaa"),
                 user("Task AAA"),
                 assistant("Done."),
-                status("current task: task-aaa"),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                status("pending task: task-bbb"),
               );
-              assert.strictEqual(
-                h.lastNotification(),
-                "Task aborted. Branch abandoned without summary.",
-              );
+              h.assertStatus("pending task: task-bbb");
+              h.assertLastNotification("Task aborted. Branch abandoned without summary.");
             }).children(
               node("finish AAA", async (h) => {
                 await h.prompt("/finish-task");
                 h.assertSession(
-                  status(),
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  status("pending task: task-aaa"),
-                  status(),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
                 );
+                h.assertStatus();
               }),
             ),
           ),
@@ -679,15 +558,13 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA", true),
-            status("pending task: task-aaa"),
             user("Task AAA"),
             assistant("Done."),
-            status("current task: task-aaa"),
             user("some more work"),
             assistant("okay", "toolUse"),
             task("Task BBB", true),
-            status("pending task: task-bbb"),
           );
+          h.assertStatus("pending task: task-bbb");
         }).children(
           node("discard BBB [inherit]", async (h) => {
             await h.prompt("/discard-task");
@@ -695,17 +572,14 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              status("pending task: task-aaa"),
               user("Task AAA"),
               assistant("Done."),
-              status("current task: task-aaa"),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB", true),
-              status("pending task: task-bbb"),
-              status("current task: task-aaa"),
             );
-            assert.strictEqual(h.lastNotification(), "Task discarded.");
+            h.assertStatus("current task: task-aaa");
+            h.assertLastNotification("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
               await h.prompt("/finish-task");
@@ -713,11 +587,10 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                status("pending task: task-aaa"),
-                status(),
                 taskResult("task-aaa", "okay"),
                 assistant("Great!"),
               );
+              h.assertStatus();
             }),
           ),
           node("start BBB [inherit]", async (h) => {
@@ -726,18 +599,15 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              status("pending task: task-aaa"),
               user("Task AAA"),
               assistant("Done."),
-              status("current task: task-aaa"),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB", true),
-              status("pending task: task-bbb"),
               user("Task BBB"),
               assistant("inner done"),
-              status("current task: task-bbb"),
             );
+            h.assertStatus("current task: task-bbb");
           }).children(
             node("finish BBB [inherit]", async (h) => {
               await h.prompt("/finish-task");
@@ -745,18 +615,15 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                status("pending task: task-aaa"),
                 user("Task AAA"),
                 assistant("Done."),
-                status("current task: task-aaa"),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                status("pending task: task-bbb"),
-                status("current task: task-aaa"),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
               );
+              h.assertStatus("current task: task-aaa");
             }).children(
               node("finish AAA", async (h) => {
                 await h.prompt("/finish-task");
@@ -764,11 +631,10 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  status("pending task: task-aaa"),
-                  status(),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
                 );
+                h.assertStatus();
               }),
             ),
             node("abort BBB [inherit]", async (h) => {
@@ -777,19 +643,14 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                status("pending task: task-aaa"),
                 user("Task AAA"),
                 assistant("Done."),
-                status("current task: task-aaa"),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                status("pending task: task-bbb"),
               );
-              assert.strictEqual(
-                h.lastNotification(),
-                "Task aborted. Branch abandoned without summary.",
-              );
+              h.assertStatus("pending task: task-bbb");
+              h.assertLastNotification("Task aborted. Branch abandoned without summary.");
             }).children(
               node("finish AAA", async (h) => {
                 await h.prompt("/finish-task");
@@ -797,11 +658,10 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  status("pending task: task-aaa"),
-                  status(),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
                 );
+                h.assertStatus();
               }),
             ),
           ),
@@ -814,28 +674,32 @@ describe("manual workflow", () => {
       await h.prompt("main work");
       await h.prompt("/start-task");
       h.assertSession(user("main work"), assistant("working..."));
-      assert.strictEqual(h.lastNotification(), "No pending task. Use push-task first.");
+      h.assertStatus();
+      h.assertLastNotification("No pending task. Use push-task first.");
     }),
     node("discard [no task]", async (h) => {
       h.llm.onPrompt("main work", responds("working..."));
       await h.prompt("main work");
       await h.prompt("/discard-task");
       h.assertSession(user("main work"), assistant("working..."));
-      assert.strictEqual(h.lastNotification(), "No pending task to discard.");
+      h.assertStatus();
+      h.assertLastNotification("No pending task to discard.");
     }),
     node("finish [no task]", async (h) => {
       h.llm.onPrompt("main work", responds("working..."));
       await h.prompt("main work");
       await h.prompt("/finish-task");
       h.assertSession(user("main work"), assistant("working..."));
-      assert.strictEqual(h.lastNotification(), "Not inside task, nothing to finish.");
+      h.assertStatus();
+      h.assertLastNotification("Not inside task, nothing to finish.");
     }),
     node("abort [no task]", async (h) => {
       h.llm.onPrompt("main work", responds("working..."));
       await h.prompt("main work");
       await h.prompt("/abort-task");
       h.assertSession(user("main work"), assistant("working..."));
-      assert.strictEqual(h.lastNotification(), "Not inside task, nothing to abort.");
+      h.assertStatus();
+      h.assertLastNotification("Not inside task, nothing to abort.");
     }),
   );
 });

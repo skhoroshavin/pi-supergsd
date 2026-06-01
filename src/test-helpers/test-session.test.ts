@@ -4,10 +4,10 @@ import { describe, it } from "node:test";
 
 import { SessionManager, Theme } from "@earendil-works/pi-coding-agent";
 
-import { TestSession, assistant, assumeCommandContext, status, task, user } from "./index.js";
+import { TestSession, assistant, assumeCommandContext, task, user } from "./index.js";
 
 describe("TestSession", () => {
-  it("projects task status changes inline with durable session entries", () => {
+  it("projects durable session entries without status", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
@@ -22,12 +22,12 @@ describe("TestSession", () => {
     assert.deepStrictEqual(session.entries(), [
       user("main work"),
       task("Task AAA"),
-      status("pending task: task-aaa"),
       assistant("queued"),
     ]);
+    assert.strictEqual(session.lastStatus, "pending task: task-aaa");
   });
 
-  it("adds status() when task status clears", () => {
+  it("tracks lastStatus when task status clears", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
@@ -36,27 +36,20 @@ describe("TestSession", () => {
     appendAssistant(sm, "Done.");
     session.context.setStatus("task", undefined);
 
-    assert.deepStrictEqual(session.entries(), [
-      user("Task AAA"),
-      status("current task: task-aaa"),
-      assistant("Done."),
-      status(),
-    ]);
+    assert.deepStrictEqual(session.entries(), [user("Task AAA"), assistant("Done.")]);
+    assert.strictEqual(session.lastStatus, undefined);
   });
 
-  it("suppresses duplicate consecutive task statuses and ignores non-task keys", () => {
+  it("ignores non-task status keys", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
     appendUser(sm, "main work");
     session.context.setStatus("other", "ignored");
     session.context.setStatus("task", "pending task: task-aaa");
-    session.context.setStatus("task", "pending task: task-aaa");
 
-    assert.deepStrictEqual(session.entries(), [
-      user("main work"),
-      status("pending task: task-aaa"),
-    ]);
+    assert.deepStrictEqual(session.entries(), [user("main work")]);
+    assert.strictEqual(session.lastStatus, "pending task: task-aaa");
   });
 
   it("normalizes ANSI styling in stored task statuses and notifications", () => {
@@ -66,7 +59,8 @@ describe("TestSession", () => {
     session.context.setStatus("task", session.context.theme.fg("dim", "pending task: task-aaa"));
     session.context.notify(session.context.theme.fg("warning", "warn once"), "warning");
 
-    assert.deepStrictEqual(session.entries(), [status("pending task: task-aaa")]);
+    assert.deepStrictEqual(session.entries(), []);
+    assert.strictEqual(session.lastStatus, "pending task: task-aaa");
     assert.strictEqual(session.lastNotification, "warn once");
   });
 

@@ -1,5 +1,3 @@
-import assert from "node:assert";
-
 import { describe, it } from "node:test";
 
 import {
@@ -7,7 +5,6 @@ import {
   assistant,
   responds,
   pushTask,
-  status,
   task,
   taskResult,
   user,
@@ -32,19 +29,15 @@ describe("automated workflow", () => {
       await h.prompt("/auto");
 
       h.assertSession(
-        status(),
         user("main work"),
         assistant("working on main..."),
         user("queue analyze"),
         assistant("", "toolUse"),
         task("Analyze performance."),
-        status("pending task: analyze-performance"),
-        status("[auto] pending task: analyze-performance"),
-        status("pending task: analyze-performance"),
-        status(),
         taskResult("analyze-performance", "Found 3 bottlenecks: ..."),
         assistant(""),
       );
+      h.assertStatus();
     } finally {
       h.dispose();
     }
@@ -69,13 +62,10 @@ describe("automated workflow", () => {
         user("queue quick-fix"),
         assistant("", "toolUse"),
         task("Quick fix.", true),
-        status("pending task: quick-fix"),
-        status("[auto] pending task: quick-fix"),
-        status("pending task: quick-fix"),
-        status(),
         taskResult("quick-fix", "Fixed the bug."),
         assistant(""),
       );
+      h.assertStatus();
     } finally {
       h.dispose();
     }
@@ -98,10 +88,8 @@ describe("automated workflow", () => {
         user("queue analyze"),
         assistant("", "toolUse"),
         task("Analyze performance."),
-        status("pending task: analyze-performance"),
-        status("[auto] pending task: analyze-performance"),
-        status("pending task: analyze-performance"),
       );
+      h.assertStatus("pending task: analyze-performance");
     } finally {
       h.dispose();
     }
@@ -112,7 +100,7 @@ describe("automated workflow", () => {
     try {
       await h.prompt("/auto");
       h.assertSession();
-      assert.strictEqual(h.lastNotification(), "No pending tasks to run.");
+      h.assertLastNotification("No pending tasks to run.");
     } finally {
       h.dispose();
     }
@@ -132,19 +120,15 @@ describe("automated workflow", () => {
       await h.prompt("/auto");
 
       h.assertSession(
-        status(),
         user("start"),
         assistant(""),
         user("queue first"),
         assistant("", "toolUse"),
         task("first task"),
-        status("pending task: first-task"),
-        status("[auto] pending task: first-task"),
-        status("pending task: first-task"),
-        status(),
         taskResult("first-task", "done"),
         assistant(""),
       );
+      h.assertStatus();
     } finally {
       h.dispose();
     }
@@ -168,12 +152,10 @@ describe("automated workflow", () => {
         user("queue implement"),
         assistant("", "toolUse"),
         task("Implement phase 1.", true),
-        status("pending task: implement-phase-1"),
-        status("[auto] pending task: implement-phase-1"),
         user("Implement phase 1."),
         assistant("Stopped by user.", "aborted"),
-        status("current task: implement-phase-1"),
       );
+      h.assertStatus("current task: implement-phase-1");
     } finally {
       h.dispose();
     }
@@ -196,19 +178,15 @@ describe("automated workflow", () => {
 
       // Current branch shows the parent task result
       h.assertSession(
-        status(),
         user("main work"),
         assistant("working..."),
         user("queue parent"),
         assistant("", "toolUse"),
         task("parent task"),
-        status("pending task: parent-task"),
-        status("[auto] pending task: parent-task"),
-        status("pending task: parent-task"),
-        status(),
         taskResult("parent-task"),
         assistant(""),
       );
+      h.assertStatus();
       // The subtask entries should be in the whole-session history
       h.assertSessionContains(
         user("subtask"),
@@ -241,13 +219,10 @@ describe("automated workflow", () => {
         user("queue quick-fix"),
         assistant("", "toolUse"),
         task("Quick fix.", true),
-        status("pending task: quick-fix"),
-        status("[auto] pending task: quick-fix"),
-        status("pending task: quick-fix"),
-        status(),
         taskResult("quick-fix", "adjusted response"),
         assistant(""),
       );
+      h.assertStatus();
     } finally {
       h.dispose();
     }
@@ -272,12 +247,10 @@ describe("automated workflow", () => {
         user("queue shutdown"),
         assistant("", "toolUse"),
         task("Shutdown task", true),
-        status("pending task: shutdown-task"),
-        status("[auto] pending task: shutdown-task"),
         user("Shutdown task"),
         assistant("working..."),
-        status("current task: shutdown-task"),
       );
+      h.assertStatus("current task: shutdown-task");
     } finally {
       h.dispose();
     }

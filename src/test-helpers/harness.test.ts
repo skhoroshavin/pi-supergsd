@@ -7,7 +7,6 @@ import {
   assistant,
   pushTask,
   responds,
-  status,
   task,
   thinks,
   user,
@@ -19,7 +18,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
   it("creates a real session and registers push-task through the extension", async (t) => {
     const h = await makeHarness(t);
     assert.ok(h.registeredToolNames().includes("push-task"));
-    assert.strictEqual(h.lastNotification(), undefined);
+    h.assertLastNotification(undefined);
   });
 
   it("uses MockLLM prompt rules for h.prompt()", async (t) => {
@@ -37,7 +36,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
     await h.prompt("/start-task");
 
     h.assertSession();
-    assert.strictEqual(h.lastNotification(), "No pending task. Use push-task first.");
+    h.assertLastNotification("No pending task. Use push-task first.");
   });
 
   it("supports thinking and aborted response descriptors", async (t) => {
@@ -57,16 +56,9 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.llm.onPrompt("delegate work", pushTask("subtask", true));
 
     await h.prompt("delegate work");
-    h.assertSession(
-      user("delegate work"),
-      assistant("", "toolUse"),
-      task("subtask", true),
-      status("pending task: subtask"),
-    );
-    assert.strictEqual(
-      h.lastNotification(),
-      "Task stored. Use `/start-task` or `/auto` to start it.",
-    );
+    h.assertSession(user("delegate work"), assistant("", "toolUse"), task("subtask", true));
+    h.assertStatus("pending task: subtask");
+    h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
   it("fails when the faux provider receives an unmatched prompt", async (t) => {
@@ -107,12 +99,9 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("Analyze X"),
       assistant("preparing subagent", "toolUse"),
       task("Detailed X analysis"),
-      status("pending task: detailed-x-analysis"),
     );
-    assert.strictEqual(
-      h.lastNotification(),
-      "Task stored. Use `/start-task` or `/auto` to start it.",
-    );
+    h.assertStatus("pending task: detailed-x-analysis");
+    h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
   it("assertSessionContains still scans durable whole-session entries across branches", async (t) => {
@@ -123,12 +112,8 @@ describe("AgentSession-backed TestHarness foundation", () => {
     await h.prompt("main work");
     await h.prompt("/start-task");
 
-    h.assertSession(
-      status(),
-      user("Task AAA"),
-      assistant("Done."),
-      status("current task: task-aaa"),
-    );
+    h.assertSession(user("Task AAA"), assistant("Done."));
+    h.assertStatus("current task: task-aaa");
     h.assertSessionContains(
       user("main work"),
       assistant("working...", "toolUse"),
@@ -153,10 +138,10 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("queue follow-up"),
       assistant("", "toolUse"),
       task("follow-up"),
-      status("pending task: follow-up"),
       user("answer follow-up"),
       assistant("queued response"),
     );
+    h.assertStatus("pending task: follow-up");
   });
 });
 

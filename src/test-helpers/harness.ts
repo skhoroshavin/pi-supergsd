@@ -114,8 +114,12 @@ export class TestHarness {
     this.session.dispose();
   }
 
-  lastNotification(): string | undefined {
-    return this.testSession.lastNotification;
+  assertStatus(expected?: string): void {
+    assert.strictEqual(this.testSession.lastStatus, expected);
+  }
+
+  assertLastNotification(expected: string | undefined): void {
+    assert.strictEqual(this.testSession.lastNotification, expected);
   }
 
   assertSession(...expected: TestSessionEntry[]): void {

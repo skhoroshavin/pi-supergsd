@@ -28,7 +28,6 @@ export class TestSession {
 
   #lastNotification: string | undefined;
   #lastStatus: string | undefined;
-  #statusEntries: TrackedStatusEntry[] = [];
 
   readonly context: ExtensionUIContext = {
     ...noOpContext,
@@ -38,20 +37,16 @@ export class TestSession {
     },
     setStatus: (key: string, value: string | undefined) => {
       if (key !== "task") return;
-
-      const nextStatus = value === undefined ? undefined : plainText(value);
-      if (nextStatus === this.#lastStatus) return;
-
-      this.#lastStatus = nextStatus;
-      this.#statusEntries.push({
-        anchorEntryId: this.sessionManager.getLeafId() ?? null,
-        entry: status(nextStatus),
-      });
+      this.#lastStatus = value === undefined ? undefined : plainText(value);
     },
   };
 
   entries(): SessionEntry[] {
-    return projectEntries(this.sessionManager.getBranch(), this.#statusEntries);
+    return projectEntries(this.sessionManager.getBranch());
+  }
+
+  get lastStatus(): string | undefined {
+    return this.#lastStatus;
   }
 
   get lastNotification(): string | undefined {
@@ -69,14 +64,13 @@ export function durableEntries(entries: PiSessionEntry[]): DurableSessionEntry[]
     .filter((entry): entry is DurableSessionEntry => entry !== null);
 }
 
-export type DurableSessionEntry = Exclude<SessionEntry, StatusEntry>;
+export type DurableSessionEntry = SessionEntry;
 
 export type SessionEntry =
   | ReturnType<typeof user>
   | ReturnType<typeof assistant>
   | ReturnType<typeof task>
-  | ReturnType<typeof taskResult>
-  | StatusEntry;
+  | ReturnType<typeof taskResult>;
 
 // ---------------------------------------------------------------------------
 // Descriptor constructors
@@ -112,48 +106,19 @@ export const taskResult = (slug: string, content?: string) => ({
   ...(content !== undefined ? { content: [textBlock(content)] } : {}),
 });
 
-export type StatusEntry = { type: "status"; text?: string };
-
-export const status = (text?: string): StatusEntry =>
-  text === undefined ? { type: "status" } : { type: "status", text };
-
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-type TrackedStatusEntry = {
-  anchorEntryId: string | null;
-  entry: StatusEntry;
-};
-
-function projectEntries(
-  branch: PiSessionEntry[],
-  trackedStatuses: readonly TrackedStatusEntry[],
-): SessionEntry[] {
+function projectEntries(branch: PiSessionEntry[]): SessionEntry[] {
   const result: SessionEntry[] = [];
 
   for (const branchEntry of branch) {
     const durable = toDurableEntry(branchEntry);
     if (durable !== null) result.push(durable);
-
-    for (const tracked of trackedStatuses) {
-      if (tracked.anchorEntryId !== branchEntry.id) continue;
-      if (sameStatus(result.at(-1), tracked.entry)) continue;
-      result.push(tracked.entry);
-    }
-  }
-
-  for (const tracked of trackedStatuses) {
-    if (tracked.anchorEntryId !== null) continue;
-    if (sameStatus(result.at(-1), tracked.entry)) continue;
-    result.unshift(tracked.entry);
   }
 
   return result;
-}
-
-function sameStatus(left: SessionEntry | undefined, right: StatusEntry): boolean {
-  return left?.type === "status" && left.text === right.text;
 }
 
 function plainText(value: string): string {
