@@ -1,15 +1,6 @@
 import assert from "node:assert";
 
-import {
-  assistant,
-  node,
-  notification,
-  responds,
-  pushTask,
-  task,
-  taskResult,
-  user,
-} from "./test-helpers/index.js";
+import { assistant, node, notification, responds, pushTask, task, taskResult, user } from "./test-helpers/index.js";
 
 import { describe } from "node:test";
 
@@ -41,9 +32,7 @@ describe("manual workflow", () => {
           user("main work"),
           assistant("working...", "toolUse"),
           task("Task AAA"),
-          notification(
-            "Task stored. Use `/start-task` or `/auto` to start it.",
-          ),
+          notification("Task stored. Use `/start-task` or `/auto` to start it."),
           notification("Task discarded."),
         );
       }),
@@ -59,9 +48,7 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA"),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
             notification("Task finished. Last response attached."),
             taskResult("task-aaa", "Done."),
             assistant("Great!"),
@@ -74,9 +61,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
@@ -90,9 +75,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
@@ -106,9 +89,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
@@ -122,9 +103,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
@@ -139,9 +118,7 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA"),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
             notification("Task aborted. Branch abandoned without summary."),
           );
         }).children(
@@ -157,9 +134,7 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task aborted. Branch abandoned without summary."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-aaa", "Done."),
@@ -169,11 +144,7 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB", async (h) => {
-          h.llm.onPrompt(
-            "some more work",
-            responds("okay"),
-            pushTask("Task BBB"),
-          );
+          h.llm.onPrompt("some more work", responds("okay"), pushTask("Task BBB"));
           await h.prompt("some more work");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertSession(
@@ -182,9 +153,7 @@ describe("manual workflow", () => {
             user("some more work"),
             assistant("okay", "toolUse"),
             task("Task BBB"),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
           );
         }).children(
           node("discard BBB", async (h) => {
@@ -196,9 +165,7 @@ describe("manual workflow", () => {
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB"),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task discarded."),
             );
           }).children(
@@ -209,9 +176,7 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-aaa", "okay"),
                 assistant("Great!"),
@@ -232,9 +197,7 @@ describe("manual workflow", () => {
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
@@ -247,9 +210,7 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  notification(
-                    "Task stored. Use `/start-task` or `/auto` to start it.",
-                  ),
+                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
                   notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
@@ -265,9 +226,7 @@ describe("manual workflow", () => {
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task aborted. Branch abandoned without summary."),
               );
             }).children(
@@ -278,9 +237,7 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  notification(
-                    "Task stored. Use `/start-task` or `/auto` to start it.",
-                  ),
+                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
                   notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
@@ -290,11 +247,7 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB [inherit]", async (h) => {
-          h.llm.onPrompt(
-            "some more work",
-            responds("okay"),
-            pushTask("Task BBB", true),
-          );
+          h.llm.onPrompt("some more work", responds("okay"), pushTask("Task BBB", true));
           await h.prompt("some more work");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertSession(
@@ -303,9 +256,7 @@ describe("manual workflow", () => {
             user("some more work"),
             assistant("okay", "toolUse"),
             task("Task BBB", true),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
           );
         }).children(
           node("discard BBB [inherit]", async (h) => {
@@ -317,9 +268,7 @@ describe("manual workflow", () => {
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task discarded."),
             );
           }).children(
@@ -330,9 +279,7 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-aaa", "okay"),
                 assistant("Great!"),
@@ -348,9 +295,7 @@ describe("manual workflow", () => {
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               user("Task BBB"),
               assistant("inner done"),
             );
@@ -364,9 +309,7 @@ describe("manual workflow", () => {
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
@@ -379,9 +322,7 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  notification(
-                    "Task stored. Use `/start-task` or `/auto` to start it.",
-                  ),
+                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
                   notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
@@ -397,9 +338,7 @@ describe("manual workflow", () => {
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task aborted. Branch abandoned without summary."),
               );
             }).children(
@@ -410,9 +349,7 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  notification(
-                    "Task stored. Use `/start-task` or `/auto` to start it.",
-                  ),
+                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
                   notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
@@ -428,11 +365,7 @@ describe("manual workflow", () => {
   // ── Inherit tree ───────────────────────────────────────────────────
 
   node("push AAA [inherit]", async (h) => {
-    h.llm.onPrompt(
-      "main work",
-      responds("working..."),
-      pushTask("Task AAA", true),
-    );
+    h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA", true));
     h.llm.onPrompt("Task AAA", responds("Done."));
     h.llm.onPrompt("Done.", responds("Great!"));
     h.llm.onPrompt("Great!", responds("Great!"));
@@ -456,9 +389,7 @@ describe("manual workflow", () => {
           user("main work"),
           assistant("working...", "toolUse"),
           task("Task AAA", true),
-          notification(
-            "Task stored. Use `/start-task` or `/auto` to start it.",
-          ),
+          notification("Task stored. Use `/start-task` or `/auto` to start it."),
           notification("Task discarded."),
         );
       }),
@@ -469,9 +400,7 @@ describe("manual workflow", () => {
           user("main work"),
           assistant("working...", "toolUse"),
           task("Task AAA", true),
-          notification(
-            "Task stored. Use `/start-task` or `/auto` to start it.",
-          ),
+          notification("Task stored. Use `/start-task` or `/auto` to start it."),
           user("Task AAA"),
           assistant("Done."),
         );
@@ -483,9 +412,7 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA", true),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
             notification("Task finished. Last response attached."),
             taskResult("task-aaa", "Done."),
             assistant("Great!"),
@@ -498,9 +425,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
@@ -514,9 +439,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
@@ -530,9 +453,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
@@ -546,9 +467,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
@@ -563,9 +482,7 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA", true),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
             notification("Task aborted. Branch abandoned without summary."),
           );
         }).children(
@@ -576,9 +493,7 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task aborted. Branch abandoned without summary."),
               user("Task AAA"),
               assistant("Done."),
@@ -591,9 +506,7 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task aborted. Branch abandoned without summary."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-aaa", "Done."),
@@ -603,28 +516,20 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB", async (h) => {
-          h.llm.onPrompt(
-            "some more work",
-            responds("okay"),
-            pushTask("Task BBB"),
-          );
+          h.llm.onPrompt("some more work", responds("okay"), pushTask("Task BBB"));
           await h.prompt("some more work");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertSession(
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA", true),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
             user("Task AAA"),
             assistant("Done."),
             user("some more work"),
             assistant("okay", "toolUse"),
             task("Task BBB"),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
           );
         }).children(
           node("discard BBB", async (h) => {
@@ -634,17 +539,13 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB"),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task discarded."),
             );
           }).children(
@@ -655,9 +556,7 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-aaa", "okay"),
                 assistant("Great!"),
@@ -676,17 +575,13 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
@@ -699,9 +594,7 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  notification(
-                    "Task stored. Use `/start-task` or `/auto` to start it.",
-                  ),
+                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
                   notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
@@ -715,17 +608,13 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task aborted. Branch abandoned without summary."),
               );
             }).children(
@@ -736,9 +625,7 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  notification(
-                    "Task stored. Use `/start-task` or `/auto` to start it.",
-                  ),
+                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
                   notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
@@ -748,28 +635,20 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB [inherit]", async (h) => {
-          h.llm.onPrompt(
-            "some more work",
-            responds("okay"),
-            pushTask("Task BBB", true),
-          );
+          h.llm.onPrompt("some more work", responds("okay"), pushTask("Task BBB", true));
           await h.prompt("some more work");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertSession(
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA", true),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
             user("Task AAA"),
             assistant("Done."),
             user("some more work"),
             assistant("okay", "toolUse"),
             task("Task BBB", true),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
           );
         }).children(
           node("discard BBB [inherit]", async (h) => {
@@ -779,17 +658,13 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task discarded."),
             );
           }).children(
@@ -800,9 +675,7 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-aaa", "okay"),
                 assistant("Great!"),
@@ -816,17 +689,13 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB", true),
-              notification(
-                "Task stored. Use `/start-task` or `/auto` to start it.",
-              ),
+              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               user("Task BBB"),
               assistant("inner done"),
             );
@@ -838,17 +707,13 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task finished. Last response attached."),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
@@ -861,9 +726,7 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  notification(
-                    "Task stored. Use `/start-task` or `/auto` to start it.",
-                  ),
+                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
                   notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
@@ -877,17 +740,13 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                notification(
-                  "Task stored. Use `/start-task` or `/auto` to start it.",
-                ),
+                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task aborted. Branch abandoned without summary."),
               );
             }).children(
@@ -898,9 +757,7 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  notification(
-                    "Task stored. Use `/start-task` or `/auto` to start it.",
-                  ),
+                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
                   notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
@@ -920,11 +777,7 @@ describe("manual workflow", () => {
     await h.prompt("main work");
     await h.prompt("/start-task");
     assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(
-      user("main work"),
-      assistant("working..."),
-      notification("No pending task. Use push-task first."),
-    );
+    h.assertSession(user("main work"), assistant("working..."), notification("No pending task. Use push-task first."));
   }).run();
 
   node("discard [no task]", async (h) => {
@@ -932,11 +785,7 @@ describe("manual workflow", () => {
     await h.prompt("main work");
     await h.prompt("/discard-task");
     assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(
-      user("main work"),
-      assistant("working..."),
-      notification("No pending task to discard."),
-    );
+    h.assertSession(user("main work"), assistant("working..."), notification("No pending task to discard."));
   }).run();
 
   node("finish [no task]", async (h) => {
@@ -944,11 +793,7 @@ describe("manual workflow", () => {
     await h.prompt("main work");
     await h.prompt("/finish-task");
     assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(
-      user("main work"),
-      assistant("working..."),
-      notification("Not inside task, nothing to finish."),
-    );
+    h.assertSession(user("main work"), assistant("working..."), notification("Not inside task, nothing to finish."));
   }).run();
 
   node("abort [no task]", async (h) => {
@@ -956,10 +801,6 @@ describe("manual workflow", () => {
     await h.prompt("main work");
     await h.prompt("/abort-task");
     assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(
-      user("main work"),
-      assistant("working..."),
-      notification("Not inside task, nothing to abort."),
-    );
+    h.assertSession(user("main work"), assistant("working..."), notification("Not inside task, nothing to abort."));
   }).run();
 });

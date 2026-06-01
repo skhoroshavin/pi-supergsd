@@ -62,8 +62,7 @@ export class TestHarness {
             api: FAUX_MODEL.api,
             baseUrl: FAUX_MODEL.baseUrl,
             apiKey: "test-key",
-            streamSimple: (model, context, options) =>
-              fauxProvider.stream(model, context, options),
+            streamSimple: (model, context, options) => fauxProvider.stream(model, context, options),
             models: [
               {
                 id: FAUX_MODEL.id,
@@ -99,14 +98,7 @@ export class TestHarness {
     });
 
     const testSession = new TestSession(sessionManager);
-    const harness = new TestHarness(
-      llm,
-      user,
-      session,
-      sessionManager,
-      testSession,
-      fauxProvider,
-    );
+    const harness = new TestHarness(llm, user, session, sessionManager, testSession, fauxProvider);
     await session.bindExtensions({
       uiContext: harness.testSession.context,
       commandContextActions: harness.commandContextActions(),
@@ -163,10 +155,7 @@ export class TestHarness {
       waitForIdle: async () => {
         await this.scanAndReactLoop();
       },
-      navigateTree: async (
-        targetId: string,
-        options?: Parameters<AgentSession["navigateTree"]>[1],
-      ) => {
+      navigateTree: async (targetId: string, options?: Parameters<AgentSession["navigateTree"]>[1]) => {
         if (this.cancelNextNav) {
           this.cancelNextNav = false;
           return { cancelled: true };
@@ -233,9 +222,7 @@ export class TestHarness {
   }
 
   async prompt(text: string): Promise<void> {
-    const knownEntryIds = new Set(
-      this.sessionManager.getEntries().map((entry) => entry.id),
-    );
+    const knownEntryIds = new Set(this.sessionManager.getEntries().map((entry) => entry.id));
 
     await this.session.prompt(text, {
       expandPromptTemplates: true,
@@ -248,20 +235,11 @@ export class TestHarness {
   private throwIfNewAssistantError(knownEntryIds: ReadonlySet<string>): void {
     const assistantError = this.sessionManager.getEntries().find((entry) => {
       if (knownEntryIds.has(entry.id)) return false;
-      return (
-        entry.type === "message" &&
-        entry.message.role === "assistant" &&
-        entry.message.stopReason === "error"
-      );
+      return entry.type === "message" && entry.message.role === "assistant" && entry.message.stopReason === "error";
     });
 
-    if (
-      assistantError?.type === "message" &&
-      assistantError.message.role === "assistant"
-    ) {
-      throw new Error(
-        assistantError.message.errorMessage ?? "Assistant turn failed.",
-      );
+    if (assistantError?.type === "message" && assistantError.message.role === "assistant") {
+      throw new Error(assistantError.message.errorMessage ?? "Assistant turn failed.");
     }
   }
 }

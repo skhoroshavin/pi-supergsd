@@ -26,10 +26,7 @@ describe("automated workflow", () => {
   it("completes push-task -> /auto -> finish-task and injects the branch result", async () => {
     const h = await TestHarness.create();
     h.llm.onPrompt("main work", responds("working on main..."));
-    h.llm.onPrompt(
-      "Analyze performance.",
-      responds("Found 3 bottlenecks: ..."),
-    );
+    h.llm.onPrompt("Analyze performance.", responds("Found 3 bottlenecks: ..."));
     h.llm.onPrompt("Found 3 bottlenecks: ...", responds(""));
     h.llm.onPrompt("working on main...", responds(""));
     h.llm.onPrompt("queue analyze", pushTask("Analyze performance."));
@@ -40,9 +37,7 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertTaskStatusHistoryIncludes(
-        "[auto] pending task: analyze-performance",
-      );
+      h.assertTaskStatusHistoryIncludes("[auto] pending task: analyze-performance");
       h.assertSession(
         user("main work"),
         assistant("working on main..."),
@@ -137,8 +132,7 @@ describe("automated workflow", () => {
       sendUserMessage() {},
       sendMessage() {},
       on(eventName: string, handler: () => unknown) {
-        if (eventName === "session_shutdown")
-          sessionShutdownHandlers.push(handler);
+        if (eventName === "session_shutdown") sessionShutdownHandlers.push(handler);
       },
     } satisfies Parameters<typeof cmdAuto>[0];
 
@@ -250,11 +244,7 @@ describe("automated workflow", () => {
     const h = await TestHarness.create();
     h.llm.onPrompt("main work", responds("working..."));
     h.llm.onPrompt("", responds(""));
-    h.llm.onPrompt(
-      "parent task",
-      responds("working on parent..."),
-      pushTask("subtask"),
-    );
+    h.llm.onPrompt("parent task", responds("working on parent..."), pushTask("subtask"));
     h.llm.onPrompt("subtask", responds("sub done"));
     h.llm.onPrompt("sub done", responds(""));
     h.llm.onPrompt("working on parent...", responds(""));
@@ -278,11 +268,7 @@ describe("automated workflow", () => {
         assistant(""),
       );
       // The subtask entries should be in the whole-session history
-      h.assertSessionContains(
-        user("subtask"),
-        assistant("sub done"),
-        taskResult("subtask", "sub done"),
-      );
+      h.assertSessionContains(user("subtask"), assistant("sub done"), taskResult("subtask", "sub done"));
     } finally {
       h.dispose();
     }

@@ -2,10 +2,7 @@ export function renderTextContent(content: unknown): string {
   return extractTextContent(content) ?? String(content ?? "");
 }
 
-export function extractTextContent(
-  content: unknown,
-  separator = "\n",
-): string | null {
+export function extractTextContent(content: unknown, separator = "\n"): string | null {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return null;
   return extractTextBlocks(content)
@@ -18,9 +15,7 @@ export function firstTextContent(content: unknown): string | undefined {
   return extractTextBlocks(content)[0]?.text;
 }
 
-export function taskResultTextContent(
-  content: unknown,
-): TextContent | undefined {
+export function taskResultTextContent(content: unknown): TextContent | undefined {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return undefined;
   return extractTextBlocks(content);
@@ -34,9 +29,7 @@ export function extractTextBlocks(content: unknown): TextBlock[] {
 }
 
 export function isTextBlock(value: unknown): value is TextBlock {
-  return (
-    isRecord(value) && value.type === "text" && typeof value.text === "string"
-  );
+  return isRecord(value) && value.type === "text" && typeof value.text === "string";
 }
 
 export type TextBlock = {

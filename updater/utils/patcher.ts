@@ -29,9 +29,7 @@ export function applyPatches(content: string, patches: Patch[]): PatchResult {
       }
     } else if (patch.op === "delete-block") {
       const lines = result.split("\n");
-      const startIdx = lines.findIndex((line) =>
-        line.includes(patch.findStart),
-      );
+      const startIdx = lines.findIndex((line) => line.includes(patch.findStart));
       const endIdx = lines.findIndex((line) => line.includes(patch.findEnd));
       if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) {
         unmatched.push(patch);
@@ -40,8 +38,7 @@ export function applyPatches(content: string, patches: Patch[]): PatchResult {
         result = lines.join("\n");
       }
     } else if (patch.op === "prepend" || patch.op === "append") {
-      result =
-        patch.op === "prepend" ? patch.text + result : result + patch.text;
+      result = patch.op === "prepend" ? patch.text + result : result + patch.text;
     } else {
       throw new Error(`Invalid patch operation: ${JSON.stringify(patch)}`);
     }

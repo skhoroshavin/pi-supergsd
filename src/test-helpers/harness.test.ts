@@ -48,10 +48,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.assertSession(user("think"), assistant(""));
 
     await h.prompt("stop");
-    h.assertSessionContains(
-      user("stop"),
-      assistant("Stopped by user.", "aborted"),
-    );
+    h.assertSessionContains(user("stop"), assistant("Stopped by user.", "aborted"));
   });
 
   it("calls the real push-task tool from a faux provider tool call", async (t) => {
@@ -80,10 +77,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.llm.onPrompt("queue AAA", pushTask("Task AAA"));
 
     await h.prompt("queue AAA");
-    await assert.rejects(
-      async () => h.prompt("/start-task"),
-      /No MockLLM rule matched provider prompt: Task AAA/,
-    );
+    await assert.rejects(async () => h.prompt("/start-task"), /No MockLLM rule matched provider prompt: Task AAA/);
   });
 
   it("treats empty prompt rules as exact matches", async (t) => {
@@ -98,11 +92,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
   it("builds one assistant turn from multiple prompt descriptors", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt(
-      "Analyze X",
-      responds("preparing subagent"),
-      pushTask("Detailed X analysis"),
-    );
+    h.llm.onPrompt("Analyze X", responds("preparing subagent"), pushTask("Detailed X analysis"));
 
     await h.prompt("Analyze X");
     h.assertSession(
@@ -122,11 +112,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
     await h.prompt("/start-task");
 
     h.assertSession(user("Task AAA"), assistant("Done."));
-    h.assertSessionContains(
-      user("main work"),
-      assistant("working...", "toolUse"),
-      task("Task AAA"),
-    );
+    h.assertSessionContains(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
   });
 
   it("fires assistant and queued-task user actions once per new entry", async (t) => {

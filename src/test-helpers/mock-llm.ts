@@ -12,9 +12,7 @@ export class MockLLM {
     });
 
     if (!matched) {
-      throw new Error(
-        `No MockLLM rule matched provider prompt: ${text || "<empty prompt>"}`,
-      );
+      throw new Error(`No MockLLM rule matched provider prompt: ${text || "<empty prompt>"}`);
     }
 
     return [...matched.responses];

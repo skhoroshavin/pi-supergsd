@@ -22,26 +22,14 @@ export default function register(pi: ExtensionAPI): void {
   pi.registerMessageRenderer("task-result", rendererTaskResult);
 
   pi.on("session_start", async (_event, ctx) => {
-    updateTaskStatus(
-      ctx.sessionManager,
-      ctx.ui.setStatus.bind(ctx.ui),
-      ctx.ui.theme,
-    );
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
   });
 
   pi.on("turn_end", async (_event, ctx) => {
-    updateTaskStatus(
-      ctx.sessionManager,
-      ctx.ui.setStatus.bind(ctx.ui),
-      ctx.ui.theme,
-    );
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
   });
 
   pi.on("session_tree", async (_event, ctx) => {
-    updateTaskStatus(
-      ctx.sessionManager,
-      ctx.ui.setStatus.bind(ctx.ui),
-      ctx.ui.theme,
-    );
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
   });
 }

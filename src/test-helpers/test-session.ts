@@ -12,9 +12,7 @@ import { extractTextContent, type TextBlock } from "../text-content.js";
 // Compatibility utility
 // ---------------------------------------------------------------------------
 
-export function assumeCommandContext<T extends object>(
-  value: T,
-): ExtensionCommandContext & T {
+export function assumeCommandContext<T extends object>(value: T): ExtensionCommandContext & T {
   return value as unknown as ExtensionCommandContext & T;
 }
 
@@ -22,12 +20,8 @@ export function assumeCommandContext<T extends object>(
 // Durable-entry projection helper
 // ---------------------------------------------------------------------------
 
-export function durableEntries(
-  entries: PiSessionEntry[],
-): DurableSessionEntry[] {
-  return entries
-    .map(toDurableEntry)
-    .filter((entry): entry is DurableSessionEntry => entry !== null);
+export function durableEntries(entries: PiSessionEntry[]): DurableSessionEntry[] {
+  return entries.map(toDurableEntry).filter((entry): entry is DurableSessionEntry => entry !== null);
 }
 
 export type DurableSessionEntry = Exclude<SessionEntry, NotificationEntry>;
@@ -170,10 +164,7 @@ function toDurableEntry(entry: PiSessionEntry): DurableSessionEntry | null {
         return user(textContent(entry.message.content));
       }
       if (entry.message.role === "assistant") {
-        return assistant(
-          textContent(entry.message.content),
-          visibleStopReason(entry.message.stopReason),
-        );
+        return assistant(textContent(entry.message.content), visibleStopReason(entry.message.stopReason));
       }
       return null;
     case "custom":
@@ -184,10 +175,7 @@ function toDurableEntry(entry: PiSessionEntry): DurableSessionEntry | null {
       if (entry.customType !== "task-result" || !hasSlug(entry.details)) {
         return null;
       }
-      return taskResult(
-        entry.details.slug,
-        textContent(entry.content) || undefined,
-      );
+      return taskResult(entry.details.slug, textContent(entry.content) || undefined);
     default:
       return null;
   }
@@ -198,19 +186,11 @@ function textContent(content: unknown): string {
 }
 
 function visibleStopReason(stopReason: unknown): string | undefined {
-  return typeof stopReason === "string" && stopReason !== "stop"
-    ? stopReason
-    : undefined;
+  return typeof stopReason === "string" && stopReason !== "stop" ? stopReason : undefined;
 }
 
-function isTaskData(
-  value: unknown,
-): value is { prompt: string; inherit_context: boolean } {
-  return (
-    isRecord(value) &&
-    typeof value.prompt === "string" &&
-    typeof value.inherit_context === "boolean"
-  );
+function isTaskData(value: unknown): value is { prompt: string; inherit_context: boolean } {
+  return isRecord(value) && typeof value.prompt === "string" && typeof value.inherit_context === "boolean";
 }
 
 function hasSlug(value: unknown): value is { slug: string } {

@@ -4,14 +4,7 @@ import { describe, it } from "node:test";
 
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 
-import {
-  TestSession,
-  assistant,
-  assumeCommandContext,
-  notification,
-  task,
-  user,
-} from "./index.js";
+import { TestSession, assistant, assumeCommandContext, notification, task, user } from "./index.js";
 
 describe("TestSession", () => {
   it("places a notification immediately after its visible anchor", () => {
@@ -23,9 +16,7 @@ describe("TestSession", () => {
       prompt: "Task AAA",
       inherit_context: false,
     });
-    session.context.notify(
-      "Task stored. Use `/start-task` or `/auto` to start it.",
-    );
+    session.context.notify("Task stored. Use `/start-task` or `/auto` to start it.");
 
     assert.deepStrictEqual(session.entries(), [
       user("main work"),
@@ -60,11 +51,7 @@ describe("TestSession", () => {
     session.context.notify("first");
     session.context.notify("second");
 
-    assert.deepStrictEqual(session.entries(), [
-      user("main work"),
-      notification("first"),
-      notification("second"),
-    ]);
+    assert.deepStrictEqual(session.entries(), [user("main work"), notification("first"), notification("second")]);
   });
 
   it("omits notifications anchored to entries outside the current branch", () => {
@@ -78,10 +65,7 @@ describe("TestSession", () => {
     sm.branch(rootId);
     appendAssistant(sm, "branch B");
 
-    assert.deepStrictEqual(session.entries(), [
-      user("main work"),
-      assistant("branch B"),
-    ]);
+    assert.deepStrictEqual(session.entries(), [user("main work"), assistant("branch B")]);
   });
 
   it("prepends null-anchor notifications before branch content", () => {
@@ -91,10 +75,7 @@ describe("TestSession", () => {
     session.context.notify("bootstrap");
     appendUser(sm, "main work");
 
-    assert.deepStrictEqual(session.entries(), [
-      notification("bootstrap"),
-      user("main work"),
-    ]);
+    assert.deepStrictEqual(session.entries(), [notification("bootstrap"), user("main work")]);
   });
 
   it("accepts notification levels without exposing them in visible assertions", () => {
@@ -104,10 +85,7 @@ describe("TestSession", () => {
     appendUser(sm, "main work");
     session.context.notify("warn once", "warning");
 
-    assert.deepStrictEqual(session.entries(), [
-      user("main work"),
-      notification("warn once"),
-    ]);
+    assert.deepStrictEqual(session.entries(), [user("main work"), notification("warn once")]);
   });
 
   it("keeps assumeCommandContext available from the new module", () => {

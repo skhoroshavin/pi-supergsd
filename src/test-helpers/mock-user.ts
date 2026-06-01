@@ -11,24 +11,17 @@ export class MockUser {
   }
 
   matchAssistant(text: string): MockUserAction[] {
-    const matched = this.assistantRules.find((rule) =>
-      text.includes(rule.text),
-    );
+    const matched = this.assistantRules.find((rule) => text.includes(rule.text));
     return matched ? [...matched.actions] : [];
   }
 
   matchQueuedTask(prompt: string): MockUserAction[] {
-    const matched = this.queuedTaskRules.find((rule) =>
-      prompt.includes(rule.prompt),
-    );
+    const matched = this.queuedTaskRules.find((rule) => prompt.includes(rule.prompt));
     return matched ? [...matched.actions] : [];
   }
 }
 
-export type MockUserAction =
-  | ReturnType<typeof userEsc>
-  | ReturnType<typeof userCtrlC>
-  | ReturnType<typeof userPrompts>;
+export type MockUserAction = ReturnType<typeof userEsc> | ReturnType<typeof userCtrlC> | ReturnType<typeof userPrompts>;
 
 export const userEsc = () => ({ type: "user-esc" as const });
 

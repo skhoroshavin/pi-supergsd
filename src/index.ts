@@ -16,19 +16,14 @@ import { Type, type Static } from "typebox";
 
 import { makeSlug } from "./slug.js";
 
-import {
-  firstTextContent,
-  renderTextContent,
-  taskResultTextContent,
-} from "./text-content.js";
+import { firstTextContent, renderTextContent, taskResultTextContent } from "./text-content.js";
 
 export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
   return defineTool({
     name: "push-task",
     label: "Push Task",
     description: "Store a task prompt for a user-started navigation branch.",
-    promptSnippet:
-      "Store a focused task prompt for a user-started navigation branch.",
+    promptSnippet: "Store a focused task prompt for a user-started navigation branch.",
     promptGuidelines: [
       "Use push-task to hand off a self-contained task for isolated execution.",
       "Do not batch multiple push-task calls together, and do not mix push-task with other tool calls in the same turn.",
@@ -41,19 +36,12 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
 
       const promptLines = args.prompt.split("\n");
       const maxLines = context.expanded ? promptLines.length : 7;
-      const displayLines = promptLines
-        .slice(0, maxLines)
-        .map((l) => theme.fg("dim", l.trimEnd() || " "));
+      const displayLines = promptLines.slice(0, maxLines).map((l) => theme.fg("dim", l.trimEnd() || " "));
 
       if (!context.expanded && promptLines.length > maxLines) {
         const totalLines = promptLines.length;
         const moreLines = totalLines - maxLines;
-        displayLines.push(
-          theme.fg(
-            "muted",
-            `... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`,
-          ),
-        );
+        displayLines.push(theme.fg("muted", `... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`));
       }
 
       return new Text([header, ...displayLines].join("\n"), 0, 0);
@@ -73,10 +61,7 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
 
       if (ctx.hasUI) {
         refreshTaskStatus(ctx);
-        ctx.ui.notify(
-          "Task stored. Use `/start-task` or `/auto` to start it.",
-          "info",
-        );
+        ctx.ui.notify("Task stored. Use `/start-task` or `/auto` to start it.", "info");
       }
 
       return {
@@ -93,8 +78,7 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
 
 export function cmdStartTask(pi: TaskCommandAPI): CommandOptions {
   return {
-    description:
-      "Navigate to a fresh context and inject the active task prompt",
+    description: "Navigate to a fresh context and inject the active task prompt",
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
       await startTask(pi, ctx);
@@ -211,11 +195,7 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
   };
 }
 
-export const rendererTaskResult: MessageRenderer<{ slug?: string }> = (
-  message,
-  _options,
-  theme,
-): Box => {
+export const rendererTaskResult: MessageRenderer<{ slug?: string }> = (message, _options, theme): Box => {
   const label = message.details?.slug
     ? theme.fg("customMessageLabel", `${message.details.slug} result:`)
     : theme.fg("customMessageLabel", "result:");
@@ -274,11 +254,7 @@ type TaskActionOptions = {
 function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
   const branch = session.getBranch();
   const last = branch[branch.length - 1];
-  return (
-    last?.type === "message" &&
-    last.message.role === "assistant" &&
-    last.message.stopReason === "aborted"
-  );
+  return last?.type === "message" && last.message.role === "assistant" && last.message.stopReason === "aborted";
 }
 
 async function startTask(
@@ -348,13 +324,8 @@ async function finishTask(
   // Capture last assistant message content before navigation. Only text blocks
   // are valid for custom_message content; provider-specific thinking/tool blocks
   // must not be replayed into the parent branch.
-  const lastAssistant = findLastEntry(
-    ctx.sessionManager,
-    isAssistantMessageEntry,
-  );
-  const lastAssistantContent = lastAssistant
-    ? taskResultTextContent(lastAssistant.message.content)
-    : undefined;
+  const lastAssistant = findLastEntry(ctx.sessionManager, isAssistantMessageEntry);
+  const lastAssistantContent = lastAssistant ? taskResultTextContent(lastAssistant.message.content) : undefined;
   const lastAssistantId = lastAssistant?.id;
 
   // Find the task prompt on the current branch for the slug label
@@ -384,23 +355,15 @@ async function finishTask(
     pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
   }
 
-  const label = lastAssistantId
-    ? "Last response attached."
-    : "No last response to attach.";
+  const label = lastAssistantId ? "Last response attached." : "No last response to attach.";
   ctx.ui.notify(`Task finished. ${label}`, "info");
 
   refreshTaskStatus(ctx, { prefix: options.statusPrefix });
 }
 
-type TaskCommandAPI = Pick<
-  ExtensionAPI,
-  "appendEntry" | "sendMessage" | "sendUserMessage"
->;
+type TaskCommandAPI = Pick<ExtensionAPI, "appendEntry" | "sendMessage" | "sendUserMessage">;
 
-async function abortTask(
-  ctx: ExtensionCommandContext,
-  options: TaskActionOptions = {},
-): Promise<TaskActionResult> {
+async function abortTask(ctx: ExtensionCommandContext, options: TaskActionOptions = {}): Promise<TaskActionResult> {
   const taskStart = currentTask(ctx.sessionManager);
   if (!taskStart) {
     ctx.ui.notify("Not inside task, nothing to abort.", "warning");
@@ -419,24 +382,13 @@ async function abortTask(
 
 type TaskActionResult = "cancelled" | void;
 
-function refreshTaskStatus(
-  ctx: TaskStatusContext,
-  options: TaskStatusOptions = {},
-): void {
+function refreshTaskStatus(ctx: TaskStatusContext, options: TaskStatusOptions = {}): void {
   if (ctx.hasUI) {
-    updateTaskStatus(
-      ctx.sessionManager,
-      ctx.ui.setStatus.bind(ctx.ui),
-      ctx.ui.theme,
-      options,
-    );
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme, options);
   }
 }
 
-type TaskStatusContext = Pick<
-  ExtensionCommandContext,
-  "hasUI" | "sessionManager" | "ui"
->;
+type TaskStatusContext = Pick<ExtensionCommandContext, "hasUI" | "sessionManager" | "ui">;
 
 /** Type guard: is the entry an assistant message with content? */
 function isAssistantMessageEntry(
@@ -474,9 +426,7 @@ function findFreshTargetId(session: ReadonlySessionLike): string | null {
  * Returns null if the branch has no model-visible entries (e.g., only non-visible setup
  * entries) or if there is no leaf.
  */
-function findPreConversationEntry(
-  session: ReadonlySessionLike,
-): SessionEntry | null {
+function findPreConversationEntry(session: ReadonlySessionLike): SessionEntry | null {
   const leafId = session.getLeafId();
   if (!leafId) return null;
 
@@ -504,8 +454,7 @@ function findTaskPrompt(session: ReadonlySessionLike): string | undefined {
 
   const startIdx = findLastEntryIndex(
     session,
-    (entry) =>
-      entry.type === "custom" && entry.customType === TASK_START_ENTRY_TYPE,
+    (entry) => entry.type === "custom" && entry.customType === TASK_START_ENTRY_TYPE,
   );
   if (startIdx === -1) return undefined;
 
@@ -519,10 +468,7 @@ function findTaskPrompt(session: ReadonlySessionLike): string | undefined {
   return undefined;
 }
 
-function findLastEntryIndex(
-  session: ReadonlySessionLike,
-  predicate: (entry: SessionEntry) => boolean,
-): number {
+function findLastEntryIndex(session: ReadonlySessionLike, predicate: (entry: SessionEntry) => boolean): number {
   const branch = session.getBranch();
   for (let i = branch.length - 1; i >= 0; i--) {
     if (predicate(branch[i])) return i;
@@ -591,11 +537,7 @@ type TaskEntry = CustomEntry<typeof TASK_ENTRY_TYPE, TaskData>;
 const TASK_ENTRY_TYPE = "task";
 
 function isTaskData(value: unknown): value is TaskData {
-  return (
-    isRecord(value) &&
-    typeof value.prompt === "string" &&
-    typeof value.inherit_context === "boolean"
-  );
+  return isRecord(value) && typeof value.prompt === "string" && typeof value.inherit_context === "boolean";
 }
 
 interface TaskData {
@@ -616,11 +558,7 @@ function isCustomEntry<TCustomType extends string, TData>(
   customType: TCustomType,
   isData: (value: unknown) => value is TData,
 ): entry is CustomEntry<TCustomType, TData> {
-  return (
-    entry.type === "custom" &&
-    entry.customType === customType &&
-    isData(entry.data)
-  );
+  return entry.type === "custom" && entry.customType === customType && isData(entry.data);
 }
 
 type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
@@ -643,8 +581,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const pushTaskParameters = Type.Object({
   prompt: Type.String({
-    description:
-      "Full prompt for the task, including all context and instructions.",
+    description: "Full prompt for the task, including all context and instructions.",
   }),
   inherit_context: Type.Optional(
     Type.Boolean({

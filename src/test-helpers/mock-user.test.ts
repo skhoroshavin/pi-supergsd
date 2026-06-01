@@ -9,9 +9,7 @@ describe("MockUser", () => {
     user.onAssistant("working", userPrompts("/auto"));
     user.onAssistant("working", userEsc());
 
-    assert.deepStrictEqual(user.matchAssistant("still working..."), [
-      userPrompts("/auto"),
-    ]);
+    assert.deepStrictEqual(user.matchAssistant("still working..."), [userPrompts("/auto")]);
   });
 
   it("matches queued tasks by prompt text only", () => {
@@ -19,9 +17,7 @@ describe("MockUser", () => {
     user.onQueuedTask("Task BBB", userCtrlC());
 
     assert.deepStrictEqual(user.matchQueuedTask("Task BBB"), [userCtrlC()]);
-    assert.deepStrictEqual(user.matchQueuedTask("prefix Task BBB suffix"), [
-      userCtrlC(),
-    ]);
+    assert.deepStrictEqual(user.matchQueuedTask("prefix Task BBB suffix"), [userCtrlC()]);
   });
 
   it("returns a copied action array", () => {
@@ -31,9 +27,7 @@ describe("MockUser", () => {
     const first = user.matchAssistant("done now");
     first.push(userEsc());
 
-    assert.deepStrictEqual(user.matchAssistant("done now"), [
-      userPrompts("next"),
-    ]);
+    assert.deepStrictEqual(user.matchAssistant("done now"), [userPrompts("next")]);
   });
 
   it("returns no actions when nothing matches", () => {

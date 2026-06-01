@@ -12,17 +12,13 @@ describe("applyPatches", () => {
   });
 
   it("applies replace to all occurrences", () => {
-    const result = applyPatches("a b a", [
-      { op: "replace", find: "a", replace: "x" },
-    ]);
+    const result = applyPatches("a b a", [{ op: "replace", find: "a", replace: "x" }]);
     assert.strictEqual(result.result, "x b x");
     assert.deepStrictEqual(result.unmatched, []);
   });
 
   it("applies regex-replace with capture groups", () => {
-    const result = applyPatches("Hello World", [
-      { op: "regex-replace", find: "Hello (\\w+)", replace: "Hi $1" },
-    ]);
+    const result = applyPatches("Hello World", [{ op: "regex-replace", find: "Hello (\\w+)", replace: "Hi $1" }]);
     assert.strictEqual(result.result, "Hi World");
     assert.deepStrictEqual(result.unmatched, []);
   });
@@ -35,17 +31,13 @@ describe("applyPatches", () => {
   });
 
   it("deletes lines containing find string", () => {
-    const result = applyPatches("line1\nline2\nline3", [
-      { op: "delete-line", find: "line2" },
-    ]);
+    const result = applyPatches("line1\nline2\nline3", [{ op: "delete-line", find: "line2" }]);
     assert.strictEqual(result.result, "line1\nline3");
     assert.deepStrictEqual(result.unmatched, []);
   });
 
   it("deletes blocks from start to end line inclusive", () => {
-    const result = applyPatches("start\na\nb\nend\nc", [
-      { op: "delete-block", findStart: "start", findEnd: "end" },
-    ]);
+    const result = applyPatches("start\na\nb\nend\nc", [{ op: "delete-block", findStart: "start", findEnd: "end" }]);
     assert.strictEqual(result.result, "c");
     assert.deepStrictEqual(result.unmatched, []);
   });
@@ -84,9 +76,7 @@ describe("applyPatches", () => {
 
   it("throws on invalid patch operation", () => {
     assert.throws(() => {
-      applyPatches("test", [
-        { op: "invalid", find: "x", replace: "y" } as unknown as Patch,
-      ]);
+      applyPatches("test", [{ op: "invalid", find: "x", replace: "y" } as unknown as Patch]);
     }, /Invalid patch operation/);
   });
 });

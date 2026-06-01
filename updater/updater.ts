@@ -2,12 +2,7 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  applyPatches,
-  superpowersUpdate,
-  superpowersGetSkill,
-  superpowersGetFile,
-} from "./utils/index.js";
+import { applyPatches, superpowersUpdate, superpowersGetSkill, superpowersGetFile } from "./utils/index.js";
 import type { SkillDefinition, Patch } from "./utils/index.js";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -32,9 +27,7 @@ function getPatchesForFile(def: SkillDefinition, filePath: string): Patch[] {
 }
 
 async function main(): Promise<void> {
-  const commonPatches: Patch[] = JSON.parse(
-    readFileSync(commonPatchPath, "utf-8"),
-  );
+  const commonPatches: Patch[] = JSON.parse(readFileSync(commonPatchPath, "utf-8"));
   const definitions = loadDefinitions();
 
   await superpowersUpdate();
@@ -56,11 +49,7 @@ async function main(): Promise<void> {
       const relativePath = repoPath.slice(`skills/${def.name}/`.length);
 
       // Check excludes
-      if (
-        def.exclude?.some(
-          (e) => relativePath === e || relativePath.startsWith(e + "/"),
-        )
-      ) {
+      if (def.exclude?.some((e) => relativePath === e || relativePath.startsWith(e + "/"))) {
         console.log(`  Skipping (excluded): ${relativePath}`);
         continue;
       }
@@ -71,28 +60,20 @@ async function main(): Promise<void> {
       const perFilePatches = getPatchesForFile(def, relativePath);
 
       // Per-file patches first (against original upstream content)
-      const { result: afterPerFile, unmatched: perFileUnmatched } =
-        applyPatches(raw, perFilePatches);
+      const { result: afterPerFile, unmatched: perFileUnmatched } = applyPatches(raw, perFilePatches);
 
       // Common patches second (best-effort — only warn if unmatched)
-      const { result, unmatched: commonUnmatched } = applyPatches(
-        afterPerFile,
-        commonPatches,
-      );
+      const { result, unmatched: commonUnmatched } = applyPatches(afterPerFile, commonPatches);
 
       totalPatches += perFilePatches.length;
       failedPatches += perFileUnmatched.length;
 
       for (const u of perFileUnmatched) {
-        console.warn(
-          `    WARNING: patch did not match in ${relativePath}: ${JSON.stringify(u)}`,
-        );
+        console.warn(`    WARNING: patch did not match in ${relativePath}: ${JSON.stringify(u)}`);
       }
       for (const u of commonUnmatched) {
         if (process.env.DEBUG) {
-          console.warn(
-            `    (common patch skipped in ${relativePath}: ${JSON.stringify(u)})`,
-          );
+          console.warn(`    (common patch skipped in ${relativePath}: ${JSON.stringify(u)})`);
         }
       }
 

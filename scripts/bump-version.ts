@@ -24,10 +24,7 @@ interface PackageLockFile extends PackageJsonFile {
   packages?: Record<string, { version?: string } & Record<string, unknown>>;
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }
 
@@ -41,9 +38,7 @@ function main(): void {
   }
 
   if (args.some((arg) => arg !== command && arg !== "--no-git")) {
-    throw new Error(
-      `Unknown argument. Valid: ${BUMP_ARGS.join(", ")}, --no-git`,
-    );
+    throw new Error(`Unknown argument. Valid: ${BUMP_ARGS.join(", ")}, --no-git`);
   }
 
   if (!noGit) {
@@ -53,17 +48,13 @@ function main(): void {
     }).trim();
 
     if (status) {
-      throw new Error(
-        "Working tree is not clean. Commit or stash changes first.",
-      );
+      throw new Error("Working tree is not clean. Commit or stash changes first.");
     }
   }
 
   const packageJson = readJson<PackageJsonFile>(packageJsonPath);
   const currentVersion = packageJson.version;
-  const nextVersion = formatVersion(
-    computeNext(parseVersion(currentVersion), command),
-  );
+  const nextVersion = formatVersion(computeNext(parseVersion(currentVersion), command));
 
   packageJson.version = nextVersion;
   writeJson(packageJsonPath, packageJson);
@@ -118,10 +109,7 @@ export function parseVersion(version: string): ParsedVersion {
   };
 }
 
-export function computeNext(
-  current: ParsedVersion,
-  command: BumpArg,
-): ParsedVersion {
+export function computeNext(current: ParsedVersion, command: BumpArg): ParsedVersion {
   switch (command) {
     case "major":
       return { major: current.major + 1, minor: 0, patch: 0 };

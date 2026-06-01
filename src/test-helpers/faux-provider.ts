@@ -1,18 +1,10 @@
 import * as piAi from "@earendil-works/pi-ai";
-import type {
-  AssistantMessage,
-  Context,
-  Model,
-  SimpleStreamOptions,
-} from "@earendil-works/pi-ai";
+import type { AssistantMessage, Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 
 import { extractTextContent } from "../text-content.js";
 import type { MockLLM, MockLLMDescriptor } from "./mock-llm.js";
 
-const registrations = new WeakMap<
-  FauxProvider,
-  piAi.FauxProviderRegistration
->();
+const registrations = new WeakMap<FauxProvider, piAi.FauxProviderRegistration>();
 
 export const FAUX_PROVIDER = "supergsd-test";
 
@@ -53,14 +45,8 @@ export class FauxProvider {
     );
   }
 
-  stream(
-    model: Model<string>,
-    context: Context,
-    options?: SimpleStreamOptions,
-  ) {
-    const lastUser = [...context.messages]
-      .reverse()
-      .find((message) => message.role === "user");
+  stream(model: Model<string>, context: Context, options?: SimpleStreamOptions) {
+    const lastUser = [...context.messages].reverse().find((message) => message.role === "user");
     const promptText = extractTextContent(lastUser?.content ?? "") ?? "";
     const responses = this.llm.matchPrompt(promptText);
 
@@ -79,9 +65,7 @@ export class FauxProvider {
   }
 }
 
-function makeAssistantMessage(
-  responses: MockLLMDescriptor[],
-): AssistantMessage {
+function makeAssistantMessage(responses: MockLLMDescriptor[]): AssistantMessage {
   if (responses.length === 1 && responses[0].type === "response:aborted") {
     const descriptor = responses[0];
     return piAi.fauxAssistantMessage(descriptor.text, {
@@ -111,8 +95,6 @@ function makeAssistantMessage(
   });
 
   return piAi.fauxAssistantMessage(content, {
-    stopReason: content.some((block) => block.type === "toolCall")
-      ? "toolUse"
-      : "stop",
+    stopReason: content.some((block) => block.type === "toolCall") ? "toolUse" : "stop",
   });
 }
