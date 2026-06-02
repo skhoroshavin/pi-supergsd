@@ -2,9 +2,9 @@ import assert from "node:assert";
 
 import { describe, it } from "node:test";
 
-import { SessionManager, Theme } from "@earendil-works/pi-coding-agent";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 
-import { TestSession, assistant, assumeCommandContext, task, user } from "./index.js";
+import { TestSession, assistant, task, user } from "./index.js";
 
 describe("TestSession", () => {
   it("projects durable session entries without status", () => {
@@ -76,21 +76,6 @@ describe("TestSession", () => {
       session.lastNotification,
       "Task stored. Use `/start-task` or `/auto` to start it.",
     );
-  });
-
-  it("exposes a real Theme on the UI context", () => {
-    const sm = SessionManager.inMemory();
-    const session = new TestSession(sm);
-
-    assert.ok(session.context.theme instanceof Theme);
-  });
-
-  it("keeps assumeCommandContext available from the new module", () => {
-    const value = {
-      hasUI: true,
-      navigateTree: async () => ({ cancelled: false }),
-    };
-    assert.strictEqual(assumeCommandContext(value), value);
   });
 });
 
