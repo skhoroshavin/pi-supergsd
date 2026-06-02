@@ -134,36 +134,25 @@ describe("automated workflow", () => {
 
   it("processes a subtask pushed during a task", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds("working..."));
-    h.llm.onPrompt("", responds(""));
+    h.llm.onPrompt("main work", responds("working..."), pushTask("parent task"));
+
+    // Task-execution
     h.llm.onPrompt("parent task", responds("working on parent..."), pushTask("subtask"));
     h.llm.onPrompt("subtask", responds("sub done"));
+
+    // Leaf continuations
     h.llm.onPrompt("sub done", responds(""));
+    h.llm.onPrompt("", responds(""));
     h.llm.onPrompt("working on parent...", responds(""));
-    h.llm.onPrompt("queue parent", pushTask("parent task"));
+
     try {
       await h.prompt("main work");
-      await h.prompt("queue parent");
 
       await h.prompt("/auto");
 
-      // Current branch shows the parent task result
-      h.assertSession(
-        user("main work"),
-        assistant("working..."),
-        user("queue parent"),
-        assistant("", "toolUse"),
-        task("parent task"),
-        taskResult("parent-task"),
-        assistant(""),
-      );
+      h.assertSession(user("main work"), assistant("working...", "toolUse"), task("parent task"), taskResult("parent-task"), assistant(""));
       h.assertStatus();
-      // The subtask entries should be in the whole-session history
-      h.assertSessionContains(
-        user("subtask"),
-        assistant("sub done"),
-        taskResult("subtask", "sub done"),
-      );
+      h.assertSessionContains(user("subtask"), assistant("sub done"), taskResult("subtask", "sub done"));
     } finally {
       h.dispose();
     }
