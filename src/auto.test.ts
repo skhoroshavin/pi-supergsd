@@ -31,7 +31,13 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(user("main work"), assistant("working on main...", "toolUse"), task("Analyze performance."), taskResult("analyze-performance", "Found 3 bottlenecks: ..."), assistant(""));
+      h.assertSession(
+        user("main work"),
+        assistant("working on main...", "toolUse"),
+        task("Analyze performance."),
+        taskResult("analyze-performance", "Found 3 bottlenecks: ..."),
+        assistant(""),
+      );
       h.assertStatus();
     } finally {
       h.dispose();
@@ -54,7 +60,13 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Quick fix.", true), taskResult("quick-fix", "Fixed the bug."), assistant(""));
+      h.assertSession(
+        user("main work"),
+        assistant("working...", "toolUse"),
+        task("Quick fix.", true),
+        taskResult("quick-fix", "Fixed the bug."),
+        assistant(""),
+      );
       h.assertStatus();
     } finally {
       h.dispose();
@@ -103,7 +115,13 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(user("start"), assistant("", "toolUse"), task("first task"), taskResult("first-task", "done"), assistant(""));
+      h.assertSession(
+        user("start"),
+        assistant("", "toolUse"),
+        task("first task"),
+        taskResult("first-task", "done"),
+        assistant(""),
+      );
       h.assertStatus();
     } finally {
       h.dispose();
@@ -125,7 +143,13 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(user("start"), assistant("", "toolUse"), task("Implement phase 1.", true), user("Implement phase 1."), assistant("Stopped by user.", "aborted"));
+      h.assertSession(
+        user("start"),
+        assistant("", "toolUse"),
+        task("Implement phase 1.", true),
+        user("Implement phase 1."),
+        assistant("Stopped by user.", "aborted"),
+      );
       h.assertStatus("current task: implement-phase-1");
     } finally {
       h.dispose();
@@ -150,9 +174,19 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(user("main work"), assistant("working...", "toolUse"), task("parent task"), taskResult("parent-task"), assistant(""));
+      h.assertSession(
+        user("main work"),
+        assistant("working...", "toolUse"),
+        task("parent task"),
+        taskResult("parent-task"),
+        assistant(""),
+      );
       h.assertStatus();
-      h.assertSessionContains(user("subtask"), assistant("sub done"), taskResult("subtask", "sub done"));
+      h.assertSessionContains(
+        user("subtask"),
+        assistant("sub done"),
+        taskResult("subtask", "sub done"),
+      );
     } finally {
       h.dispose();
     }
@@ -176,7 +210,13 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(user("start"), assistant("", "toolUse"), task("Quick fix.", true), taskResult("quick-fix", "adjusted response"), assistant(""));
+      h.assertSession(
+        user("start"),
+        assistant("", "toolUse"),
+        task("Quick fix.", true),
+        taskResult("quick-fix", "adjusted response"),
+        assistant(""),
+      );
       h.assertStatus();
     } finally {
       h.dispose();
@@ -199,7 +239,13 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(user("start"), assistant("", "toolUse"), task("Shutdown task", true), user("Shutdown task"), assistant("working..."));
+      h.assertSession(
+        user("start"),
+        assistant("", "toolUse"),
+        task("Shutdown task", true),
+        user("Shutdown task"),
+        assistant("working..."),
+      );
       h.assertStatus("current task: shutdown-task");
     } finally {
       h.dispose();
