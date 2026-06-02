@@ -47,6 +47,7 @@
     "typebox": "*"
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": "^0.75.5",
     "@types/node": "^25.9.1",
     "eslint": "^10.4.0",
     "eslint-plugin-unslop": "^0.7.3",

@@ -20,13 +20,13 @@ This extension also bundles a subset of [Superpowers](https://github.com/obra/su
 
 ## Tools and commands reference
 
-| Command | Action                                                                               |
-|---|--------------------------------------------------------------------------------------|
-| `/start-task` | Saves a checkpoint and starts the pending task in a new branch                       |
-| `/finish-task` | Returns from task branch to saved checkpoint with the assistant response as a result |
-| `/abort-task` | Returns from task branch to saved checkpoint without attaching any result            |
+| Command         | Action                                                                               |
+| --------------- | ------------------------------------------------------------------------------------ |
+| `/start-task`   | Saves a checkpoint and starts the pending task in a new branch                       |
+| `/finish-task`  | Returns from task branch to saved checkpoint with the assistant response as a result |
+| `/abort-task`   | Returns from task branch to saved checkpoint without attaching any result            |
 | `/discard-task` | Discards a pending task without executing it                                         |
-| `/auto` | EXPERIMENTAL! Runs all pending tasks hands-free, including any queued during the run |
+| `/auto`         | EXPERIMENTAL! Runs all pending tasks hands-free, including any queued during the run |
 
 ### `push-task` tool
 
@@ -55,7 +55,7 @@ LLM:     [reviews code] Two issues: parse() swallows the original
          error, and the cache isn't invalidated on config changes.
 
 You:     I agree with cache invalidation issue, but error handling
-         in parse() was intentional. Adjust your report. 
+         in parse() was intentional. Adjust your report.
 
 LLM:     [adjusts report]
 

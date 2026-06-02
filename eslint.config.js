@@ -9,18 +9,20 @@ export default tseslint.config(
   unslop.configs.full,
   {
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { "varsIgnorePattern": "^_" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { varsIgnorePattern: "^_" },
+      ],
     },
   },
   {
     settings: {
       unslop: {
         architecture: {
-          src: { entrypoints: ['index.ts', 'text-content.ts'] },
-          'src/test-helpers': { imports: ['src'] },
+          src: { entrypoints: ["index.ts", "text-content.ts"] },
+          "src/test-helpers": { imports: ["src"] },
         },
       },
     },
-
   },
 );

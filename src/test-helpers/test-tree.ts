@@ -1,6 +1,6 @@
 import { it } from "node:test";
 
-import { TestHarness } from "./test-harness.js";
+import { TestHarness } from "./harness.js";
 
 export function node(name: string, fn: NodeFn) {
   return new TestNode(name, fn);
@@ -8,7 +8,7 @@ export function node(name: string, fn: NodeFn) {
 
 type NodeFn = (h: TestHarness) => Promise<void> | void;
 
-class TestNode {
+export class TestNode {
   constructor(
     private readonly name: string,
     private readonly fn?: NodeFn,
@@ -22,8 +22,10 @@ class TestNode {
     return this;
   }
 
-  run(): void {
-    this.register([]);
+  static run(...nodes: TestNode[]): void {
+    for (const node of nodes) {
+      node.register([]);
+    }
   }
 
   private register(ancestors: TestNode[]): void {
@@ -37,10 +39,13 @@ class TestNode {
     const name = chain.map((node) => node.name).join(" → ");
 
     it(name, async () => {
-      const h = new TestHarness();
-
-      for (const node of chain) {
-        await node.fn?.(h);
+      const h = await TestHarness.create();
+      try {
+        for (const node of chain) {
+          await node.fn?.(h);
+        }
+      } finally {
+        h.dispose();
       }
     });
 
