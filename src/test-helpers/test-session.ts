@@ -19,12 +19,11 @@ export class TestSession {
   readonly context: ExtensionUIContext = {
     ...noOpContext,
     notify: (message: string) => {
-      const nextNotification = plainText(message).trim();
-      this.#lastNotification = nextNotification === "" ? undefined : nextNotification;
+      this.#lastNotification = normalizeText(message);
     },
     setStatus: (key: string, value: string | undefined) => {
       if (key !== "task") return;
-      this.#lastStatus = value === undefined ? undefined : plainText(value);
+      this.#lastStatus = normalizeText(value);
     },
   };
 
@@ -127,8 +126,10 @@ function sessionEntries(entries: PiSessionEntry[]): SessionEntry[] {
   return result;
 }
 
-function plainText(value: string): string {
-  return stripVTControlCharacters(value);
+function normalizeText(value: string | undefined): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  const result = stripVTControlCharacters(value).trim();
+  return result === "" ? undefined : result;
 }
 
 const textBlock = (text: string): TextBlock => ({ type: "text", text });
