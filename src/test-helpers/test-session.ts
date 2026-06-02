@@ -32,6 +32,10 @@ export class TestSession {
     return projectEntries(this.sessionManager.getBranch());
   }
 
+  allEntries(): SessionEntry[] {
+    return projectEntries(this.sessionManager.getEntries());
+  }
+
   get lastStatus(): string | undefined {
     return this.#lastStatus;
   }
@@ -40,18 +44,6 @@ export class TestSession {
     return this.#lastNotification;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Durable-entry projection helper
-// ---------------------------------------------------------------------------
-
-export function durableEntries(entries: PiSessionEntry[]): DurableSessionEntry[] {
-  return entries
-    .map(toDurableEntry)
-    .filter((entry): entry is DurableSessionEntry => entry !== null);
-}
-
-export type DurableSessionEntry = SessionEntry;
 
 export type SessionEntry =
   | ReturnType<typeof user>
@@ -114,7 +106,7 @@ function plainText(value: string): string {
 
 const textBlock = (text: string): TextBlock => ({ type: "text", text });
 
-function toDurableEntry(entry: PiSessionEntry): DurableSessionEntry | null {
+function toDurableEntry(entry: PiSessionEntry): SessionEntry | null {
   switch (entry.type) {
     case "thinking_level_change":
     case "model_change":

@@ -17,12 +17,7 @@ import {
 import registerSuperGsd from "../../index.js";
 import { isDeepStrictEqual } from "node:util";
 import { extractTextContent } from "../text-content.js";
-import {
-  durableEntries,
-  type DurableSessionEntry,
-  type SessionEntry as TestSessionEntry,
-  TestSession,
-} from "./test-session.js";
+import { type SessionEntry as TestSessionEntry, TestSession } from "./test-session.js";
 import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
 import { MockLLM } from "./mock-llm.js";
 import { MockUser, type MockUserAction } from "./mock-user.js";
@@ -126,8 +121,8 @@ export class TestHarness {
     assert.deepStrictEqual(this.testSession.entries(), expected);
   }
 
-  assertSessionContains(...expected: DurableSessionEntry[]): void {
-    const actual = durableEntries(this.sessionManager.getEntries());
+  assertSessionContains(...expected: TestSessionEntry[]): void {
+    const actual = this.testSession.allEntries();
     for (const expectedEntry of expected) {
       assert.ok(
         actual.some((entry) => isDeepStrictEqual(entry, expectedEntry)),
