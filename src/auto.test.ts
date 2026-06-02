@@ -185,26 +185,21 @@ describe("automated workflow", () => {
 
   it("stops when session is shut down during auto", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""));
-    h.llm.onPrompt("", responds(""));
+    h.llm.onPrompt("start", responds(""), pushTask("Shutdown task", true));
+
+    // Task-execution
     h.llm.onPrompt("Shutdown task", responds("working..."));
-    h.llm.onPrompt("queue shutdown", pushTask("Shutdown task", true));
+
+    // Leaf continuation (auto re-prompts after detecting Ctrl+C, but task is left open)
+    h.llm.onPrompt("", responds(""));
+
     h.user.onAssistant("working...", userCtrlC());
     try {
       await h.prompt("start");
-      await h.prompt("queue shutdown");
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("start"),
-        assistant(""),
-        user("queue shutdown"),
-        assistant("", "toolUse"),
-        task("Shutdown task", true),
-        user("Shutdown task"),
-        assistant("working..."),
-      );
+      h.assertSession(user("start"), assistant("", "toolUse"), task("Shutdown task", true), user("Shutdown task"), assistant("working..."));
       h.assertStatus("current task: shutdown-task");
     } finally {
       h.dispose();
