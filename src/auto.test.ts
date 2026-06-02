@@ -40,26 +40,21 @@ describe("automated workflow", () => {
 
   it("returns the branch result to the original leaf for branch-context tasks", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds("working..."));
+    h.llm.onPrompt("main work", responds("working..."), pushTask("Quick fix.", true));
+
+    // Task-execution
     h.llm.onPrompt("Quick fix.", responds("Fixed the bug."));
     h.llm.onPrompt("Fixed the bug.", responds(""));
+
+    // Leaf continuation
     h.llm.onPrompt("working...", responds(""));
-    h.llm.onPrompt("queue quick-fix", pushTask("Quick fix.", true));
+
     try {
       await h.prompt("main work");
-      await h.prompt("queue quick-fix");
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("main work"),
-        assistant("working..."),
-        user("queue quick-fix"),
-        assistant("", "toolUse"),
-        task("Quick fix.", true),
-        taskResult("quick-fix", "Fixed the bug."),
-        assistant(""),
-      );
+      h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Quick fix.", true), taskResult("quick-fix", "Fixed the bug."), assistant(""));
       h.assertStatus();
     } finally {
       h.dispose();
