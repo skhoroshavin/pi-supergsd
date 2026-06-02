@@ -160,28 +160,23 @@ describe("automated workflow", () => {
 
   it("continues processing when user queues a steering message during auto", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""));
-    h.llm.onPrompt("", responds(""));
+    h.llm.onPrompt("start", responds(""), pushTask("Quick fix.", true));
+
+    // Task-execution
     h.llm.onPrompt("Quick fix.", responds("thinking..."));
     h.llm.onPrompt("steer it", responds("adjusted response"));
+
+    // Leaf continuations
     h.llm.onPrompt("adjusted response", responds(""));
-    h.llm.onPrompt("queue quick-fix", pushTask("Quick fix.", true));
+    h.llm.onPrompt("", responds(""));
+
     h.user.onAssistant("thinking...", userPrompts("steer it"));
     try {
       await h.prompt("start");
-      await h.prompt("queue quick-fix");
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("start"),
-        assistant(""),
-        user("queue quick-fix"),
-        assistant("", "toolUse"),
-        task("Quick fix.", true),
-        taskResult("quick-fix", "adjusted response"),
-        assistant(""),
-      );
+      h.assertSession(user("start"), assistant("", "toolUse"), task("Quick fix.", true), taskResult("quick-fix", "adjusted response"), assistant(""));
       h.assertStatus();
     } finally {
       h.dispose();
