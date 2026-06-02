@@ -3,25 +3,12 @@ import { stripVTControlCharacters } from "node:util";
 import { Theme } from "@earendil-works/pi-coding-agent";
 
 import type {
-  ExtensionCommandContext,
   ExtensionUIContext,
   SessionEntry as PiSessionEntry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 
 import { extractTextContent, type TextBlock } from "../text-content.js";
-
-// ---------------------------------------------------------------------------
-// Compatibility utility
-// ---------------------------------------------------------------------------
-
-export function assumeCommandContext<T extends object>(value: T): ExtensionCommandContext & T {
-  return value as unknown as ExtensionCommandContext & T;
-}
-
-// ---------------------------------------------------------------------------
-// TestSession — canonical visible-session model
-// ---------------------------------------------------------------------------
 
 export class TestSession {
   constructor(private readonly sessionManager: SessionManager) {}
