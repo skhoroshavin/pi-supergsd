@@ -91,26 +91,19 @@ describe("automated workflow", () => {
 
   it("warns and returns when /auto is already running", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""));
+    h.llm.onPrompt("start", responds(""), pushTask("first task"));
+
+    // Task-execution
     h.llm.onPrompt("first task", responds("done"));
     h.llm.onPrompt("done", responds(""));
-    h.llm.onPrompt("queue first", pushTask("first task"));
+
     h.user.onAssistant("done", userPrompts("/auto"));
     try {
       await h.prompt("start");
-      await h.prompt("queue first");
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("start"),
-        assistant(""),
-        user("queue first"),
-        assistant("", "toolUse"),
-        task("first task"),
-        taskResult("first-task", "done"),
-        assistant(""),
-      );
+      h.assertSession(user("start"), assistant("", "toolUse"), task("first task"), taskResult("first-task", "done"), assistant(""));
       h.assertStatus();
     } finally {
       h.dispose();
