@@ -17,26 +17,21 @@ import {
 describe("automated workflow", () => {
   it("completes push-task -> /auto -> finish-task and injects the branch result", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds("working on main..."));
+    h.llm.onPrompt("main work", responds("working on main..."), pushTask("Analyze performance."));
+
+    // Task-execution
     h.llm.onPrompt("Analyze performance.", responds("Found 3 bottlenecks: ..."));
     h.llm.onPrompt("Found 3 bottlenecks: ...", responds(""));
+
+    // Leaf continuation
     h.llm.onPrompt("working on main...", responds(""));
-    h.llm.onPrompt("queue analyze", pushTask("Analyze performance."));
+
     try {
       await h.prompt("main work");
-      await h.prompt("queue analyze");
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("main work"),
-        assistant("working on main..."),
-        user("queue analyze"),
-        assistant("", "toolUse"),
-        task("Analyze performance."),
-        taskResult("analyze-performance", "Found 3 bottlenecks: ..."),
-        assistant(""),
-      );
+      h.assertSession(user("main work"), assistant("working on main...", "toolUse"), task("Analyze performance."), taskResult("analyze-performance", "Found 3 bottlenecks: ..."), assistant(""));
       h.assertStatus();
     } finally {
       h.dispose();
