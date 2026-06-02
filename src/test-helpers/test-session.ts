@@ -29,11 +29,11 @@ export class TestSession {
   };
 
   entries(): SessionEntry[] {
-    return projectEntries(this.sessionManager.getBranch());
+    return sessionEntries(this.sessionManager.getBranch());
   }
 
   allEntries(): SessionEntry[] {
-    return projectEntries(this.sessionManager.getEntries());
+    return sessionEntries(this.sessionManager.getEntries());
   }
 
   get lastStatus(): string | undefined {
@@ -89,12 +89,39 @@ export const taskResult = (slug: string, content?: string) => ({
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function projectEntries(branch: PiSessionEntry[]): SessionEntry[] {
+function sessionEntries(entries: PiSessionEntry[]): SessionEntry[] {
   const result: SessionEntry[] = [];
 
-  for (const branchEntry of branch) {
-    const durable = toDurableEntry(branchEntry);
-    if (durable !== null) result.push(durable);
+  for (const entry of entries) {
+    switch (entry.type) {
+      case "thinking_level_change":
+      case "model_change":
+      case "session_info":
+      case "label":
+        break;
+      case "message":
+        if (entry.message.role === "user") {
+          result.push(user(textContent(entry.message.content)));
+        } else if (entry.message.role === "assistant") {
+          result.push(
+            assistant(
+              textContent(entry.message.content),
+              visibleStopReason(entry.message.stopReason),
+            ),
+          );
+        }
+        break;
+      case "custom":
+        if (entry.customType === "task" && isTaskData(entry.data)) {
+          result.push(task(entry.data.prompt, entry.data.inherit_context));
+        }
+        break;
+      case "custom_message":
+        if (entry.customType === "task-result" && hasSlug(entry.details)) {
+          result.push(taskResult(entry.details.slug, textContent(entry.content) || undefined));
+        }
+        break;
+    }
   }
 
   return result;
@@ -105,38 +132,6 @@ function plainText(value: string): string {
 }
 
 const textBlock = (text: string): TextBlock => ({ type: "text", text });
-
-function toDurableEntry(entry: PiSessionEntry): SessionEntry | null {
-  switch (entry.type) {
-    case "thinking_level_change":
-    case "model_change":
-    case "session_info":
-    case "label":
-      return null;
-    case "message":
-      if (entry.message.role === "user") {
-        return user(textContent(entry.message.content));
-      }
-      if (entry.message.role === "assistant") {
-        return assistant(
-          textContent(entry.message.content),
-          visibleStopReason(entry.message.stopReason),
-        );
-      }
-      return null;
-    case "custom":
-      return entry.customType === "task" && isTaskData(entry.data)
-        ? task(entry.data.prompt, entry.data.inherit_context)
-        : null;
-    case "custom_message":
-      if (entry.customType !== "task-result" || !hasSlug(entry.details)) {
-        return null;
-      }
-      return taskResult(entry.details.slug, textContent(entry.content) || undefined);
-    default:
-      return null;
-  }
-}
 
 function textContent(content: unknown): string {
   return extractTextContent(content, "") ?? "";
