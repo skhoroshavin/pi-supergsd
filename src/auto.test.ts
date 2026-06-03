@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 
 import {
-  aborts,
   assistant,
   responds,
   pushTask,
@@ -132,10 +131,11 @@ describe("automated workflow", () => {
     const h = await TestHarness.create();
     h.llm.onPrompt("start", responds(""), pushTask("Implement phase 1.", true));
 
-    // Task-execution
-    h.llm.onPrompt("Implement phase 1.", aborts("Stopped by user."));
+    // Task-execution: live streaming abort via userEsc
+    h.llm.onPrompt("Implement phase 1.", responds("AbcdEfghIjkl"));
+    h.user.onAssistant("AbcdEfgh", userEsc());
 
-    // Leaf continuation (triggered when auto re-prompts after abort detection)
+    // Leaf continuation (triggered when auto re-prompts after abort)
     h.llm.onPrompt("", responds(""));
 
     try {
@@ -148,7 +148,7 @@ describe("automated workflow", () => {
         assistant("", "toolUse"),
         task("Implement phase 1.", true),
         user("Implement phase 1."),
-        assistant("Stopped by user.", "aborted"),
+        assistant("AbcdEfgh", "aborted"),
       );
       h.assertStatus("current task: implement-phase-1");
     } finally {

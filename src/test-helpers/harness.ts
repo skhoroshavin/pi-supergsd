@@ -105,6 +105,23 @@ export class TestHarness {
       testUi,
       fauxProvider,
     );
+
+    // Wire up in-flight assistant-stream abort detection.
+    // When streaming text matches a user.onAssistant rule with userEsc(),
+    // abort the current session turn so the stream produces an aborted
+    // assistant message with partial text preserved.
+    fauxProvider.setOnPartialText((text: string) => {
+      for (const action of user.matchAssistant(text)) {
+        if (action.type === "user-esc") {
+          // Fire without awaiting: agent.abort() fires the signal synchronously,
+          // the stream detects it at the next chunk boundary, and the partial
+          // text is preserved in the aborted message.
+          void session.abort();
+          return;
+        }
+      }
+    });
+
     await session.bindExtensions({
       uiContext: harness.testUi.context,
       commandContextActions: harness.commandContextActions(),
