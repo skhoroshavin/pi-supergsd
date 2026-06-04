@@ -35,4 +35,13 @@ describe("MockUser", () => {
     assert.deepStrictEqual(user.matchAssistant("missing"), []);
     assert.deepStrictEqual(user.matchQueuedTask("missing"), []);
   });
+
+  it("rejects userEsc for queued-task rules at registration time", () => {
+    const user = new MockUser();
+
+    assert.throws(
+      () => user.onQueuedTask("Task BBB", userEsc()),
+      /userEsc\(\) is only supported for onAssistant\(\.\.\.\), not onQueuedTask\(\.\.\.\)/,
+    );
+  });
 });
