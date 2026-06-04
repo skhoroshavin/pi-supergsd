@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
 
-import { MockLLM, aborts, pushTask, responds, thinks } from "./index.js";
+import { MockLLM, pushTask, responds, thinks } from "./index.js";
 
 describe("MockLLM", () => {
   it("uses the first matching prompt rule", () => {
@@ -28,7 +28,7 @@ describe("MockLLM", () => {
     llm.onPrompt("delegate", responds("working"), pushTask("subtask", true));
 
     const first = llm.matchPrompt("delegate now");
-    first.push(aborts("mutated"));
+    first.push(responds("mutated"));
 
     assert.deepStrictEqual(llm.matchPrompt("delegate now"), [
       responds("working"),

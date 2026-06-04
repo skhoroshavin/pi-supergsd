@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 
 import {
-  aborts,
   assistant,
+  assistantAborted,
   responds,
   pushTask,
   task,
@@ -73,23 +73,6 @@ describe("automated workflow", () => {
     }
   });
 
-  it("stops when navigation is cancelled and does not mark the task done", async () => {
-    const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds(""), pushTask("Analyze performance."));
-
-    h.user.onQueuedTask("Analyze performance.", userEsc());
-    try {
-      await h.prompt("main work");
-
-      await h.prompt("/auto");
-
-      h.assertSession(user("main work"), assistant("", "toolUse"), task("Analyze performance."));
-      h.assertStatus("pending task: analyze-performance");
-    } finally {
-      h.dispose();
-    }
-  });
-
   it("notifies and exits when started with no pending tasks", async () => {
     const h = await TestHarness.create();
     try {
@@ -128,15 +111,12 @@ describe("automated workflow", () => {
     }
   });
 
-  it("stops when the last assistant message was aborted", async () => {
+  it("stops when the last assistant message is aborted to empty text", async () => {
     const h = await TestHarness.create();
     h.llm.onPrompt("start", responds(""), pushTask("Implement phase 1.", true));
 
-    // Task-execution
-    h.llm.onPrompt("Implement phase 1.", aborts("Stopped by user."));
-
-    // Leaf continuation (triggered when auto re-prompts after abort detection)
-    h.llm.onPrompt("", responds(""));
+    h.llm.onPrompt("Implement phase 1.", responds("ABCDEFGHIJ"));
+    h.user.onAssistant("FGHI", userEsc());
 
     try {
       await h.prompt("start");
@@ -148,7 +128,7 @@ describe("automated workflow", () => {
         assistant("", "toolUse"),
         task("Implement phase 1.", true),
         user("Implement phase 1."),
-        assistant("Stopped by user.", "aborted"),
+        assistantAborted(),
       );
       h.assertStatus("current task: implement-phase-1");
     } finally {

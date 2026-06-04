@@ -7,6 +7,10 @@ export class MockUser {
   }
 
   onQueuedTask(prompt: string, ...actions: MockUserAction[]): void {
+    if (actions.some((action) => action.type === "user-esc")) {
+      throw new Error("userEsc() is only supported for onAssistant(...), not onQueuedTask(...)");
+    }
+
     this.queuedTaskRules.push({ prompt, actions });
   }
 

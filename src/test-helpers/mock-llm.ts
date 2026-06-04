@@ -22,7 +22,6 @@ export class MockLLM {
 export type MockLLMDescriptor =
   | ReturnType<typeof responds>
   | ReturnType<typeof thinks>
-  | ReturnType<typeof aborts>
   | ReturnType<typeof pushTask>;
 
 export const responds = (text: string) => ({
@@ -32,11 +31,6 @@ export const responds = (text: string) => ({
 
 export const thinks = (text: string) => ({
   type: "response:thinking" as const,
-  text,
-});
-
-export const aborts = (text: string) => ({
-  type: "response:aborted" as const,
   text,
 });
 

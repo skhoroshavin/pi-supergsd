@@ -3,13 +3,14 @@ import assert from "node:assert";
 import { describe, it, type TestContext } from "node:test";
 
 import {
-  aborts,
   assistant,
+  assistantAborted,
   pushTask,
   responds,
   task,
   thinks,
   user,
+  userEsc,
   userPrompts,
   TestHarness,
 } from "./index.js";
@@ -39,16 +40,12 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.assertLastNotification("No pending task. Use push-task first.");
   });
 
-  it("supports thinking and aborted response descriptors", async (t) => {
+  it("supports thinking blocks", async (t) => {
     const h = await makeHarness(t);
     h.llm.onPrompt("think", thinks("checking context"));
-    h.llm.onPrompt("stop", aborts("Stopped by user."));
 
     await h.prompt("think");
     h.assertSession(user("think"), assistant(""));
-
-    await h.prompt("stop");
-    h.assertSessionContains(user("stop"), assistant("Stopped by user.", "aborted"));
   });
 
   it("calls the real push-task tool from a faux provider tool call", async (t) => {
@@ -142,6 +139,18 @@ describe("AgentSession-backed TestHarness foundation", () => {
       assistant("queued response"),
     );
     h.assertStatus("pending task: follow-up");
+  });
+});
+
+describe("userEsc assistant-only semantics", () => {
+  it("replaces the assistant message with empty text and marks it aborted", async (t) => {
+    const h = await makeHarness(t);
+    h.llm.onPrompt("mixed text", thinks("hidden"), responds("ABCDEFGH"));
+    h.user.onAssistant("CDEF", userEsc());
+
+    await h.prompt("mixed text");
+
+    h.assertSession(user("mixed text"), assistantAborted());
   });
 });
 

@@ -18,6 +18,7 @@ import registerSuperGsd from "../../index.js";
 import { isDeepStrictEqual } from "node:util";
 import { extractTextContent } from "../text-content.js";
 import { type SessionEntry as TestSessionEntry, TestSession } from "./test-session.js";
+import { TestUi } from "./test-ui.js";
 import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
 import { MockLLM } from "./mock-llm.js";
 import { MockUser, type MockUserAction } from "./mock-user.js";
@@ -29,9 +30,9 @@ export class TestHarness {
     private readonly session: AgentSession,
     private readonly sessionManager: SessionManager,
     private readonly testSession: TestSession,
+    private readonly testUi: TestUi,
     private readonly fauxProvider: FauxProvider,
-    private seenReactionEntryIds = new Set<string>(),
-    private cancelNextNav = false,
+    private handledSessionEntryIds = new Set<string>(),
   ) {}
 
   static async create(): Promise<TestHarness> {
@@ -46,7 +47,7 @@ export class TestHarness {
     const sessionManager = SessionManager.inMemory(cwd);
     const llm = new MockLLM();
     const user = new MockUser();
-    const fauxProvider = new FauxProvider(llm);
+    const fauxProvider = new FauxProvider(llm, (text) => user.matchAssistant(text));
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir,
@@ -93,9 +94,19 @@ export class TestHarness {
     });
 
     const testSession = new TestSession(sessionManager);
-    const harness = new TestHarness(llm, user, session, sessionManager, testSession, fauxProvider);
+    const testUi = new TestUi();
+    const harness = new TestHarness(
+      llm,
+      user,
+      session,
+      sessionManager,
+      testSession,
+      testUi,
+      fauxProvider,
+    );
+
     await session.bindExtensions({
-      uiContext: harness.testSession.context,
+      uiContext: harness.testUi.context,
       commandContextActions: harness.commandContextActions(),
       shutdownHandler: () => {
         // No-op: we don't want extension shutdown to terminate the process.
@@ -110,11 +121,11 @@ export class TestHarness {
   }
 
   assertStatus(expected?: string): void {
-    assert.strictEqual(this.testSession.lastStatus, expected);
+    assert.strictEqual(this.testUi.lastStatus, expected);
   }
 
   assertLastNotification(expected: string | undefined): void {
-    assert.strictEqual(this.testSession.lastNotification, expected);
+    assert.strictEqual(this.testUi.lastNotification, expected);
   }
 
   assertSession(...expected: TestSessionEntry[]): void {
@@ -150,13 +161,7 @@ export class TestHarness {
       navigateTree: async (
         targetId: string,
         options?: Parameters<AgentSession["navigateTree"]>[1],
-      ) => {
-        if (this.cancelNextNav) {
-          this.cancelNextNav = false;
-          return { cancelled: true };
-        }
-        return this.session.navigateTree(targetId, options);
-      },
+      ) => this.session.navigateTree(targetId, options),
       newSession: async () => ({ cancelled: false }),
       fork: async () => ({ cancelled: false }),
       switchSession: async () => ({ cancelled: false }),
@@ -174,12 +179,13 @@ export class TestHarness {
     do {
       reacted = false;
       for (const entry of this.sessionManager.getBranch()) {
-        if (this.seenReactionEntryIds.has(entry.id)) continue;
-        this.seenReactionEntryIds.add(entry.id);
+        if (this.handledSessionEntryIds.has(entry.id)) continue;
+        this.handledSessionEntryIds.add(entry.id);
 
         if (entry.type === "message" && entry.message.role === "assistant") {
           const text = extractTextContent(entry.message.content, "") ?? "";
           for (const action of this.user.matchAssistant(text)) {
+            if (action.type === "user-esc") continue;
             await this.applyUserAction(action);
             reacted = true;
           }
@@ -201,9 +207,6 @@ export class TestHarness {
 
   private async applyUserAction(action: MockUserAction): Promise<void> {
     switch (action.type) {
-      case "user-esc":
-        this.cancelNextNav = true;
-        return;
       case "user-ctrl-c":
         await this.session.extensionRunner.emit({
           type: "session_shutdown",
