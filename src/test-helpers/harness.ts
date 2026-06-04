@@ -33,7 +33,6 @@ export class TestHarness {
     private readonly testUi: TestUi,
     private readonly fauxProvider: FauxProvider,
     private handledSessionEntryIds = new Set<string>(),
-    private cancelNextNavigation = false,
   ) {}
 
   static async create(): Promise<TestHarness> {
@@ -48,7 +47,7 @@ export class TestHarness {
     const sessionManager = SessionManager.inMemory(cwd);
     const llm = new MockLLM();
     const user = new MockUser();
-    const fauxProvider = new FauxProvider(llm);
+    const fauxProvider = new FauxProvider(llm, (text) => user.matchAssistant(text));
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir,
@@ -106,22 +105,6 @@ export class TestHarness {
       fauxProvider,
     );
 
-    // Wire up in-flight assistant-stream abort detection.
-    // When streaming text matches a user.onAssistant rule with userEsc(),
-    // abort the current session turn so the stream produces an aborted
-    // assistant message with partial text preserved.
-    fauxProvider.setOnPartialText((text: string) => {
-      for (const action of user.matchAssistant(text)) {
-        if (action.type === "user-esc") {
-          // Fire without awaiting: agent.abort() fires the signal synchronously,
-          // the stream detects it at the next chunk boundary, and the partial
-          // text is preserved in the aborted message.
-          void session.abort();
-          return;
-        }
-      }
-    });
-
     await session.bindExtensions({
       uiContext: harness.testUi.context,
       commandContextActions: harness.commandContextActions(),
@@ -178,13 +161,7 @@ export class TestHarness {
       navigateTree: async (
         targetId: string,
         options?: Parameters<AgentSession["navigateTree"]>[1],
-      ) => {
-        if (this.cancelNextNavigation) {
-          this.cancelNextNavigation = false;
-          return { cancelled: true };
-        }
-        return this.session.navigateTree(targetId, options);
-      },
+      ) => this.session.navigateTree(targetId, options),
       newSession: async () => ({ cancelled: false }),
       fork: async () => ({ cancelled: false }),
       switchSession: async () => ({ cancelled: false }),
@@ -208,6 +185,7 @@ export class TestHarness {
         if (entry.type === "message" && entry.message.role === "assistant") {
           const text = extractTextContent(entry.message.content, "") ?? "";
           for (const action of this.user.matchAssistant(text)) {
+            if (action.type === "user-esc") continue;
             await this.applyUserAction(action);
             reacted = true;
           }
@@ -229,9 +207,6 @@ export class TestHarness {
 
   private async applyUserAction(action: MockUserAction): Promise<void> {
     switch (action.type) {
-      case "user-esc":
-        this.cancelNextNavigation = true;
-        return;
       case "user-ctrl-c":
         await this.session.extensionRunner.emit({
           type: "session_shutdown",

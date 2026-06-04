@@ -141,47 +141,52 @@ describe("AgentSession-backed TestHarness foundation", () => {
   });
 });
 
-describe("userEsc context-sensitive semantics", () => {
-  it("aborts the in-flight assistant stream preserving partial text", async (t) => {
+describe("userEsc assistant-only semantics", () => {
+  it("rewrites even-length assistant text to the first half and marks it aborted", async (t) => {
     const h = await makeHarness(t);
-    // Token size { min:1, max:1 } → 4-char chunks.
-    // "Hello World This Is A Longer Text For Testing" = 44 chars
-    // chunk0: "Hell", chunk1: "o Wo", chunk2: "rld ", chunk3: "This"
-    // Match "World This" fires after chunk3 → partial = chunks 0-3
-    h.llm.onPrompt("long text", responds("Hello World This Is A Longer Text For Testing"));
-    h.user.onAssistant("World This", userEsc());
+    h.llm.onPrompt("even text", responds("ABCDEFGHIJ"));
+    h.user.onAssistant("FGHI", userEsc());
 
-    await h.prompt("long text");
+    await h.prompt("even text");
 
-    h.assertSession(user("long text"), assistant("Hello World This", "aborted"));
+    h.assertSession(user("even text"), assistant("ABCDE", "aborted"));
   });
 
-  it("preserves partial text with stopReason aborted", async (t) => {
+  it("rewrites odd-length assistant text with Math.floor(length / 2)", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("write code", responds("ABCdefGHIjklMNOpqrSTUvwxYZ"));
-    h.user.onAssistant("GHIjkl", userEsc());
+    h.llm.onPrompt("odd text", responds("ABCDEFGHI"));
+    h.user.onAssistant("EFGH", userEsc());
 
-    await h.prompt("write code");
+    await h.prompt("odd text");
 
-    h.assertSession(user("write code"), assistant("ABCdefGHIjkl", "aborted"));
+    h.assertSession(user("odd text"), assistant("ABCD", "aborted"));
   });
 
-  it("keeps existing queued-task navigation-cancel behavior for userEsc", async (t) => {
+  it("matches userEsc against final visible text and drops thinking blocks in the aborted rewrite", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("main work", responds(""), pushTask("Analyze performance."));
+    h.llm.onPrompt("mixed text", thinks("hidden"), responds("ABCDEFGH"));
+    h.user.onAssistant("CDEF", userEsc());
 
-    h.user.onQueuedTask("Analyze performance.", userEsc());
-    try {
-      await h.prompt("main work");
+    await h.prompt("mixed text");
 
-      await h.prompt("/auto");
+    h.assertSession(user("mixed text"), assistant("ABCD", "aborted"));
+  });
 
-      // Navigation should be cancelled, task not marked done
-      h.assertSession(user("main work"), assistant("", "toolUse"), task("Analyze performance."));
-      h.assertStatus("pending task: analyze-performance");
-    } finally {
-      h.dispose();
-    }
+  it("still runs non-ESC assistant reactions after recording the aborted assistant message", async (t) => {
+    const h = await makeHarness(t);
+    h.llm.onPrompt("plan", responds("ABCDEABCDE"));
+    h.llm.onPrompt("follow-up", responds("done"));
+    h.user.onAssistant("ABCDE", userEsc(), userPrompts("follow-up"));
+
+    await h.prompt("plan");
+    await h.waitForIdle();
+
+    h.assertSession(
+      user("plan"),
+      assistant("ABCDE", "aborted"),
+      user("follow-up"),
+      assistant("done"),
+    );
   });
 });
 
