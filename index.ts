@@ -8,6 +8,7 @@ import {
   toolPushTask,
   cmdStartTask,
   rendererTaskResult,
+  setSkillsFromEvent,
   updateTaskStatus,
 } from "./src/index.js";
 
@@ -20,6 +21,12 @@ export default function register(pi: ExtensionAPI): void {
   pi.registerCommand("auto", cmdAuto(pi));
 
   pi.registerMessageRenderer("task-result", rendererTaskResult);
+
+  pi.on("before_agent_start", async (event) => {
+    if (event.systemPromptOptions.skills?.length) {
+      setSkillsFromEvent(event.systemPromptOptions.skills);
+    }
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);

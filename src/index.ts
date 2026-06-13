@@ -6,6 +6,7 @@ import {
   type RegisteredCommand,
   type SessionEntry,
   type SessionMessageEntry,
+  type Skill,
   type Theme,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
@@ -58,20 +59,30 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
         throw new Error("Task storage aborted.");
       }
 
+      const { rewritten, unresolved } = resolveSkillRefs(params.prompt);
+
       pi.appendEntry(TASK_ENTRY_TYPE, {
-        prompt: params.prompt,
+        prompt: rewritten,
         inherit_context: params.inherit_context ?? false,
       });
 
       if (ctx.hasUI) {
         refreshTaskStatus(ctx);
-        ctx.ui.notify("Task stored. Use `/start-task` or `/auto` to start it.", "info");
+        if (unresolved.length > 0) {
+          const names = unresolved.map((n) => `/skill:${n}`).join(", ");
+          ctx.ui.notify(
+            `Warning: ${names} were not resolved.\nTask stored. Use \`/start-task\` or \`/auto\` to start it.`,
+            "warning",
+          );
+        } else {
+          ctx.ui.notify("Task stored. Use `/start-task` or `/auto` to start it.", "info");
+        }
       }
 
       return {
         content: [],
         details: {
-          prompt: params.prompt,
+          prompt: rewritten,
           inherit_context: params.inherit_context ?? false,
         },
         terminate: true,
@@ -237,6 +248,22 @@ export function updateTaskStatus(
   }
 
   setStatus("task", undefined);
+}
+
+export function setSkills(s: Skill[]): void {
+  skills = s;
+  skillsExternallySet = true;
+}
+
+/**
+ * Used by before_agent_start handler to prime the registry from Pi's
+ * skill list. Does nothing if skills were already explicitly set
+ * (e.g., by tests calling setSkills before h.prompt()).
+ */
+export function setSkillsFromEvent(s: Skill[]): void {
+  if (!skillsExternallySet) {
+    skills = s;
+  }
 }
 
 type CommandOptions = Omit<RegisteredCommand, "name" | "sourceInfo">;
@@ -603,6 +630,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function resolveSkillRefs(prompt: string): ResolveResult {
+  const unresolvedSet = new Set<string>();
+  const byName = new Map<string, string>();
+  for (const skill of skills) {
+    byName.set(skill.name, skill.filePath);
+  }
+
+  const rewritten = prompt.replace(
+    /\/skill:([a-z0-9](?:[a-z0-9]|-(?!-))*[a-z0-9])/g,
+    (match, name) => {
+      const filePath = byName.get(name);
+      if (filePath) {
+        return filePath;
+      }
+      unresolvedSet.add(name);
+      return match;
+    },
+  );
+
+  return { rewritten, unresolved: [...unresolvedSet] };
+}
+
+interface ResolveResult {
+  rewritten: string;
+  unresolved: string[];
+}
+
 const pushTaskParameters = Type.Object({
   prompt: Type.String({
     description: "Full prompt for the task, including all context and instructions.",
@@ -615,3 +669,9 @@ const pushTaskParameters = Type.Object({
     }),
   ),
 });
+
+// ── Skill resolution registry ─────────────────────────────────────
+
+let skills: Skill[] = [];
+
+let skillsExternallySet = false;
