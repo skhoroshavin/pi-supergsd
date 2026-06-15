@@ -373,24 +373,12 @@ function registerTestModels(h: TestHarness, models: Array<{ id: string; name: st
   });
 }
 
-function modelSpec(
-  id: string,
-  name: string,
-  reasoning: boolean,
-): {
-  id: string;
-  name: string;
-  reasoning: boolean;
-  input: readonly ["text"];
-  cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
-  contextWindow: number;
-  maxTokens: number;
-} {
+function modelSpec(id: string, name: string, reasoning: boolean) {
   return {
     id,
     name,
     reasoning,
-    input: ["text"] as const,
+    input: ["text"] as Array<"text" | "image">,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 100000,
     maxTokens: 4096,
