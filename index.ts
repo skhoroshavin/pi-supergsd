@@ -9,6 +9,7 @@ import {
   cmdStartTask,
   rendererTaskResult,
   setSkillsFromEvent,
+  setModelRegistry,
   updateTaskStatus,
 } from "./src/index.js";
 
@@ -17,7 +18,7 @@ export default function register(pi: ExtensionAPI): void {
   pi.registerCommand("start-task", cmdStartTask(pi));
   pi.registerCommand("discard-task", cmdDiscardTask(pi));
   pi.registerCommand("finish-task", cmdFinishTask(pi));
-  pi.registerCommand("abort-task", cmdAbortTask());
+  pi.registerCommand("abort-task", cmdAbortTask(pi));
   pi.registerCommand("auto", cmdAuto(pi));
 
   pi.registerMessageRenderer("task-result", rendererTaskResult);
@@ -29,6 +30,7 @@ export default function register(pi: ExtensionAPI): void {
   });
 
   pi.on("session_start", async (_event, ctx) => {
+    setModelRegistry(ctx.modelRegistry);
     updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
   });
 

@@ -20,13 +20,15 @@ This extension also bundles a subset of [Superpowers](https://github.com/obra/su
 
 ## Tools and commands reference
 
-| Command         | Action                                                                               |
-| --------------- | ------------------------------------------------------------------------------------ |
-| `/start-task`   | Saves a checkpoint and starts the pending task in a new branch                       |
-| `/finish-task`  | Returns from task branch to saved checkpoint with the assistant response as a result |
-| `/abort-task`   | Returns from task branch to saved checkpoint without attaching any result            |
-| `/discard-task` | Discards a pending task without executing it                                         |
-| `/auto`         | EXPERIMENTAL! Runs all pending tasks hands-free, including any queued during the run |
+| Command               | Action                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `/start-task [model]` | Saves a checkpoint and starts the pending task in a new branch                       |
+| `/finish-task`        | Returns from task branch to saved checkpoint with the assistant response as a result |
+| `/abort-task`         | Returns from task branch to saved checkpoint without attaching any result            |
+| `/discard-task`       | Discards a pending task without executing it                                         |
+| `/auto`               | EXPERIMENTAL! Runs all pending tasks hands-free, including any queued during the run |
+
+If `[model]` is passed to `/start-task`, the model switches before the task prompt is sent. On `/finish-task` or `/abort-task`, the original model is restored.
 
 ### `push-task` tool
 
