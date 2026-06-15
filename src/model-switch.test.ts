@@ -19,7 +19,9 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task");
+      h.assertModel(FAUX);
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
     } finally {
@@ -37,11 +39,14 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task Cheap");
+      h.assertModel("test-extra/cheap-model");
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
 
       await h.prompt("/finish-task");
+      h.assertModel(FAUX);
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -65,7 +70,9 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task test-extra/cheap-model");
+      h.assertModel("test-extra/cheap-model");
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
     } finally {
@@ -79,8 +86,10 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task nonexistent-model-xyz");
 
+      h.assertModel(FAUX);
       h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
       h.assertStatus("pending task: task-aaa");
       h.assertLastNotification('No model matching "nonexistent-model-xyz".');
@@ -100,8 +109,10 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task cheap-model");
 
+      h.assertModel(FAUX);
       h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
       h.assertStatus("pending task: task-aaa");
       h.assertLastNotification(
@@ -124,15 +135,19 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task cheap");
+      h.assertModel("test-extra/cheap-model");
       h.assertSession(user("Task AAA"), assistant("outer working...", "toolUse"), task("Task BBB"));
 
-      // Start nested without model switch
+      // Start nested without model switch — stays on cheap
       await h.prompt("/start-task");
+      h.assertModel("test-extra/cheap-model");
       h.assertSession(user("Task BBB"), assistant("inner done"));
 
       // Finish nested — no previousModel on its task-start, stays on cheap
       await h.prompt("/finish-task");
+      h.assertModel("test-extra/cheap-model");
       h.assertSession(
         user("Task AAA"),
         assistant("outer working...", "toolUse"),
@@ -143,6 +158,7 @@ describe("model switching on /start-task", () => {
 
       // Finish outer — restores to FAUX_MODEL
       await h.prompt("/finish-task");
+      h.assertModel(FAUX);
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -171,14 +187,18 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task model-a");
+      h.assertModel("test-extra/model-a");
       h.assertSession(user("Task AAA"), assistant("outer working...", "toolUse"), task("Task BBB"));
 
       await h.prompt("/start-task model-b");
+      h.assertModel("test-extra/model-b");
       h.assertSession(user("Task BBB"), assistant("inner done"));
 
       // Finish inner — restores to model-a
       await h.prompt("/finish-task");
+      h.assertModel("test-extra/model-a");
       h.assertSession(
         user("Task AAA"),
         assistant("outer working...", "toolUse"),
@@ -189,6 +209,7 @@ describe("model switching on /start-task", () => {
 
       // Finish outer — restores to FAUX_MODEL
       await h.prompt("/finish-task");
+      h.assertModel(FAUX);
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -219,10 +240,12 @@ describe("model switching on /start-task", () => {
       await h.prompt("main work");
       // Switch to model-a (previousModel = FAUX_MODEL)
       await h.prompt("/start-task model-a");
+      h.assertModel("test-extra/model-a");
       h.assertSession(user("Task AAA"), assistant("outer working...", "toolUse"), task("Task BBB"));
 
       // Switch to model-b inside (previousModel = test-extra/model-a)
       await h.prompt("/start-task model-b");
+      h.assertModel("test-extra/model-b");
       h.assertSession(user("Task BBB"), assistant("inner done"));
 
       // Unregister provider to make model-a (the inner previousModel) unavailable
@@ -230,6 +253,8 @@ describe("model switching on /start-task", () => {
 
       // Finish inner — tries to restore model-a, which is now unavailable
       await h.prompt("/finish-task");
+      // Model stays on model-b (restore failed, active model unchanged)
+      h.assertModel("test-extra/model-b");
       h.assertSession(
         user("Task AAA"),
         assistant("outer working...", "toolUse"),
@@ -237,10 +262,11 @@ describe("model switching on /start-task", () => {
         taskResult("task-bbb", "inner done"),
         assistant("Great!"),
       );
-      h.assertNotification("Previous model test-extra/model-a no longer available.");
+      h.assertLastNotification("Previous model test-extra/model-a no longer available.");
 
       // Finish outer — restores FAUX_MODEL which is still available
       await h.prompt("/finish-task");
+      h.assertModel(FAUX);
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -264,7 +290,9 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task alt");
+      h.assertModel("test-extra/alt-model");
 
       h.assertSession(
         user("main work"),
@@ -276,6 +304,7 @@ describe("model switching on /start-task", () => {
       h.assertStatus("current task: task-aaa");
 
       await h.prompt("/finish-task");
+      h.assertModel(FAUX);
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -299,18 +328,22 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
+      h.assertModel(FAUX);
       await h.prompt("/start-task Cheap");
+      h.assertModel("test-extra/cheap-model");
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
 
       // Abort switches model back and leaves task pending
       await h.prompt("/abort-task");
+      h.assertModel(FAUX);
       h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
       h.assertStatus("pending task: task-aaa");
       h.assertLastNotification("Task aborted. Branch abandoned without summary.");
 
       // Task can be started again (no model arg = FAUX_MODEL, proving restore)
       await h.prompt("/start-task");
+      h.assertModel(FAUX);
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
     } finally {
@@ -318,6 +351,8 @@ describe("model switching on /start-task", () => {
     }
   });
 });
+
+const FAUX = "supergsd-test/deterministic";
 
 /** Register extra test models with configured auth on the harness model registry. */
 function registerTestModels(h: TestHarness, models: Array<{ id: string; name: string }>) {

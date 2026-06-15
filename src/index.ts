@@ -422,8 +422,6 @@ async function finishTask(
   });
   if (result.cancelled) return "cancelled";
 
-  await restorePreviousModel(pi, taskStart, ctx);
-
   // Inject last assistant message after navigation
   if (lastAssistantId && lastAssistantContent !== undefined) {
     pi.sendMessage(
@@ -444,6 +442,8 @@ async function finishTask(
 
   const label = lastAssistantId ? "Last response attached." : "No last response to attach.";
   ctx.ui.notify(`Task finished. ${label}`, "info");
+
+  await restorePreviousModel(pi, taskStart, ctx);
 
   refreshTaskStatus(ctx, { prefix: options.statusPrefix });
 }
@@ -469,9 +469,9 @@ async function abortTask(
   });
   if (result.cancelled) return "cancelled";
 
-  await restorePreviousModel(pi, taskStart, ctx);
-
   ctx.ui.notify("Task aborted. Branch abandoned without summary.", "info");
+
+  await restorePreviousModel(pi, taskStart, ctx);
 
   refreshTaskStatus(ctx, { prefix: options.statusPrefix });
 }
