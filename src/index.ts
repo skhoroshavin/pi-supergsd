@@ -3,6 +3,7 @@ import {
   type ExtensionAPI,
   type ExtensionCommandContext,
   type MessageRenderer,
+  type ModelRegistry,
   type RegisteredCommand,
   type SessionEntry,
   type SessionMessageEntry,
@@ -11,7 +12,9 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
-import { Box, Text } from "@earendil-works/pi-tui";
+import type { Api, Model } from "@earendil-works/pi-ai";
+
+import { Box, Text, type AutocompleteItem } from "@earendil-works/pi-tui";
 
 import { Type, type Static } from "typebox";
 
@@ -94,9 +97,14 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
 export function cmdStartTask(pi: TaskCommandAPI): CommandOptions {
   return {
     description: "Navigate to a fresh context and inject the active task prompt",
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+    getArgumentCompletions: (argumentPrefix: string) => {
+      if (!modelRegistry) return null;
+      return getModelCompletions(argumentPrefix, modelRegistry);
+    },
+    handler: async (args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
-      await startTask(pi, ctx);
+      const modelArg = args.trim() || undefined;
+      await startTask(pi, ctx, { modelArg });
     },
   };
 }
@@ -121,12 +129,12 @@ export function cmdFinishTask(pi: TaskCommandAPI): CommandOptions {
   };
 }
 
-export function cmdAbortTask(): CommandOptions {
+export function cmdAbortTask(pi: TaskCommandAPI): CommandOptions {
   return {
     description: "Abort the current task without finishing",
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
-      await abortTask(ctx);
+      await abortTask(pi, ctx);
     },
   };
 }
@@ -284,6 +292,7 @@ type PushTaskParams = Static<typeof pushTaskParameters>;
 
 type TaskActionOptions = {
   statusPrefix?: string;
+  modelArg?: string;
 };
 
 function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
@@ -307,10 +316,43 @@ async function startTask(
     return;
   }
 
+  // ── Model switching ─────────────────────────────────────────────
+  let previousModel: TaskStartData["previousModel"];
+  if (options.modelArg) {
+    const matched = resolveModelPattern(options.modelArg, ctx.modelRegistry);
+    if (matched === null) {
+      ctx.ui.notify(`No model matching "${options.modelArg}".`, "warning");
+      return;
+    }
+    if (matched === "ambiguous") {
+      const lower = options.modelArg.toLowerCase();
+      const names = ctx.modelRegistry
+        .getAvailable()
+        .filter((m) => modelMatchesPrefix(m, lower))
+        .map((m) => `${m.provider}/${m.id}`)
+        .join(", ");
+      ctx.ui.notify(`Ambiguous model: matches ${names}.`, "warning");
+      return;
+    }
+
+    const currentModel = ctx.model;
+    if (currentModel) {
+      previousModel = { provider: currentModel.provider, modelId: currentModel.id };
+    }
+
+    const switched = await pi.setModel(matched);
+    if (!switched) {
+      ctx.ui.notify(`No API key configured for ${matched.provider}/${matched.id}.`, "warning");
+      return;
+    }
+  }
+
+  // ── Task start ──────────────────────────────────────────────────
   const inheritContext = activeTask.data.inherit_context;
 
+  let departureLeafId: string;
   if (!inheritContext) {
-    const departureLeafId = ctx.sessionManager.getLeafId()!;
+    departureLeafId = ctx.sessionManager.getLeafId()!;
     const freshTargetId = findFreshTargetId(ctx.sessionManager);
     if (!freshTargetId) {
       ctx.ui.notify("No starting point found on current branch.", "warning");
@@ -319,13 +361,15 @@ async function startTask(
 
     const result = await ctx.navigateTree(freshTargetId, { summarize: false });
     if (result.cancelled) return "cancelled";
-
-    pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: departureLeafId });
   } else {
-    pi.appendEntry(TASK_START_ENTRY_TYPE, {
-      returnTo: ctx.sessionManager.getLeafId()!,
-    });
+    departureLeafId = ctx.sessionManager.getLeafId()!;
   }
+
+  const startEntryData: TaskStartData = { returnTo: departureLeafId };
+  if (previousModel) {
+    startEntryData.previousModel = previousModel;
+  }
+  pi.appendEntry(TASK_START_ENTRY_TYPE, startEntryData);
 
   pi.sendUserMessage(activeTask.data.prompt);
 
@@ -378,6 +422,8 @@ async function finishTask(
   });
   if (result.cancelled) return "cancelled";
 
+  await restorePreviousModel(pi, taskStart, ctx);
+
   // Inject last assistant message after navigation
   if (lastAssistantId && lastAssistantContent !== undefined) {
     pi.sendMessage(
@@ -402,9 +448,13 @@ async function finishTask(
   refreshTaskStatus(ctx, { prefix: options.statusPrefix });
 }
 
-type TaskCommandAPI = Pick<ExtensionAPI, "appendEntry" | "sendMessage" | "sendUserMessage">;
+type TaskCommandAPI = Pick<
+  ExtensionAPI,
+  "appendEntry" | "sendMessage" | "sendUserMessage" | "setModel"
+>;
 
 async function abortTask(
+  pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
   options: TaskActionOptions = {},
 ): Promise<TaskActionResult> {
@@ -419,9 +469,30 @@ async function abortTask(
   });
   if (result.cancelled) return "cancelled";
 
+  await restorePreviousModel(pi, taskStart, ctx);
+
   ctx.ui.notify("Task aborted. Branch abandoned without summary.", "info");
 
   refreshTaskStatus(ctx, { prefix: options.statusPrefix });
+}
+
+/** Restore the model that was active before a task started, if one was recorded. */
+async function restorePreviousModel(
+  pi: TaskCommandAPI,
+  taskStart: TaskStartEntry,
+  ctx: ExtensionCommandContext,
+): Promise<void> {
+  if (!taskStart.data.previousModel) return;
+
+  const { provider, modelId } = taskStart.data.previousModel;
+  const restoredModel = ctx.modelRegistry.find(provider, modelId);
+  if (restoredModel) {
+    if (!(await pi.setModel(restoredModel))) {
+      ctx.ui.notify(`Failed to restore previous model ${provider}/${modelId}.`, "warning");
+    }
+  } else {
+    ctx.ui.notify(`Previous model ${provider}/${modelId} no longer available.`, "warning");
+  }
 }
 
 type TaskActionResult = "cancelled" | void;
@@ -619,11 +690,20 @@ type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
 };
 
 function isTaskStartData(value: unknown): value is TaskStartData {
-  return isRecord(value) && typeof value.returnTo === "string";
+  if (!isRecord(value) || typeof value.returnTo !== "string") return false;
+  if (value.previousModel !== undefined) {
+    return (
+      isRecord(value.previousModel) &&
+      typeof value.previousModel.provider === "string" &&
+      typeof value.previousModel.modelId === "string"
+    );
+  }
+  return true;
 }
 
 interface TaskStartData {
   returnTo: string;
+  previousModel?: { provider: string; modelId: string };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -652,9 +732,63 @@ function resolveSkillRefs(prompt: string): ResolveResult {
   return { rewritten, unresolved: [...unresolvedSet] };
 }
 
+/** Check if a model matches a lowercased search string against id, name, or provider/id. */
+function modelMatchesPrefix(m: Model<Api>, lowerPrefix: string): boolean {
+  return (
+    m.id.toLowerCase().includes(lowerPrefix) ||
+    m.name.toLowerCase().includes(lowerPrefix) ||
+    `${m.provider}/${m.id}`.toLowerCase().includes(lowerPrefix)
+  );
+}
+
 interface ResolveResult {
   rewritten: string;
   unresolved: string[];
+}
+
+/**
+ * Resolve a model pattern to a single model, null (no match), or "ambiguous".
+ *
+ * Matching order:
+ * 1. If pattern contains "/": split as provider/modelId, try exact lookup.
+ *    Falls through to substring matching even if the exact lookup fails.
+ * 2. Substring, case-insensitive match against each available model's
+ *    id, name, and provider/id.
+ */
+function resolveModelPattern(
+  pattern: string,
+  registry: ModelRegistry,
+): Model<Api> | "ambiguous" | null {
+  if (pattern.includes("/")) {
+    const slashIdx = pattern.indexOf("/");
+    const provider = pattern.slice(0, slashIdx);
+    const modelId = pattern.slice(slashIdx + 1);
+    const found = registry.find(provider, modelId);
+    if (found) return found;
+  }
+
+  const lowerPattern = pattern.toLowerCase();
+  const matches = registry.getAvailable().filter((m) => modelMatchesPrefix(m, lowerPattern));
+
+  if (matches.length === 0) return null;
+  if (matches.length > 1) return "ambiguous";
+  return matches[0];
+}
+
+/**
+ * Autocompletion for /start-task model argument.
+ * Filters available models by case-insensitive substring match against
+ * id, name, and provider/id. Returns up to 20 items.
+ */
+function getModelCompletions(argumentPrefix: string, registry: ModelRegistry): AutocompleteItem[] {
+  const lowerPrefix = argumentPrefix.toLowerCase();
+  const matched = registry.getAvailable().filter((m) => modelMatchesPrefix(m, lowerPrefix));
+
+  return matched.slice(0, 20).map((m) => ({
+    value: `${m.provider}/${m.id}`,
+    label: m.name,
+    description: `${m.provider}/${m.id}`,
+  }));
 }
 
 const pushTaskParameters = Type.Object({
@@ -675,3 +809,9 @@ const pushTaskParameters = Type.Object({
 let skills: Skill[] = [];
 
 let skillsExternallySet = false;
+
+let modelRegistry: ModelRegistry | undefined;
+
+export function setModelRegistry(mr: ModelRegistry): void {
+  modelRegistry = mr;
+}

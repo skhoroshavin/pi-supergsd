@@ -35,6 +35,10 @@ export class TestHarness {
     private handledSessionEntryIds = new Set<string>(),
   ) {}
 
+  get modelRegistry(): ModelRegistry {
+    return this.session.modelRegistry;
+  }
+
   static async create(): Promise<TestHarness> {
     const cwd = process.cwd();
     const agentDir = getAgentDir();
@@ -126,6 +130,13 @@ export class TestHarness {
 
   assertLastNotification(expected: string | undefined): void {
     assert.strictEqual(this.testUi.lastNotification, expected);
+  }
+
+  assertNotification(expected: string): void {
+    assert.ok(
+      this.testUi.notifications().some((n) => n.includes(expected)),
+      `Expected notification containing: ${JSON.stringify(expected)}. Got: ${JSON.stringify(this.testUi.notifications())}`,
+    );
   }
 
   assertSession(...expected: TestSessionEntry[]): void {

@@ -5,12 +5,14 @@ import { Theme } from "@earendil-works/pi-coding-agent";
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 
 export class TestUi {
+  #notifications: string[] = [];
   #lastNotification: string | undefined;
   #lastStatus: string | undefined;
 
   readonly context: ExtensionUIContext = {
     ...noOpContext,
     notify: (message: string) => {
+      this.#notifications.push(normalizeText(message) ?? "");
       this.#lastNotification = normalizeText(message);
     },
     setStatus: (key: string, value: string | undefined) => {
@@ -25,6 +27,10 @@ export class TestUi {
 
   get lastNotification(): string | undefined {
     return this.#lastNotification;
+  }
+
+  notifications(): string[] {
+    return [...this.#notifications];
   }
 }
 
