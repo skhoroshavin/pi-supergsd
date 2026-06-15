@@ -19,9 +19,9 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       await h.prompt("/start-task");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
     } finally {
@@ -31,7 +31,7 @@ describe("model switching on /start-task", () => {
 
   it("switches model and restores on finish (substring match)", async () => {
     const h = await TestHarness.create();
-    registerTestModels(h, [{ id: "cheap-model", name: "Cheap Model" }]);
+    registerTestModels(h, [{ id: "other-model", name: "Other Model" }]);
 
     h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
     h.llm.onPrompt("Task AAA", responds("Done."));
@@ -39,14 +39,14 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
-      await h.prompt("/start-task Cheap");
-      h.assertModel("test-extra/cheap-model");
+      h.assertModel("supergsd-test/deterministic");
+      await h.prompt("/start-task Other");
+      h.assertModel("supergsd-test/other-model");
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
 
       await h.prompt("/finish-task");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -62,7 +62,7 @@ describe("model switching on /start-task", () => {
 
   it("switches model via provider/modelId syntax", async () => {
     const h = await TestHarness.create();
-    registerTestModels(h, [{ id: "cheap-model", name: "Cheap Model" }]);
+    registerTestModels(h, [{ id: "other-model", name: "Other Model" }]);
 
     h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
     h.llm.onPrompt("Task AAA", responds("Done."));
@@ -70,9 +70,9 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
-      await h.prompt("/start-task test-extra/cheap-model");
-      h.assertModel("test-extra/cheap-model");
+      h.assertModel("supergsd-test/deterministic");
+      await h.prompt("/start-task supergsd-test/other-model");
+      h.assertModel("supergsd-test/other-model");
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
     } finally {
@@ -86,10 +86,10 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       await h.prompt("/start-task nonexistent-model-xyz");
 
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
       h.assertStatus("pending task: task-aaa");
       h.assertLastNotification('No model matching "nonexistent-model-xyz".');
@@ -101,22 +101,22 @@ describe("model switching on /start-task", () => {
   it("notifies when multiple models match", async () => {
     const h = await TestHarness.create();
     registerTestModels(h, [
-      { id: "cheap-model-v1", name: "Cheap Model V1" },
-      { id: "cheap-model-v2", name: "Cheap Model V2" },
+      { id: "other-model-v1", name: "Other Model V1" },
+      { id: "other-model-v2", name: "Other Model V2" },
     ]);
 
     h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
-      await h.prompt("/start-task cheap-model");
+      h.assertModel("supergsd-test/deterministic");
+      await h.prompt("/start-task other-model");
 
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
       h.assertStatus("pending task: task-aaa");
       h.assertLastNotification(
-        "Ambiguous model: matches test-extra/cheap-model-v1, test-extra/cheap-model-v2.",
+        "Ambiguous model: matches supergsd-test/other-model-v1, supergsd-test/other-model-v2.",
       );
     } finally {
       h.dispose();
@@ -125,7 +125,7 @@ describe("model switching on /start-task", () => {
 
   it("restores original model on nested task finish", async () => {
     const h = await TestHarness.create();
-    registerTestModels(h, [{ id: "cheap-model", name: "Cheap Model" }]);
+    registerTestModels(h, [{ id: "other-model", name: "Other Model" }]);
 
     h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
     h.llm.onPrompt("Task AAA", responds("outer working..."), pushTask("Task BBB"));
@@ -135,19 +135,19 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
-      await h.prompt("/start-task cheap");
-      h.assertModel("test-extra/cheap-model");
+      h.assertModel("supergsd-test/deterministic");
+      await h.prompt("/start-task other");
+      h.assertModel("supergsd-test/other-model");
       h.assertSession(user("Task AAA"), assistant("outer working...", "toolUse"), task("Task BBB"));
 
-      // Start nested without model switch — stays on cheap
+      // Start nested without model switch — stays on other-model
       await h.prompt("/start-task");
-      h.assertModel("test-extra/cheap-model");
+      h.assertModel("supergsd-test/other-model");
       h.assertSession(user("Task BBB"), assistant("inner done"));
 
-      // Finish nested — no previousModel on its task-start, stays on cheap
+      // Finish nested — no previousModel on its task-start, stays on other-model
       await h.prompt("/finish-task");
-      h.assertModel("test-extra/cheap-model");
+      h.assertModel("supergsd-test/other-model");
       h.assertSession(
         user("Task AAA"),
         assistant("outer working...", "toolUse"),
@@ -156,9 +156,9 @@ describe("model switching on /start-task", () => {
         assistant("Great!"),
       );
 
-      // Finish outer — restores to FAUX_MODEL
+      // Finish outer — restores to deterministic
       await h.prompt("/finish-task");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -187,18 +187,18 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       await h.prompt("/start-task model-a");
-      h.assertModel("test-extra/model-a");
+      h.assertModel("supergsd-test/model-a");
       h.assertSession(user("Task AAA"), assistant("outer working...", "toolUse"), task("Task BBB"));
 
       await h.prompt("/start-task model-b");
-      h.assertModel("test-extra/model-b");
+      h.assertModel("supergsd-test/model-b");
       h.assertSession(user("Task BBB"), assistant("inner done"));
 
       // Finish inner — restores to model-a
       await h.prompt("/finish-task");
-      h.assertModel("test-extra/model-a");
+      h.assertModel("supergsd-test/model-a");
       h.assertSession(
         user("Task AAA"),
         assistant("outer working...", "toolUse"),
@@ -207,9 +207,9 @@ describe("model switching on /start-task", () => {
         assistant("Great!"),
       );
 
-      // Finish outer — restores to FAUX_MODEL
+      // Finish outer — restores to deterministic
       await h.prompt("/finish-task");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -238,23 +238,31 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      // Switch to model-a (previousModel = FAUX_MODEL)
+      // Switch to model-a (previousModel = deterministic)
       await h.prompt("/start-task model-a");
-      h.assertModel("test-extra/model-a");
+      h.assertModel("supergsd-test/model-a");
       h.assertSession(user("Task AAA"), assistant("outer working...", "toolUse"), task("Task BBB"));
 
-      // Switch to model-b inside (previousModel = test-extra/model-a)
+      // Switch to model-b inside (previousModel = model-a)
       await h.prompt("/start-task model-b");
-      h.assertModel("test-extra/model-b");
+      h.assertModel("supergsd-test/model-b");
       h.assertSession(user("Task BBB"), assistant("inner done"));
 
-      // Unregister provider to make model-a (the inner previousModel) unavailable
-      h.modelRegistry.unregisterProvider("test-extra");
+      // Re-register without model-a to make it unavailable
+      h.modelRegistry.registerProvider("supergsd-test", {
+        baseUrl: "memory://supergsd-test",
+        apiKey: "test-key",
+        api: "supergsd-test-api",
+        models: [
+          modelSpec("deterministic", "Deterministic Test Model", true),
+          modelSpec("model-b", "Model B", false),
+        ],
+      });
 
       // Finish inner — tries to restore model-a, which is now unavailable
       await h.prompt("/finish-task");
       // Model stays on model-b (restore failed, active model unchanged)
-      h.assertModel("test-extra/model-b");
+      h.assertModel("supergsd-test/model-b");
       h.assertSession(
         user("Task AAA"),
         assistant("outer working...", "toolUse"),
@@ -262,11 +270,11 @@ describe("model switching on /start-task", () => {
         taskResult("task-bbb", "inner done"),
         assistant("Great!"),
       );
-      h.assertLastNotification("Previous model test-extra/model-a no longer available.");
+      h.assertLastNotification("Previous model supergsd-test/model-a no longer available.");
 
-      // Finish outer — restores FAUX_MODEL which is still available
+      // Finish outer — restores deterministic which is still available
       await h.prompt("/finish-task");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -290,9 +298,9 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       await h.prompt("/start-task alt");
-      h.assertModel("test-extra/alt-model");
+      h.assertModel("supergsd-test/alt-model");
 
       h.assertSession(
         user("main work"),
@@ -304,7 +312,7 @@ describe("model switching on /start-task", () => {
       h.assertStatus("current task: task-aaa");
 
       await h.prompt("/finish-task");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
@@ -320,7 +328,7 @@ describe("model switching on /start-task", () => {
 
   it("restores model on abort-task and leaves task pending", async () => {
     const h = await TestHarness.create();
-    registerTestModels(h, [{ id: "cheap-model", name: "Cheap Model" }]);
+    registerTestModels(h, [{ id: "other-model", name: "Other Model" }]);
 
     h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
     h.llm.onPrompt("Task AAA", responds("Done."));
@@ -328,22 +336,22 @@ describe("model switching on /start-task", () => {
 
     try {
       await h.prompt("main work");
-      h.assertModel(FAUX);
-      await h.prompt("/start-task Cheap");
-      h.assertModel("test-extra/cheap-model");
+      h.assertModel("supergsd-test/deterministic");
+      await h.prompt("/start-task other");
+      h.assertModel("supergsd-test/other-model");
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
 
       // Abort switches model back and leaves task pending
       await h.prompt("/abort-task");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(user("main work"), assistant("working...", "toolUse"), task("Task AAA"));
       h.assertStatus("pending task: task-aaa");
       h.assertLastNotification("Task aborted. Branch abandoned without summary.");
 
-      // Task can be started again (no model arg = FAUX_MODEL, proving restore)
+      // Task can be started again (no model arg = deterministic, proving restore)
       await h.prompt("/start-task");
-      h.assertModel(FAUX);
+      h.assertModel("supergsd-test/deterministic");
       h.assertSession(user("Task AAA"), assistant("Done."));
       h.assertStatus("current task: task-aaa");
     } finally {
@@ -352,22 +360,39 @@ describe("model switching on /start-task", () => {
   });
 });
 
-const FAUX = "supergsd-test/deterministic";
-
-/** Register extra test models with configured auth on the harness model registry. */
+/** Register extra test models under the supergsd-test provider. */
 function registerTestModels(h: TestHarness, models: Array<{ id: string; name: string }>) {
-  h.modelRegistry.registerProvider("test-extra", {
-    baseUrl: "memory://test-extra",
-    apiKey: "test-key-extra",
+  h.modelRegistry.registerProvider("supergsd-test", {
+    baseUrl: "memory://supergsd-test",
+    apiKey: "test-key",
     api: "supergsd-test-api",
-    models: models.map((m) => ({
-      id: m.id,
-      name: m.name,
-      reasoning: false,
-      input: ["text"] as const,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 100000,
-      maxTokens: 4096,
-    })),
+    models: [
+      modelSpec("deterministic", "Deterministic Test Model", true),
+      ...models.map((m) => modelSpec(m.id, m.name, false)),
+    ],
   });
+}
+
+function modelSpec(
+  id: string,
+  name: string,
+  reasoning: boolean,
+): {
+  id: string;
+  name: string;
+  reasoning: boolean;
+  input: readonly ["text"];
+  cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  contextWindow: number;
+  maxTokens: number;
+} {
+  return {
+    id,
+    name,
+    reasoning,
+    input: ["text"] as const,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 100000,
+    maxTokens: 4096,
+  };
 }
