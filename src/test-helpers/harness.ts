@@ -132,11 +132,11 @@ export class TestHarness {
     assert.strictEqual(this.testUi.lastNotification, expected);
   }
 
-  assertNotification(expected: string): void {
-    assert.ok(
-      this.testUi.notifications().some((n) => n.includes(expected)),
-      `Expected notification containing: ${JSON.stringify(expected)}. Got: ${JSON.stringify(this.testUi.notifications())}`,
-    );
+  assertModel(expected: string): void {
+    const current = this.session.model;
+    assert.ok(current, "Expected a model to be set, but none is active.");
+    const got = `${current.provider}/${current.id}`;
+    assert.strictEqual(got, expected, `Expected model ${expected}, got ${got}`);
   }
 
   assertSession(...expected: TestSessionEntry[]): void {
