@@ -326,10 +326,7 @@ async function startTask(
       return;
     }
     if (matched === "ambiguous") {
-      const lower = options.modelArg.toLowerCase();
-      const names = ctx.modelRegistry
-        .getAvailable()
-        .filter((m) => modelMatchesPrefix(m, lower))
+      const names = matchModels(options.modelArg, ctx.modelRegistry)
         .map((m) => `${m.provider}/${m.id}`)
         .join(", ");
       ctx.ui.notify(`Ambiguous model: matches ${names}.`, "warning");
@@ -376,7 +373,6 @@ async function startTask(
 async function discardTask(
   pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
-  options: TaskActionOptions = {},
 ): Promise<TaskActionResult> {
   const activeTask = pendingTask(ctx.sessionManager);
   if (!activeTask) {
@@ -387,7 +383,7 @@ async function discardTask(
   pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
   ctx.ui.notify("Task discarded.", "info");
 
-  refreshTaskStatus(ctx, { prefix: options.statusPrefix });
+  refreshTaskStatus(ctx);
 }
 
 async function finishTask(
@@ -451,7 +447,6 @@ type TaskCommandAPI = Pick<
 async function abortTask(
   pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
-  options: TaskActionOptions = {},
 ): Promise<TaskActionResult> {
   const taskStart = currentTask(ctx.sessionManager);
   if (!taskStart) {
@@ -468,7 +463,7 @@ async function abortTask(
 
   await restorePreviousModel(pi, taskStart, ctx);
 
-  refreshTaskStatus(ctx, { prefix: options.statusPrefix });
+  refreshTaskStatus(ctx);
 }
 
 /** Restore the model that was active before a task started, if one was recorded. */
@@ -704,13 +699,17 @@ function resolveSkillRefs(prompt: string): ResolveResult {
   return { rewritten, unresolved: [...unresolvedSet] };
 }
 
-/** Check if a model matches a lowercased search string against id, name, or provider/id. */
-function modelMatchesPrefix(m: Model<Api>, lowerPrefix: string): boolean {
-  return (
-    m.id.toLowerCase().includes(lowerPrefix) ||
-    m.name.toLowerCase().includes(lowerPrefix) ||
-    `${m.provider}/${m.id}`.toLowerCase().includes(lowerPrefix)
-  );
+/** Case-insensitive substring match of `pattern` against each available model's id, name, or provider/id. */
+function matchModels(pattern: string, registry: ModelRegistry): Model<Api>[] {
+  const lower = pattern.toLowerCase();
+  return registry
+    .getAvailable()
+    .filter(
+      (m) =>
+        m.id.toLowerCase().includes(lower) ||
+        m.name.toLowerCase().includes(lower) ||
+        `${m.provider}/${m.id}`.toLowerCase().includes(lower),
+    );
 }
 
 interface ResolveResult {
@@ -733,15 +732,11 @@ function resolveModelPattern(
 ): Model<Api> | "ambiguous" | null {
   if (pattern.includes("/")) {
     const slashIdx = pattern.indexOf("/");
-    const provider = pattern.slice(0, slashIdx);
-    const modelId = pattern.slice(slashIdx + 1);
-    const found = registry.find(provider, modelId);
+    const found = registry.find(pattern.slice(0, slashIdx), pattern.slice(slashIdx + 1));
     if (found) return found;
   }
 
-  const lowerPattern = pattern.toLowerCase();
-  const matches = registry.getAvailable().filter((m) => modelMatchesPrefix(m, lowerPattern));
-
+  const matches = matchModels(pattern, registry);
   if (matches.length === 0) return null;
   if (matches.length > 1) return "ambiguous";
   return matches[0];
@@ -753,14 +748,13 @@ function resolveModelPattern(
  * id, name, and provider/id. Returns up to 20 items.
  */
 function getModelCompletions(argumentPrefix: string, registry: ModelRegistry): AutocompleteItem[] {
-  const lowerPrefix = argumentPrefix.toLowerCase();
-  const matched = registry.getAvailable().filter((m) => modelMatchesPrefix(m, lowerPrefix));
-
-  return matched.slice(0, 20).map((m) => ({
-    value: `${m.provider}/${m.id}`,
-    label: m.name,
-    description: `${m.provider}/${m.id}`,
-  }));
+  return matchModels(argumentPrefix, registry)
+    .slice(0, 20)
+    .map((m) => ({
+      value: `${m.provider}/${m.id}`,
+      label: m.name,
+      description: `${m.provider}/${m.id}`,
+    }));
 }
 
 const pushTaskParameters = Type.Object({
