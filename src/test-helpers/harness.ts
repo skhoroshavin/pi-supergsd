@@ -143,6 +143,11 @@ export class TestHarness {
     assert.deepStrictEqual(this.testSession.entries(), expected);
   }
 
+  /** Inject a raw custom entry (for testing legacy/edge-case session shapes). */
+  appendCustomEntry(customType: string, data: unknown): void {
+    this.sessionManager.appendCustomEntry(customType, data);
+  }
+
   assertSessionContains(...expected: TestSessionEntry[]): void {
     const actual = this.testSession.allEntries();
     for (const expectedEntry of expected) {

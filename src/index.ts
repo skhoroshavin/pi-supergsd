@@ -240,13 +240,19 @@ export function updateTaskStatus(
   const prefix = options.prefix ?? "";
   const pending = pendingTask(session);
   if (pending) {
-    setStatus("task", `${prefix}${theme.fg("dim", `pending task: ${pending.data.title}`)}`);
+    setStatus(
+      "task",
+      `${prefix}${theme.fg("dim", `pending task: ${taskTitle(pending.data.title)}`)}`,
+    );
     return;
   }
 
   const active = currentTask(session);
   if (active) {
-    setStatus("task", `${prefix}${theme.fg("dim", `current task: ${active.data.title}`)}`);
+    setStatus(
+      "task",
+      `${prefix}${theme.fg("dim", `current task: ${taskTitle(active.data.title)}`)}`,
+    );
     return;
   }
 
@@ -354,7 +360,7 @@ async function startTask(
   if (result.cancelled) return "cancelled";
 
   const startEntryData: TaskStartData = {
-    title: activeTask.data.title,
+    title: taskTitle(activeTask.data.title),
     returnTo: departureLeafId,
   };
   if (previousModel) {
@@ -404,7 +410,7 @@ async function finishTask(
     : undefined;
   const lastAssistantId = lastAssistant?.id;
 
-  const title = taskStart.data.title;
+  const title = taskTitle(taskStart.data.title);
 
   const result = await ctx.navigateTree(taskStart.data.returnTo, {
     summarize: false,
@@ -610,11 +616,15 @@ type TaskEntry = CustomEntry<typeof TASK_ENTRY_TYPE, TaskData>;
 const TASK_ENTRY_TYPE = "task";
 
 function isTaskData(value: unknown): value is TaskData {
-  return isRecord(value) && typeof value.title === "string" && typeof value.prompt === "string";
+  return (
+    isRecord(value) &&
+    typeof value.prompt === "string" &&
+    (value.title === undefined || typeof value.title === "string")
+  );
 }
 
 interface TaskData {
-  title: string;
+  title?: string;
   prompt: string;
 }
 
@@ -641,7 +651,11 @@ type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
 };
 
 function isTaskStartData(value: unknown): value is TaskStartData {
-  if (!isRecord(value) || typeof value.title !== "string" || typeof value.returnTo !== "string") {
+  if (
+    !isRecord(value) ||
+    typeof value.returnTo !== "string" ||
+    (value.title !== undefined && typeof value.title !== "string")
+  ) {
     return false;
   }
   if (value.previousModel !== undefined) {
@@ -655,13 +669,18 @@ function isTaskStartData(value: unknown): value is TaskStartData {
 }
 
 interface TaskStartData {
-  title: string;
+  title?: string;
   returnTo: string;
   previousModel?: { provider: string; modelId: string };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/** Normalize an optional title to a non-empty display string. */
+function taskTitle(title?: string): string {
+  return title || "untitled";
 }
 
 function resolveSkillRefs(prompt: string): ResolveResult {
