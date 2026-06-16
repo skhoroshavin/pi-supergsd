@@ -260,14 +260,13 @@ export class TestHarness {
 function isTaskEntryData(entry: SessionEntry): entry is SessionEntry & {
   type: "custom";
   customType: "task";
-  data: { prompt: string; inherit_context: boolean };
+  data: { prompt: string };
 } {
   return (
     entry.type === "custom" &&
     entry.customType === "task" &&
     isRecord(entry.data) &&
-    typeof entry.data.prompt === "string" &&
-    typeof entry.data.inherit_context === "boolean"
+    typeof entry.data.prompt === "string"
   );
 }
 

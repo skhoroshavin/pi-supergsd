@@ -34,9 +34,7 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
     ],
     parameters: pushTaskParameters,
     renderCall(args: PushTaskParams, theme, context) {
-      const header =
-        theme.fg("toolTitle", theme.bold("push-task")) +
-        (args.inherit_context ? " " + theme.fg("warning", "[inherit]") : "");
+      const header = theme.fg("toolTitle", theme.bold("push-task"));
 
       const promptLines = args.prompt.split("\n");
       const maxLines = context.expanded ? promptLines.length : 7;
@@ -66,7 +64,6 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
 
       pi.appendEntry(TASK_ENTRY_TYPE, {
         prompt: rewritten,
-        inherit_context: params.inherit_context ?? false,
       });
 
       if (ctx.hasUI) {
@@ -86,7 +83,6 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
         content: [],
         details: {
           prompt: rewritten,
-          inherit_context: params.inherit_context ?? false,
         },
         terminate: true,
       };
@@ -348,22 +344,15 @@ async function startTask(
   }
 
   // ── Task start ──────────────────────────────────────────────────
-  const inheritContext = activeTask.data.inherit_context;
-
-  let departureLeafId: string;
-  if (!inheritContext) {
-    departureLeafId = ctx.sessionManager.getLeafId()!;
-    const freshTargetId = findFreshTargetId(ctx.sessionManager);
-    if (!freshTargetId) {
-      ctx.ui.notify("No starting point found on current branch.", "warning");
-      return;
-    }
-
-    const result = await ctx.navigateTree(freshTargetId, { summarize: false });
-    if (result.cancelled) return "cancelled";
-  } else {
-    departureLeafId = ctx.sessionManager.getLeafId()!;
+  const departureLeafId = ctx.sessionManager.getLeafId()!;
+  const freshTargetId = findFreshTargetId(ctx.sessionManager);
+  if (!freshTargetId) {
+    ctx.ui.notify("No starting point found on current branch.", "warning");
+    return;
   }
+
+  const result = await ctx.navigateTree(freshTargetId, { summarize: false });
+  if (result.cancelled) return "cancelled";
 
   const startEntryData: TaskStartData = { returnTo: departureLeafId };
   if (previousModel) {
@@ -655,16 +644,11 @@ type TaskEntry = CustomEntry<typeof TASK_ENTRY_TYPE, TaskData>;
 const TASK_ENTRY_TYPE = "task";
 
 function isTaskData(value: unknown): value is TaskData {
-  return (
-    isRecord(value) &&
-    typeof value.prompt === "string" &&
-    typeof value.inherit_context === "boolean"
-  );
+  return isRecord(value) && typeof value.prompt === "string";
 }
 
 interface TaskData {
   prompt: string;
-  inherit_context: boolean;
 }
 
 function isTaskStartEntry(entry: SessionEntry): entry is TaskStartEntry {
@@ -795,13 +779,6 @@ const pushTaskParameters = Type.Object({
   prompt: Type.String({
     description: "Full prompt for the task, including all context and instructions.",
   }),
-  inherit_context: Type.Optional(
-    Type.Boolean({
-      default: false,
-      description:
-        "Whether to inherit the current branch context instead of starting fresh. Never set it to true, unless explicitly requested by the user.",
-    }),
-  ),
 });
 
 // ── Skill resolution registry ─────────────────────────────────────

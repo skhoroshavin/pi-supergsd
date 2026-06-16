@@ -100,7 +100,6 @@ function makeAssistantMessage(responses: MockLLMDescriptor[]): AssistantMessage 
           "push-task",
           {
             prompt: descriptor.prompt,
-            inherit_context: descriptor.inherit_context,
           },
           { id: `call-${index + 1}` },
         );

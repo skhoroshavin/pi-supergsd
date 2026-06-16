@@ -288,44 +288,6 @@ describe("model switching on /start-task", () => {
     }
   });
 
-  it("model switch works with inherit-context tasks", async () => {
-    const h = await TestHarness.create();
-    registerTestModels(h, [{ id: "alt-model", name: "Alt Model" }]);
-
-    h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA", true));
-    h.llm.onPrompt("Task AAA", responds("Done."));
-    h.llm.onPrompt("Done.", responds("Great!"));
-
-    try {
-      await h.prompt("main work");
-      h.assertModel("supergsd-test/deterministic");
-      await h.prompt("/start-task alt");
-      h.assertModel("supergsd-test/alt-model");
-
-      h.assertSession(
-        user("main work"),
-        assistant("working...", "toolUse"),
-        task("Task AAA", true),
-        user("Task AAA"),
-        assistant("Done."),
-      );
-      h.assertStatus("current task: task-aaa");
-
-      await h.prompt("/finish-task");
-      h.assertModel("supergsd-test/deterministic");
-      h.assertSession(
-        user("main work"),
-        assistant("working...", "toolUse"),
-        task("Task AAA", true),
-        taskResult("task-aaa", "Done."),
-        assistant("Great!"),
-      );
-      h.assertStatus();
-    } finally {
-      h.dispose();
-    }
-  });
-
   it("restores model on abort-task and leaves task pending", async () => {
     const h = await TestHarness.create();
     registerTestModels(h, [{ id: "other-model", name: "Other Model" }]);

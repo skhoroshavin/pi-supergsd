@@ -15,55 +15,22 @@ import {
 } from "./test-helpers/index.js";
 
 describe("automated workflow", () => {
-  it("completes push-task -> /auto -> finish-task and injects the branch result", async () => {
+  it("always starts queued tasks from fresh context", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds("working on main..."), pushTask("Analyze performance."));
+    h.llm.onPrompt("main work", responds("working..."), pushTask("Quick fix."));
 
-    // Task-execution
-    h.llm.onPrompt("Analyze performance.", responds("Found 3 bottlenecks: ..."));
-    h.llm.onPrompt("Found 3 bottlenecks: ...", responds(""));
-
-    // Leaf continuation
-    h.llm.onPrompt("working on main...", responds(""));
-
-    try {
-      await h.prompt("main work");
-
-      await h.prompt("/auto");
-
-      h.assertSession(
-        user("main work"),
-        assistant("working on main...", "toolUse"),
-        task("Analyze performance."),
-        taskResult("analyze-performance", "Found 3 bottlenecks: ..."),
-        assistant(""),
-      );
-      h.assertStatus();
-    } finally {
-      h.dispose();
-    }
-  });
-
-  it("returns the branch result to the original leaf for branch-context tasks", async () => {
-    const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds("working..."), pushTask("Quick fix.", true));
-
-    // Task-execution
     h.llm.onPrompt("Quick fix.", responds("Fixed the bug."));
     h.llm.onPrompt("Fixed the bug.", responds(""));
-
-    // Leaf continuation
     h.llm.onPrompt("working...", responds(""));
 
     try {
       await h.prompt("main work");
-
       await h.prompt("/auto");
 
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
-        task("Quick fix.", true),
+        task("Quick fix."),
         taskResult("quick-fix", "Fixed the bug."),
         assistant(""),
       );
@@ -113,7 +80,7 @@ describe("automated workflow", () => {
 
   it("stops when the last assistant message is aborted to empty text", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""), pushTask("Implement phase 1.", true));
+    h.llm.onPrompt("start", responds(""), pushTask("Implement phase 1."));
 
     h.llm.onPrompt("Implement phase 1.", responds("ABCDEFGHIJ"));
     h.user.onAssistant("FGHI", userEsc());
@@ -123,13 +90,7 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("start"),
-        assistant("", "toolUse"),
-        task("Implement phase 1.", true),
-        user("Implement phase 1."),
-        assistantAborted(),
-      );
+      h.assertSession(user("Implement phase 1."), assistantAborted());
       h.assertStatus("current task: implement-phase-1");
     } finally {
       h.dispose();
@@ -174,7 +135,7 @@ describe("automated workflow", () => {
 
   it("continues processing when user queues a steering message during auto", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""), pushTask("Quick fix.", true));
+    h.llm.onPrompt("start", responds(""), pushTask("Quick fix."));
 
     // Task-execution
     h.llm.onPrompt("Quick fix.", responds("thinking..."));
@@ -193,7 +154,7 @@ describe("automated workflow", () => {
       h.assertSession(
         user("start"),
         assistant("", "toolUse"),
-        task("Quick fix.", true),
+        task("Quick fix."),
         taskResult("quick-fix", "adjusted response"),
         assistant(""),
       );
@@ -205,7 +166,7 @@ describe("automated workflow", () => {
 
   it("stops when session is shut down during auto", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""), pushTask("Shutdown task", true));
+    h.llm.onPrompt("start", responds(""), pushTask("Shutdown task"));
 
     // Task-execution
     h.llm.onPrompt("Shutdown task", responds("working..."));
@@ -219,13 +180,7 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("start"),
-        assistant("", "toolUse"),
-        task("Shutdown task", true),
-        user("Shutdown task"),
-        assistant("working..."),
-      );
+      h.assertSession(user("Shutdown task"), assistant("working..."));
       h.assertStatus("current task: shutdown-task");
     } finally {
       h.dispose();

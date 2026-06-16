@@ -50,10 +50,10 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
   it("calls the real push-task tool from a faux provider tool call", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("delegate work", pushTask("subtask", true));
+    h.llm.onPrompt("delegate work", pushTask("subtask"));
 
     await h.prompt("delegate work");
-    h.assertSession(user("delegate work"), assistant("", "toolUse"), task("subtask", true));
+    h.assertSession(user("delegate work"), assistant("", "toolUse"), task("subtask"));
     h.assertStatus("pending task: subtask");
     h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });

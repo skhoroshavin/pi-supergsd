@@ -47,10 +47,10 @@ export const assistant = (content: string, stopReason?: string) => ({
 
 export const assistantAborted = () => assistant("", "aborted");
 
-export const task = (prompt: string, inherit_context = false) => ({
+export const task = (prompt: string) => ({
   type: "custom" as const,
   customType: "task" as const,
-  data: { prompt, inherit_context },
+  data: { prompt },
 });
 
 export const taskResult = (slug: string, content?: string) => ({
@@ -88,7 +88,7 @@ function sessionEntries(entries: PiSessionEntry[]): SessionEntry[] {
         break;
       case "custom":
         if (entry.customType === "task" && isTaskData(entry.data)) {
-          result.push(task(entry.data.prompt, entry.data.inherit_context));
+          result.push(task(entry.data.prompt));
         }
         break;
       case "custom_message":
@@ -112,12 +112,8 @@ function visibleStopReason(stopReason: unknown): string | undefined {
   return typeof stopReason === "string" && stopReason !== "stop" ? stopReason : undefined;
 }
 
-function isTaskData(value: unknown): value is { prompt: string; inherit_context: boolean } {
-  return (
-    isRecord(value) &&
-    typeof value.prompt === "string" &&
-    typeof value.inherit_context === "boolean"
-  );
+function isTaskData(value: unknown): value is { prompt: string } {
+  return isRecord(value) && typeof value.prompt === "string";
 }
 
 function hasSlug(value: unknown): value is { slug: string } {
