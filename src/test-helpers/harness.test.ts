@@ -96,16 +96,16 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.llm.onPrompt(
       "Analyze X",
       responds("preparing subagent"),
-      pushTask("Analys X", "Detailed X analysis"),
+      pushTask("Analyse X", "Analysis details"),
     );
 
     await h.prompt("Analyze X");
     h.assertSession(
       user("Analyze X"),
       assistant("preparing subagent", "toolUse"),
-      task("Analys X", "Detailed X analysis"),
+      task("Analyse X", "Analysis details"),
     );
-    h.assertStatus("pending task: Analys X");
+    h.assertStatus("pending task: Analyse X");
     h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
