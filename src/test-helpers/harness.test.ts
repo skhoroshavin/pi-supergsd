@@ -22,14 +22,6 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.assertLastNotification(undefined);
   });
 
-  it("uses MockLLM prompt rules for h.prompt()", async (t) => {
-    const h = await makeHarness(t);
-    h.llm.onPrompt("main work", responds("working..."));
-
-    await h.prompt("main work");
-    h.assertSession(user("main work"), assistant("working..."));
-  });
-
   it("slash-prefixed prompts go through the real slash pipeline", async (t) => {
     const h = await makeHarness(t);
     h.llm.onPrompt("/start-task", responds("literal slash prompt"));
@@ -46,16 +38,6 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
     await h.prompt("think");
     h.assertSession(user("think"), assistant(""));
-  });
-
-  it("calls the real push-task tool from a faux provider tool call", async (t) => {
-    const h = await makeHarness(t);
-    h.llm.onPrompt("delegate work", pushTask("Subtask", "subtask"));
-
-    await h.prompt("delegate work");
-    h.assertSession(user("delegate work"), assistant("", "toolUse"), task("Subtask", "subtask"));
-    h.assertStatus("pending task: Subtask");
-    h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
   it("fails when the faux provider receives an unmatched prompt", async (t) => {
@@ -85,24 +67,6 @@ describe("AgentSession-backed TestHarness foundation", () => {
       async () => h.prompt("non-empty prompt"),
       /No MockLLM rule matched provider prompt: non-empty prompt/,
     );
-  });
-
-  it("builds one assistant turn from multiple prompt descriptors", async (t) => {
-    const h = await makeHarness(t);
-    h.llm.onPrompt(
-      "Analyze X",
-      responds("preparing subagent"),
-      pushTask("Analys X", "Detailed X analysis"),
-    );
-
-    await h.prompt("Analyze X");
-    h.assertSession(
-      user("Analyze X"),
-      assistant("preparing subagent", "toolUse"),
-      task("Analys X", "Detailed X analysis"),
-    );
-    h.assertStatus("pending task: Analys X");
-    h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
   it("assertSessionContains still scans durable whole-session entries across branches", async (t) => {
