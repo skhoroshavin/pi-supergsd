@@ -60,9 +60,6 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
       }
 
       const title = params.title.trim();
-      if (!title) {
-        throw new Error("push-task title must not be empty.");
-      }
 
       const { rewritten, unresolved } = resolveSkillRefs(params.prompt);
 

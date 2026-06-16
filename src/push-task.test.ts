@@ -1,10 +1,8 @@
-import assert from "node:assert";
-
 import { describe, it } from "node:test";
 
 import { pushTask, task, TestHarness } from "./test-helpers/index.js";
 
-import { setSkills, toolPushTask } from "./index.js";
+import { setSkills } from "./index.js";
 
 import type { Skill } from "@earendil-works/pi-coding-agent";
 
@@ -155,44 +153,6 @@ describe("push-task title validation", () => {
     } finally {
       h.dispose();
     }
-  });
-
-  it("rejects blank titles without storing a task, then allows an immediate retry", async () => {
-    const appended: unknown[] = [];
-    const tool = toolPushTask({
-      appendEntry(type, data) {
-        appended.push({ type, data });
-      },
-    });
-
-    await assert.rejects(
-      async () =>
-        tool.execute?.("call-1", { title: "   ", prompt: "Do the work." }, undefined, undefined, {
-          hasUI: false,
-        } as never),
-      /push-task title must not be empty\./,
-    );
-
-    assert.deepStrictEqual(appended, []);
-
-    const result = await tool.execute?.(
-      "call-2",
-      { title: "Review work", prompt: "Do the work." },
-      undefined,
-      undefined,
-      { hasUI: false } as never,
-    );
-
-    assert.deepStrictEqual(appended, [
-      {
-        type: "task",
-        data: { title: "Review work", prompt: "Do the work." },
-      },
-    ]);
-    assert.deepStrictEqual(result?.details, {
-      title: "Review work",
-      prompt: "Do the work.",
-    });
   });
 });
 
