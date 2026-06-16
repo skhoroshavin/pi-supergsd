@@ -13,7 +13,6 @@ import { describe } from "node:test";
 
 describe("manual workflow", () => {
   TestNode.run(
-    // ── Non-inherit tree ────────────────────────────────────────────────
     node("push AAA", async (h) => {
       h.llm.onPrompt("main work", responds("working..."), pushTask("AAA", "some prompt"));
       h.llm.onPrompt("some prompt", responds("Done."));
@@ -228,7 +227,6 @@ describe("manual workflow", () => {
       ),
     ),
 
-    // ── Top-level no-task commands ─────────────────────────────────
     node("start [no task]", async (h) => {
       h.llm.onPrompt("main work", responds("working..."));
       await h.prompt("main work");
