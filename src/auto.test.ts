@@ -20,8 +20,7 @@ describe("automated workflow", () => {
     h.llm.onPrompt("main work", responds("working..."), pushTask("quick fix", "Quick fix."));
 
     h.llm.onPrompt("Quick fix.", responds("Fixed the bug."));
-    h.llm.onPrompt("Fixed the bug.", responds(""));
-    h.llm.onPrompt("working...", responds(""));
+    h.llm.onPrompt("Fixed the bug.", responds("Great!"));
 
     try {
       await h.prompt("main work");
@@ -32,7 +31,7 @@ describe("automated workflow", () => {
         assistant("working...", "toolUse"),
         task("quick fix", "Quick fix."),
         taskResult("quick fix", "Fixed the bug."),
-        assistant(""),
+        assistant("Great!"),
       );
       h.assertStatus();
     } finally {
