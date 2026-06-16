@@ -15,7 +15,7 @@ import {
 } from "./test-helpers/index.js";
 
 describe("automated workflow", () => {
-  it("always starts queued tasks from fresh context", async () => {
+  it("completes push-task -> /auto -> finish-task and injects the branch result", async () => {
     const h = await TestHarness.create();
     h.llm.onPrompt("main work", responds("working..."), pushTask("quick fix", "Quick fix."));
 
