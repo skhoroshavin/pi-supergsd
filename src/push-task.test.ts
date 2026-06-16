@@ -2,8 +2,6 @@ import assert from "node:assert";
 
 import { describe, it } from "node:test";
 
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-
 import { pushTask, task, TestHarness } from "./test-helpers/index.js";
 
 import { setSkills, toolPushTask } from "./index.js";
@@ -170,8 +168,8 @@ describe("push-task title validation", () => {
     await assert.rejects(
       async () =>
         tool.execute?.("call-1", { title: "   ", prompt: "Do the work." }, undefined, undefined, {
-          ...stubContext(),
-        }),
+          hasUI: false,
+        } as never),
       /push-task title must not be empty\./,
     );
 
@@ -182,7 +180,7 @@ describe("push-task title validation", () => {
       { title: "Review work", prompt: "Do the work." },
       undefined,
       undefined,
-      { ...stubContext() },
+      { hasUI: false } as never,
     );
 
     assert.deepStrictEqual(appended, [
@@ -233,24 +231,3 @@ const MOCK_SKILLS: Skill[] = [
 
 // ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
-
-function stubContext(overrides?: Partial<ExtensionContext>): ExtensionContext {
-  return {
-    hasUI: false,
-    cwd: "/",
-    getSystemPrompt: () => "",
-    isIdle: () => true,
-    abort: () => {},
-    hasPendingMessages: () => false,
-    shutdown: () => {},
-    getContextUsage: () => undefined,
-    compact: () => {},
-    ui: undefined as unknown as ExtensionContext["ui"],
-    sessionManager: undefined as unknown as ExtensionContext["sessionManager"],
-    modelRegistry: undefined as unknown as ExtensionContext["modelRegistry"],
-    model: undefined,
-    signal: undefined,
-    ...overrides,
-  };
-}
