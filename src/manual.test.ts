@@ -15,18 +15,18 @@ describe("manual workflow", () => {
   TestNode.run(
     // ── Non-inherit tree ────────────────────────────────────────────────
     node("push AAA", async (h) => {
-      h.llm.onPrompt("main work", responds("working..."), pushTask("AAA", "Task AAA"));
-      h.llm.onPrompt("Task AAA", responds("Done."));
+      h.llm.onPrompt("main work", responds("working..."), pushTask("AAA", "some prompt"));
+      h.llm.onPrompt("some prompt", responds("Done."));
       h.llm.onPrompt("Done.", responds("Great!"));
       h.llm.onPrompt("Great!", responds("Great!"));
       h.llm.onPrompt("okay", responds("Great!"));
-      h.llm.onPrompt("Task BBB", responds("inner done"));
+      h.llm.onPrompt("other prompt", responds("inner done"));
       h.llm.onPrompt("inner done", responds("Great!"));
       await h.prompt("main work");
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
-        task("AAA", "Task AAA"),
+        task("AAA", "some prompt"),
       );
       h.assertStatus("pending task: AAA");
     }).children(
@@ -35,14 +35,14 @@ describe("manual workflow", () => {
         h.assertSession(
           user("main work"),
           assistant("working...", "toolUse"),
-          task("AAA", "Task AAA"),
+          task("AAA", "some prompt"),
         );
         h.assertStatus();
         h.assertLastNotification("Task discarded.");
       }),
       node("start AAA", async (h) => {
         await h.prompt("/start-task");
-        h.assertSession(user("Task AAA"), assistant("Done."));
+        h.assertSession(user("some prompt"), assistant("Done."));
         h.assertStatus("current task: AAA");
       }).children(
         node("finish AAA", async (h) => {
@@ -50,7 +50,7 @@ describe("manual workflow", () => {
           h.assertSession(
             user("main work"),
             assistant("working...", "toolUse"),
-            task("AAA", "Task AAA"),
+            task("AAA", "some prompt"),
             taskResult("AAA", "Done."),
             assistant("Great!"),
           );
@@ -61,7 +61,7 @@ describe("manual workflow", () => {
             h.assertSession(
               user("main work"),
               assistant("working...", "toolUse"),
-              task("AAA", "Task AAA"),
+              task("AAA", "some prompt"),
               taskResult("AAA", "Done."),
               assistant("Great!"),
             );
@@ -73,7 +73,7 @@ describe("manual workflow", () => {
             h.assertSession(
               user("main work"),
               assistant("working...", "toolUse"),
-              task("AAA", "Task AAA"),
+              task("AAA", "some prompt"),
               taskResult("AAA", "Done."),
               assistant("Great!"),
             );
@@ -85,7 +85,7 @@ describe("manual workflow", () => {
             h.assertSession(
               user("main work"),
               assistant("working...", "toolUse"),
-              task("AAA", "Task AAA"),
+              task("AAA", "some prompt"),
               taskResult("AAA", "Done."),
               assistant("Great!"),
             );
@@ -97,7 +97,7 @@ describe("manual workflow", () => {
             h.assertSession(
               user("main work"),
               assistant("working...", "toolUse"),
-              task("AAA", "Task AAA"),
+              task("AAA", "some prompt"),
               taskResult("AAA", "Done."),
               assistant("Great!"),
             );
@@ -110,14 +110,14 @@ describe("manual workflow", () => {
           h.assertSession(
             user("main work"),
             assistant("working...", "toolUse"),
-            task("AAA", "Task AAA"),
+            task("AAA", "some prompt"),
           );
           h.assertStatus("pending task: AAA");
           h.assertLastNotification("Task aborted. Branch abandoned without summary.");
         }).children(
           node("start AAA", async (h) => {
             await h.prompt("/start-task");
-            h.assertSession(user("Task AAA"), assistant("Done."));
+            h.assertSession(user("some prompt"), assistant("Done."));
             h.assertStatus("current task: AAA");
           }).children(
             node("finish AAA", async (h) => {
@@ -125,7 +125,7 @@ describe("manual workflow", () => {
               h.assertSession(
                 user("main work"),
                 assistant("working...", "toolUse"),
-                task("AAA", "Task AAA"),
+                task("AAA", "some prompt"),
                 taskResult("AAA", "Done."),
                 assistant("Great!"),
               );
@@ -134,25 +134,25 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB", async (h) => {
-          h.llm.onPrompt("some more work", responds("okay"), pushTask("BBB", "Task BBB"));
+          h.llm.onPrompt("some more work", responds("okay"), pushTask("BBB", "other prompt"));
           await h.prompt("some more work");
           h.assertSession(
-            user("Task AAA"),
+            user("some prompt"),
             assistant("Done."),
             user("some more work"),
             assistant("okay", "toolUse"),
-            task("BBB", "Task BBB"),
+            task("BBB", "other prompt"),
           );
           h.assertStatus("pending task: BBB");
         }).children(
           node("discard BBB", async (h) => {
             await h.prompt("/discard-task");
             h.assertSession(
-              user("Task AAA"),
+              user("some prompt"),
               assistant("Done."),
               user("some more work"),
               assistant("okay", "toolUse"),
-              task("BBB", "Task BBB"),
+              task("BBB", "other prompt"),
             );
             h.assertStatus("current task: AAA");
             h.assertLastNotification("Task discarded.");
@@ -162,7 +162,7 @@ describe("manual workflow", () => {
               h.assertSession(
                 user("main work"),
                 assistant("working...", "toolUse"),
-                task("AAA", "Task AAA"),
+                task("AAA", "some prompt"),
                 taskResult("AAA", "okay"),
                 assistant("Great!"),
               );
@@ -171,17 +171,17 @@ describe("manual workflow", () => {
           ),
           node("start BBB", async (h) => {
             await h.prompt("/start-task");
-            h.assertSession(user("Task BBB"), assistant("inner done"));
+            h.assertSession(user("other prompt"), assistant("inner done"));
             h.assertStatus("current task: BBB");
           }).children(
             node("finish BBB", async (h) => {
               await h.prompt("/finish-task");
               h.assertSession(
-                user("Task AAA"),
+                user("some prompt"),
                 assistant("Done."),
                 user("some more work"),
                 assistant("okay", "toolUse"),
-                task("BBB", "Task BBB"),
+                task("BBB", "other prompt"),
                 taskResult("BBB", "inner done"),
                 assistant("Great!"),
               );
@@ -192,7 +192,7 @@ describe("manual workflow", () => {
                 h.assertSession(
                   user("main work"),
                   assistant("working...", "toolUse"),
-                  task("AAA", "Task AAA"),
+                  task("AAA", "some prompt"),
                   taskResult("AAA", "Great!"),
                   assistant("Great!"),
                 );
@@ -202,11 +202,11 @@ describe("manual workflow", () => {
             node("abort BBB", async (h) => {
               await h.prompt("/abort-task");
               h.assertSession(
-                user("Task AAA"),
+                user("some prompt"),
                 assistant("Done."),
                 user("some more work"),
                 assistant("okay", "toolUse"),
-                task("BBB", "Task BBB"),
+                task("BBB", "other prompt"),
               );
               h.assertStatus("pending task: BBB");
               h.assertLastNotification("Task aborted. Branch abandoned without summary.");
@@ -216,7 +216,7 @@ describe("manual workflow", () => {
                 h.assertSession(
                   user("main work"),
                   assistant("working...", "toolUse"),
-                  task("AAA", "Task AAA"),
+                  task("AAA", "some prompt"),
                   taskResult("AAA", "okay"),
                   assistant("Great!"),
                 );

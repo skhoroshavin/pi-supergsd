@@ -68,12 +68,12 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
   it("fails loudly when /start-task hits an unmatched provider prompt", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("queue AAA", pushTask("AAA", "Task AAA"));
+    h.llm.onPrompt("queue AAA", pushTask("AAA", "some prompt"));
 
     await h.prompt("queue AAA");
     await assert.rejects(
       async () => h.prompt("/start-task"),
-      /No MockLLM rule matched provider prompt: Task AAA/,
+      /No MockLLM rule matched provider prompt: some prompt/,
     );
   });
 
@@ -107,18 +107,18 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
   it("assertSessionContains still scans durable whole-session entries across branches", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("main work", responds("working..."), pushTask("AAA", "Task AAA"));
-    h.llm.onPrompt("Task AAA", responds("Done."));
+    h.llm.onPrompt("main work", responds("working..."), pushTask("AAA", "some prompt"));
+    h.llm.onPrompt("some prompt", responds("Done."));
 
     await h.prompt("main work");
     await h.prompt("/start-task");
 
-    h.assertSession(user("Task AAA"), assistant("Done."));
+    h.assertSession(user("some prompt"), assistant("Done."));
     h.assertStatus("current task: AAA");
     h.assertSessionContains(
       user("main work"),
       assistant("working...", "toolUse"),
-      task("AAA", "Task AAA"),
+      task("AAA", "some prompt"),
     );
   });
 
