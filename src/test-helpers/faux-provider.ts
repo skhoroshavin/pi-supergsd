@@ -99,6 +99,7 @@ function makeAssistantMessage(responses: MockLLMDescriptor[]): AssistantMessage 
         return piAi.fauxToolCall(
           "push-task",
           {
+            title: descriptor.title,
             prompt: descriptor.prompt,
           },
           { id: `call-${index + 1}` },

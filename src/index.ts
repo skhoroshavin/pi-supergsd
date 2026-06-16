@@ -18,9 +18,7 @@ import { Box, Text, type AutocompleteItem } from "@earendil-works/pi-tui";
 
 import { Type, type Static } from "typebox";
 
-import { makeSlug } from "./slug.js";
-
-import { firstTextContent, renderTextContent, taskResultTextContent } from "./text-content.js";
+import { renderTextContent, taskResultTextContent } from "./text-content.js";
 
 export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
   return defineTool({
@@ -34,7 +32,8 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
     ],
     parameters: pushTaskParameters,
     renderCall(args: PushTaskParams, theme, context) {
-      const header = theme.fg("toolTitle", theme.bold("push-task"));
+      const title = args.title.trim();
+      const header = theme.fg("toolTitle", theme.bold(`push-task: ${title}`));
 
       const promptLines = args.prompt.split("\n");
       const maxLines = context.expanded ? promptLines.length : 7;
@@ -60,9 +59,15 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
         throw new Error("Task storage aborted.");
       }
 
+      const title = params.title.trim();
+      if (!title) {
+        throw new Error("push-task title must not be empty.");
+      }
+
       const { rewritten, unresolved } = resolveSkillRefs(params.prompt);
 
       pi.appendEntry(TASK_ENTRY_TYPE, {
+        title,
         prompt: rewritten,
       });
 
@@ -82,6 +87,7 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
       return {
         content: [],
         details: {
+          title,
           prompt: rewritten,
         },
         terminate: true,
@@ -214,13 +220,13 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
   };
 }
 
-export const rendererTaskResult: MessageRenderer<{ slug?: string }> = (
+export const rendererTaskResult: MessageRenderer<{ title?: string }> = (
   message,
   _options,
   theme,
 ): Box => {
-  const label = message.details?.slug
-    ? theme.fg("customMessageLabel", `${message.details.slug} result:`)
+  const label = message.details?.title
+    ? theme.fg("customMessageLabel", `${message.details.title} result:`)
     : theme.fg("customMessageLabel", "result:");
   const text = renderTextContent(message.content);
   const box = new Box(1, 1, (t: string) => theme.bg("customMessageBg", t));
@@ -237,17 +243,13 @@ export function updateTaskStatus(
   const prefix = options.prefix ?? "";
   const pending = pendingTask(session);
   if (pending) {
-    const slug = makeSlug(pending.data.prompt);
-    setStatus("task", `${prefix}${theme.fg("dim", `pending task: ${slug}`)}`);
+    setStatus("task", `${prefix}${theme.fg("dim", `pending task: ${pending.data.title}`)}`);
     return;
   }
 
-  if (currentTask(session)) {
-    const prompt = findTaskPrompt(session);
-    if (prompt) {
-      const slug = makeSlug(prompt);
-      setStatus("task", `${prefix}${theme.fg("dim", `current task: ${slug}`)}`);
-    }
+  const active = currentTask(session);
+  if (active) {
+    setStatus("task", `${prefix}${theme.fg("dim", `current task: ${active.data.title}`)}`);
     return;
   }
 
@@ -354,7 +356,10 @@ async function startTask(
   const result = await ctx.navigateTree(freshTargetId, { summarize: false });
   if (result.cancelled) return "cancelled";
 
-  const startEntryData: TaskStartData = { returnTo: departureLeafId };
+  const startEntryData: TaskStartData = {
+    title: activeTask.data.title,
+    returnTo: departureLeafId,
+  };
   if (previousModel) {
     startEntryData.previousModel = previousModel;
   }
@@ -402,9 +407,7 @@ async function finishTask(
     : undefined;
   const lastAssistantId = lastAssistant?.id;
 
-  // Find the task prompt on the current branch for the slug label
-  const taskPrompt = findTaskPrompt(ctx.sessionManager);
-  const slug = taskPrompt ? makeSlug(taskPrompt) : undefined;
+  const title = taskStart.data.title;
 
   const result = await ctx.navigateTree(taskStart.data.returnTo, {
     summarize: false,
@@ -419,7 +422,7 @@ async function finishTask(
         // Content is filtered to only TextContent blocks (or original string)
         content: lastAssistantContent,
         display: true,
-        details: { slug },
+        details: { title },
       },
       { triggerTurn: true },
     );
@@ -549,40 +552,6 @@ function findPreConversationEntry(session: ReadonlySessionLike): SessionEntry | 
   return null;
 }
 
-/**
- * Find the user message content injected as the task prompt after the
- * most recent TASK_START entry. Returns undefined if no task is active.
- */
-function findTaskPrompt(session: ReadonlySessionLike): string | undefined {
-  const branch = session.getBranch();
-
-  const startIdx = findLastEntryIndex(
-    session,
-    (entry) => entry.type === "custom" && entry.customType === TASK_START_ENTRY_TYPE,
-  );
-  if (startIdx === -1) return undefined;
-
-  // Walk forward from TASK_START to find the next user message
-  for (let i = startIdx + 1; i < branch.length; i++) {
-    const entry = branch[i];
-    if (entry.type === "message" && entry.message.role === "user") {
-      return firstTextContent(entry.message.content);
-    }
-  }
-  return undefined;
-}
-
-function findLastEntryIndex(
-  session: ReadonlySessionLike,
-  predicate: (entry: SessionEntry) => boolean,
-): number {
-  const branch = session.getBranch();
-  for (let i = branch.length - 1; i >= 0; i--) {
-    if (predicate(branch[i])) return i;
-  }
-  return -1;
-}
-
 // ── Lookup utilities ──────────────────────────────────────────────
 
 function pendingTask(session: ReadonlySessionLike): TaskEntry | null {
@@ -644,10 +613,11 @@ type TaskEntry = CustomEntry<typeof TASK_ENTRY_TYPE, TaskData>;
 const TASK_ENTRY_TYPE = "task";
 
 function isTaskData(value: unknown): value is TaskData {
-  return isRecord(value) && typeof value.prompt === "string";
+  return isRecord(value) && typeof value.title === "string" && typeof value.prompt === "string";
 }
 
 interface TaskData {
+  title: string;
   prompt: string;
 }
 
@@ -674,7 +644,9 @@ type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
 };
 
 function isTaskStartData(value: unknown): value is TaskStartData {
-  if (!isRecord(value) || typeof value.returnTo !== "string") return false;
+  if (!isRecord(value) || typeof value.title !== "string" || typeof value.returnTo !== "string") {
+    return false;
+  }
   if (value.previousModel !== undefined) {
     return (
       isRecord(value.previousModel) &&
@@ -686,6 +658,7 @@ function isTaskStartData(value: unknown): value is TaskStartData {
 }
 
 interface TaskStartData {
+  title: string;
   returnTo: string;
   previousModel?: { provider: string; modelId: string };
 }
@@ -776,6 +749,9 @@ function getModelCompletions(argumentPrefix: string, registry: ModelRegistry): A
 }
 
 const pushTaskParameters = Type.Object({
+  title: Type.String({
+    description: "Short task title shown in status, results, and tool rendering.",
+  }),
   prompt: Type.String({
     description: "Full prompt for the task, including all context and instructions.",
   }),
