@@ -537,8 +537,7 @@ function findFreshTargetId(session: ReadonlySessionLike): string | null {
  * entries) or if there is no leaf.
  */
 function findPreConversationEntry(session: ReadonlySessionLike): SessionEntry | null {
-  const leafId = session.getLeafId();
-  if (!leafId) return null;
+  if (!session.getLeafId()) return null;
 
   const branch = session.getBranch();
   for (const entry of branch) {
