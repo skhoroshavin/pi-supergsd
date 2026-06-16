@@ -130,8 +130,8 @@ describe("AgentSession-backed TestHarness foundation", () => {
     const h = await makeHarness(t);
     h.llm.onPrompt("main work", responds("working..."));
     h.user.onAssistant("working...", userPrompts("queue follow-up"));
-    h.llm.onPrompt("queue follow-up", pushTask("Follow-up", "follow-up"));
-    h.user.onQueuedTask("follow-up", userPrompts("answer follow-up"));
+    h.llm.onPrompt("queue follow-up", pushTask("Follow-up", "follow-up work"));
+    h.user.onQueuedTask("follow-up work", userPrompts("answer follow-up"));
     h.llm.onPrompt("answer follow-up", responds("queued response"));
 
     await h.prompt("main work");
@@ -142,7 +142,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
       assistant("working..."),
       user("queue follow-up"),
       assistant("", "toolUse"),
-      task("Follow-up", "follow-up"),
+      task("Follow-up", "follow-up work"),
       user("answer follow-up"),
       assistant("queued response"),
     );
