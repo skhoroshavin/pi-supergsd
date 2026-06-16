@@ -70,7 +70,7 @@
         },
         {
           "op": "replace",
-          "find": "Subagent (general-purpose):\n  description: \"Review plan document\"\n  prompt: |",
+          "find": "Task tool (general-purpose):\n  description: \"Review plan document\"\n  prompt: |",
           "replace": "push-task:\n  title: Review plan document\n  prompt: |"
         }
       ]
