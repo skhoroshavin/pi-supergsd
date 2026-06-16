@@ -61,8 +61,8 @@
         },
         {
           "op": "replace",
-          "find": "Task tool (general-purpose):\n  description: \"Review spec document\"\n  prompt: |",
-          "replace": "push-task:\n  prompt: |"
+          "find": "Subagent (general-purpose):\n  description: \"Review spec document\"\n  prompt: |",
+          "replace": "push-task:\n  title: Review spec document\n  prompt: |"
         }
       ]
     }

@@ -8,6 +8,7 @@ Use this template when dispatching a plan document reviewer task.
 
 ```
 push-task:
+  title: Review plan document
   prompt: |
     You are a plan document reviewer. Verify this plan is complete and ready for implementation.
 

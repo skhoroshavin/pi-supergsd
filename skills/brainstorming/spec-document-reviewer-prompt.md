@@ -8,6 +8,7 @@ Use this template when dispatching a spec document reviewer task.
 
 ```
 push-task:
+  title: Review spec document
   prompt: |
     You are a spec document reviewer. Verify this spec is complete and ready for planning.
 
