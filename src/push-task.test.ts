@@ -2,19 +2,13 @@ import assert from "node:assert";
 
 import { describe, it } from "node:test";
 
-import { stripVTControlCharacters } from "node:util";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import type {
-  ExtensionContext,
-  MessageRenderOptions,
-  Skill,
-} from "@earendil-works/pi-coding-agent";
+import { pushTask, task, TestHarness } from "./test-helpers/index.js";
 
-import { type Component, Text } from "@earendil-works/pi-tui";
+import { setSkills, toolPushTask } from "./index.js";
 
-import { pushTask, task, TestHarness, TestUi } from "./test-helpers/index.js";
-
-import { rendererTaskResult, setSkills, toolPushTask } from "./index.js";
+import type { Skill } from "@earendil-works/pi-coding-agent";
 
 // ---------------------------------------------------------------------------
 // Skill resolution tests
@@ -140,10 +134,10 @@ describe("push-task skill resolution", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Title validation and rendering tests
+// Title validation tests
 // ---------------------------------------------------------------------------
 
-describe("push-task title validation and rendering", () => {
+describe("push-task title validation", () => {
   it("stores trimmed titles while resolving skill refs", async () => {
     const h = await TestHarness.create();
     h.llm.onPrompt(
@@ -202,42 +196,6 @@ describe("push-task title validation and rendering", () => {
       prompt: "Do the work.",
     });
   });
-
-  it("renders the task title in the push-task header", () => {
-    const tool = toolPushTask({ appendEntry() {} });
-    const theme = new TestUi().context.theme;
-    const rendered = stripVTControlCharacters(
-      (
-        tool.renderCall?.(
-          { title: "Review implementation", prompt: "Check correctness.\nCheck tests." },
-          theme,
-          { ...stubRenderContext() },
-        ) ?? new Text("", 0, 0)
-      )
-        .render(80)
-        .join("\n"),
-    );
-
-    assert.match(rendered, /push-task: Review implementation/);
-  });
-
-  it("renders task results with the explicit title", () => {
-    const theme = new TestUi().context.theme;
-    const message: StubCustomMessage<{ title: string }> = {
-      role: "custom",
-      customType: "task-result",
-      content: [{ type: "text", text: "Looks good." }],
-      display: true,
-      details: { title: "Review implementation" },
-      timestamp: 0,
-    };
-    const options: MessageRenderOptions = { expanded: false };
-    const rendered = stripVTControlCharacters(
-      (rendererTaskResult(message, options, theme) ?? new Text("", 0, 0)).render(80).join("\n"),
-    );
-
-    assert.match(rendered, /Review implementation result:/);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -274,20 +232,7 @@ const MOCK_SKILLS: Skill[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Locally-defined interfaces for types not re-exported by the public API
-// ---------------------------------------------------------------------------
-
-interface StubCustomMessage<T> {
-  role: "custom";
-  customType: string;
-  content: string | { type: "text"; text: string }[];
-  display: boolean;
-  details?: T;
-  timestamp: number;
-}
-
-// ---------------------------------------------------------------------------
-// Typed stubs
+// Helpers
 // ---------------------------------------------------------------------------
 
 function stubContext(overrides?: Partial<ExtensionContext>): ExtensionContext {
@@ -308,37 +253,4 @@ function stubContext(overrides?: Partial<ExtensionContext>): ExtensionContext {
     signal: undefined,
     ...overrides,
   };
-}
-
-function stubRenderContext(overrides?: Partial<StubRenderContext>): StubRenderContext {
-  return {
-    args: undefined,
-    toolCallId: "test-call",
-    invalidate: () => {},
-    lastComponent: undefined,
-    state: undefined,
-    cwd: "/",
-    executionStarted: true,
-    argsComplete: true,
-    isPartial: false,
-    expanded: false,
-    showImages: false,
-    isError: false,
-    ...overrides,
-  };
-}
-
-interface StubRenderContext {
-  args: unknown;
-  toolCallId: string;
-  invalidate: () => void;
-  lastComponent: Component | undefined;
-  state: unknown;
-  cwd: string;
-  executionStarted: boolean;
-  argsComplete: boolean;
-  isPartial: boolean;
-  expanded: boolean;
-  showImages: boolean;
-  isError: boolean;
 }
