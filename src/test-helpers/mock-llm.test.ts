@@ -25,14 +25,14 @@ describe("MockLLM", () => {
 
   it("returns a copied descriptor array", () => {
     const llm = new MockLLM();
-    llm.onPrompt("delegate", responds("working"), pushTask("X", "subtask"));
+    llm.onPrompt("delegate", responds("working"), pushTask("x", "subtask"));
 
     const first = llm.matchPrompt("delegate now");
     first.push(responds("mutated"));
 
     assert.deepStrictEqual(llm.matchPrompt("delegate now"), [
       responds("working"),
-      pushTask("X", "subtask"),
+      pushTask("x", "subtask"),
     ]);
   });
 

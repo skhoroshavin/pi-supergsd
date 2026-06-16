@@ -50,15 +50,15 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
   it("calls the real push-task tool from a faux provider tool call", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("delegate work", pushTask("Subtask", "some prompt"));
+    h.llm.onPrompt("delegate work", pushTask("subtask", "some prompt"));
 
     await h.prompt("delegate work");
     h.assertSession(
       user("delegate work"),
       assistant("", "toolUse"),
-      task("Subtask", "some prompt"),
+      task("subtask", "some prompt"),
     );
-    h.assertStatus("pending task: Subtask");
+    h.assertStatus("pending task: subtask");
     h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
@@ -96,16 +96,16 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.llm.onPrompt(
       "Analyze X",
       responds("preparing subagent"),
-      pushTask("Analyse X", "Analysis details"),
+      pushTask("analyse x", "Analysis details"),
     );
 
     await h.prompt("Analyze X");
     h.assertSession(
       user("Analyze X"),
       assistant("preparing subagent", "toolUse"),
-      task("Analyse X", "Analysis details"),
+      task("analyse x", "Analysis details"),
     );
-    h.assertStatus("pending task: Analyse X");
+    h.assertStatus("pending task: analyse x");
     h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
@@ -130,7 +130,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
     const h = await makeHarness(t);
     h.llm.onPrompt("main work", responds("working..."));
     h.user.onAssistant("working...", userPrompts("queue follow-up"));
-    h.llm.onPrompt("queue follow-up", pushTask("Follow-up", "follow-up work"));
+    h.llm.onPrompt("queue follow-up", pushTask("follow-up", "follow-up work"));
     h.user.onQueuedTask("follow-up work", userPrompts("answer follow-up"));
     h.llm.onPrompt("answer follow-up", responds("queued response"));
 
@@ -142,11 +142,11 @@ describe("AgentSession-backed TestHarness foundation", () => {
       assistant("working..."),
       user("queue follow-up"),
       assistant("", "toolUse"),
-      task("Follow-up", "follow-up work"),
+      task("follow-up", "follow-up work"),
       user("answer follow-up"),
       assistant("queued response"),
     );
-    h.assertStatus("pending task: Follow-up");
+    h.assertStatus("pending task: follow-up");
   });
 });
 

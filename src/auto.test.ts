@@ -17,7 +17,7 @@ import {
 describe("automated workflow", () => {
   it("always starts queued tasks from fresh context", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds("working..."), pushTask("Quick fix", "Quick fix."));
+    h.llm.onPrompt("main work", responds("working..."), pushTask("quick fix", "Quick fix."));
 
     h.llm.onPrompt("Quick fix.", responds("Fixed the bug."));
     h.llm.onPrompt("Fixed the bug.", responds(""));
@@ -30,8 +30,8 @@ describe("automated workflow", () => {
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
-        task("Quick fix", "Quick fix."),
-        taskResult("Quick fix", "Fixed the bug."),
+        task("quick fix", "Quick fix."),
+        taskResult("quick fix", "Fixed the bug."),
         assistant(""),
       );
       h.assertStatus();
@@ -53,7 +53,7 @@ describe("automated workflow", () => {
 
   it("warns and returns when /auto is already running", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""), pushTask("X", "first task"));
+    h.llm.onPrompt("start", responds(""), pushTask("x", "first task"));
 
     // Task-execution
     h.llm.onPrompt("first task", responds("done"));
@@ -68,8 +68,8 @@ describe("automated workflow", () => {
       h.assertSession(
         user("start"),
         assistant("", "toolUse"),
-        task("X", "first task"),
-        taskResult("X", "done"),
+        task("x", "first task"),
+        taskResult("x", "done"),
         assistant(""),
       );
       h.assertStatus();
@@ -80,7 +80,7 @@ describe("automated workflow", () => {
 
   it("stops when the last assistant message is aborted to empty text", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""), pushTask("Implement phase 1", "Implement phase 1."));
+    h.llm.onPrompt("start", responds(""), pushTask("implement phase 1", "Implement phase 1."));
 
     h.llm.onPrompt("Implement phase 1.", responds("ABCDEFGHIJ"));
     h.user.onAssistant("FGHI", userEsc());
@@ -91,7 +91,7 @@ describe("automated workflow", () => {
       await h.prompt("/auto");
 
       h.assertSession(user("Implement phase 1."), assistantAborted());
-      h.assertStatus("current task: Implement phase 1");
+      h.assertStatus("current task: implement phase 1");
     } finally {
       h.dispose();
     }
@@ -99,10 +99,10 @@ describe("automated workflow", () => {
 
   it("processes a subtask pushed during a task", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds("working..."), pushTask("X", "parent task"));
+    h.llm.onPrompt("main work", responds("working..."), pushTask("x", "parent task"));
 
     // Task-execution
-    h.llm.onPrompt("parent task", responds("working on parent..."), pushTask("X", "subtask"));
+    h.llm.onPrompt("parent task", responds("working on parent..."), pushTask("x", "subtask"));
     h.llm.onPrompt("subtask", responds("sub done"));
 
     // Leaf continuations
@@ -118,12 +118,12 @@ describe("automated workflow", () => {
       h.assertSession(
         user("main work"),
         assistant("working...", "toolUse"),
-        task("X", "parent task"),
-        taskResult("X"),
+        task("x", "parent task"),
+        taskResult("x"),
         assistant(""),
       );
       h.assertStatus();
-      h.assertSessionContains(user("subtask"), assistant("sub done"), taskResult("X", "sub done"));
+      h.assertSessionContains(user("subtask"), assistant("sub done"), taskResult("x", "sub done"));
     } finally {
       h.dispose();
     }
@@ -131,7 +131,7 @@ describe("automated workflow", () => {
 
   it("continues processing when user queues a steering message during auto", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""), pushTask("Quick fix", "Quick fix."));
+    h.llm.onPrompt("start", responds(""), pushTask("quick fix", "Quick fix."));
 
     // Task-execution
     h.llm.onPrompt("Quick fix.", responds("thinking..."));
@@ -150,8 +150,8 @@ describe("automated workflow", () => {
       h.assertSession(
         user("start"),
         assistant("", "toolUse"),
-        task("Quick fix", "Quick fix."),
-        taskResult("Quick fix", "adjusted response"),
+        task("quick fix", "Quick fix."),
+        taskResult("quick fix", "adjusted response"),
         assistant(""),
       );
       h.assertStatus();
@@ -162,7 +162,7 @@ describe("automated workflow", () => {
 
   it("stops when session is shut down during auto", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""), pushTask("X", "Shutdown task"));
+    h.llm.onPrompt("start", responds(""), pushTask("x", "Shutdown task"));
 
     // Task-execution
     h.llm.onPrompt("Shutdown task", responds("working..."));
@@ -177,7 +177,7 @@ describe("automated workflow", () => {
       await h.prompt("/auto");
 
       h.assertSession(user("Shutdown task"), assistant("working..."));
-      h.assertStatus("current task: X");
+      h.assertStatus("current task: x");
     } finally {
       h.dispose();
     }

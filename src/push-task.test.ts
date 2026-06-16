@@ -9,12 +9,12 @@ import type { Skill } from "@earendil-works/pi-coding-agent";
 describe("push-task skill resolution", () => {
   it("leaves prompt unchanged when there are no skill refs", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("work", pushTask("No refs", "Do a thing with no skill refs."));
+    h.llm.onPrompt("work", pushTask("no refs", "Do a thing with no skill refs."));
     try {
       setSkills(MOCK_SKILLS);
       await h.prompt("work");
 
-      h.assertSessionContains(task("No refs", "Do a thing with no skill refs."));
+      h.assertSessionContains(task("no refs", "Do a thing with no skill refs."));
     } finally {
       h.dispose();
     }
@@ -24,7 +24,7 @@ describe("push-task skill resolution", () => {
     const h = await TestHarness.create();
     h.llm.onPrompt(
       "work",
-      pushTask("Brainstorming review", "Review using /skill:brainstorming for ideas."),
+      pushTask("brainstorming review", "Review using /skill:brainstorming for ideas."),
     );
     try {
       setSkills(MOCK_SKILLS);
@@ -32,7 +32,7 @@ describe("push-task skill resolution", () => {
 
       h.assertSessionContains(
         task(
-          "Brainstorming review",
+          "brainstorming review",
           "Review using /dev/null/skills/brainstorming/SKILL.md for ideas.",
         ),
       );
@@ -46,7 +46,7 @@ describe("push-task skill resolution", () => {
     const h = await TestHarness.create();
     h.llm.onPrompt(
       "work",
-      pushTask("Multiple skills", "Use /skill:brainstorming then /skill:tdd for implementation."),
+      pushTask("multiple skills", "Use /skill:brainstorming then /skill:tdd for implementation."),
     );
     try {
       setSkills(MOCK_SKILLS);
@@ -54,7 +54,7 @@ describe("push-task skill resolution", () => {
 
       h.assertSessionContains(
         task(
-          "Multiple skills",
+          "multiple skills",
           "Use /dev/null/skills/brainstorming/SKILL.md then /dev/null/skills/tdd/SKILL.md for implementation.",
         ),
       );
@@ -67,7 +67,7 @@ describe("push-task skill resolution", () => {
     const h = await TestHarness.create();
     h.llm.onPrompt(
       "work",
-      pushTask("Duplicate skill", "First /skill:brainstorming. Then more /skill:brainstorming."),
+      pushTask("duplicate skill", "First /skill:brainstorming. Then more /skill:brainstorming."),
     );
     try {
       setSkills(MOCK_SKILLS);
@@ -75,7 +75,7 @@ describe("push-task skill resolution", () => {
 
       h.assertSessionContains(
         task(
-          "Duplicate skill",
+          "duplicate skill",
           "First /dev/null/skills/brainstorming/SKILL.md. Then more /dev/null/skills/brainstorming/SKILL.md.",
         ),
       );
@@ -88,7 +88,7 @@ describe("push-task skill resolution", () => {
     const h = await TestHarness.create();
     h.llm.onPrompt(
       "work",
-      pushTask("Partial unknown", "Use /skill:brainstorming and /skill:nonexistent."),
+      pushTask("partial unknown", "Use /skill:brainstorming and /skill:nonexistent."),
     );
     try {
       setSkills(MOCK_SKILLS);
@@ -96,7 +96,7 @@ describe("push-task skill resolution", () => {
 
       h.assertSessionContains(
         task(
-          "Partial unknown",
+          "partial unknown",
           "Use /dev/null/skills/brainstorming/SKILL.md and /skill:nonexistent.",
         ),
       );
@@ -110,12 +110,12 @@ describe("push-task skill resolution", () => {
 
   it("keeps all unknown skill names unchanged", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("work", pushTask("All unknown", "Use /skill:foo and /skill:bar."));
+    h.llm.onPrompt("work", pushTask("all unknown", "Use /skill:foo and /skill:bar."));
     try {
       setSkills(MOCK_SKILLS);
       await h.prompt("work");
 
-      h.assertSessionContains(task("All unknown", "Use /skill:foo and /skill:bar."));
+      h.assertSessionContains(task("all unknown", "Use /skill:foo and /skill:bar."));
       h.assertLastNotification(
         "Warning: /skill:foo, /skill:bar were not resolved.\nTask stored. Use `/start-task` or `/auto` to start it.",
       );
