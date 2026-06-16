@@ -97,7 +97,7 @@ Pi:      [returns to main branch, with report attached]
 
 LLM:     [reads report] Great! Let me queue phase 2.
 
-LLM:     [calls push-task with phase 2 plan]
+LLM:     [calls push-task({ title: "Implement phase 2", prompt: "..." })]
 
 Pi:      [branches to fresh context, injects phase 2 plan]
 

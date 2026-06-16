@@ -1,12 +1,24 @@
 import assert from "node:assert";
+
 import { describe, it } from "node:test";
+
 import { stripVTControlCharacters } from "node:util";
+
+import type {
+  ExtensionContext,
+  MessageRenderOptions,
+  Skill,
+} from "@earendil-works/pi-coding-agent";
+
+import { type Component, Text } from "@earendil-works/pi-tui";
 
 import { pushTask, task, TestHarness, TestUi } from "./test-helpers/index.js";
 
 import { rendererTaskResult, setSkills, toolPushTask } from "./index.js";
 
-import type { Skill } from "@earendil-works/pi-coding-agent";
+// ---------------------------------------------------------------------------
+// Skill resolution tests
+// ---------------------------------------------------------------------------
 
 describe("push-task skill resolution", () => {
   it("leaves prompt unchanged when there are no skill refs", async () => {
@@ -127,6 +139,10 @@ describe("push-task skill resolution", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Title validation and rendering tests
+// ---------------------------------------------------------------------------
+
 describe("push-task title validation and rendering", () => {
   it("stores trimmed titles while resolving skill refs", async () => {
     const h = await TestHarness.create();
@@ -159,13 +175,9 @@ describe("push-task title validation and rendering", () => {
 
     await assert.rejects(
       async () =>
-        tool.execute?.(
-          "call-1",
-          { title: "   ", prompt: "Do the work." },
-          undefined,
-          async () => {},
-          { hasUI: false },
-        ),
+        tool.execute?.("call-1", { title: "   ", prompt: "Do the work." }, undefined, undefined, {
+          ...stubContext(),
+        }),
       /push-task title must not be empty\./,
     );
 
@@ -175,8 +187,8 @@ describe("push-task title validation and rendering", () => {
       "call-2",
       { title: "Review work", prompt: "Do the work." },
       undefined,
-      async () => {},
-      { hasUI: false },
+      undefined,
+      { ...stubContext() },
     );
 
     assert.deepStrictEqual(appended, [
@@ -195,14 +207,15 @@ describe("push-task title validation and rendering", () => {
     const tool = toolPushTask({ appendEntry() {} });
     const theme = new TestUi().context.theme;
     const rendered = stripVTControlCharacters(
-      tool
-        .renderCall?.(
+      (
+        tool.renderCall?.(
           { title: "Review implementation", prompt: "Check correctness.\nCheck tests." },
           theme,
-          { expanded: false },
-        )
-        ?.render(80)
-        .join("\n") ?? "",
+          { ...stubRenderContext() },
+        ) ?? new Text("", 0, 0)
+      )
+        .render(80)
+        .join("\n"),
     );
 
     assert.match(rendered, /push-task: Review implementation/);
@@ -210,25 +223,27 @@ describe("push-task title validation and rendering", () => {
 
   it("renders task results with the explicit title", () => {
     const theme = new TestUi().context.theme;
+    const message: StubCustomMessage<{ title: string }> = {
+      role: "custom",
+      customType: "task-result",
+      content: [{ type: "text", text: "Looks good." }],
+      display: true,
+      details: { title: "Review implementation" },
+      timestamp: 0,
+    };
+    const options: MessageRenderOptions = { expanded: false };
     const rendered = stripVTControlCharacters(
-      rendererTaskResult(
-        {
-          content: [{ type: "text", text: "Looks good." }],
-          details: { title: "Review implementation" },
-        },
-        {},
-        theme,
-      )
-        .render(80)
-        .join("\n"),
+      (rendererTaskResult(message, options, theme) ?? new Text("", 0, 0)).render(80).join("\n"),
     );
 
     assert.match(rendered, /Review implementation result:/);
   });
 });
 
-// Mock skill paths are project-relative for the test environment.
-// Actual file existence is not required — resolution is pure string replacement.
+// ---------------------------------------------------------------------------
+// Mock skill data
+// ---------------------------------------------------------------------------
+
 const MOCK_SKILLS: Skill[] = [
   {
     name: "brainstorming",
@@ -257,3 +272,73 @@ const MOCK_SKILLS: Skill[] = [
     disableModelInvocation: false,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Locally-defined interfaces for types not re-exported by the public API
+// ---------------------------------------------------------------------------
+
+interface StubCustomMessage<T> {
+  role: "custom";
+  customType: string;
+  content: string | { type: "text"; text: string }[];
+  display: boolean;
+  details?: T;
+  timestamp: number;
+}
+
+// ---------------------------------------------------------------------------
+// Typed stubs
+// ---------------------------------------------------------------------------
+
+function stubContext(overrides?: Partial<ExtensionContext>): ExtensionContext {
+  return {
+    hasUI: false,
+    cwd: "/",
+    getSystemPrompt: () => "",
+    isIdle: () => true,
+    abort: () => {},
+    hasPendingMessages: () => false,
+    shutdown: () => {},
+    getContextUsage: () => undefined,
+    compact: () => {},
+    ui: undefined as unknown as ExtensionContext["ui"],
+    sessionManager: undefined as unknown as ExtensionContext["sessionManager"],
+    modelRegistry: undefined as unknown as ExtensionContext["modelRegistry"],
+    model: undefined,
+    signal: undefined,
+    ...overrides,
+  };
+}
+
+function stubRenderContext(overrides?: Partial<StubRenderContext>): StubRenderContext {
+  return {
+    args: undefined,
+    toolCallId: "test-call",
+    invalidate: () => {},
+    lastComponent: undefined,
+    state: undefined,
+    cwd: "/",
+    executionStarted: true,
+    argsComplete: true,
+    isPartial: false,
+    expanded: false,
+    showImages: false,
+    isError: false,
+    ...overrides,
+  };
+}
+
+interface StubRenderContext {
+  args: unknown;
+  toolCallId: string;
+  invalidate: () => void;
+  lastComponent: Component | undefined;
+  state: unknown;
+  cwd: string;
+  executionStarted: boolean;
+  argsComplete: boolean;
+  isPartial: boolean;
+  expanded: boolean;
+  showImages: boolean;
+  isError: boolean;
+}
