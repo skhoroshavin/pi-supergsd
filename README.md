@@ -32,7 +32,7 @@ If `[model]` is passed to `/start-task`, the model switches before the task prom
 
 ### `push-task` tool
 
-Queues a task with required `title` and `prompt`. Tasks always start from fresh context. The task sits pending — nothing runs until you start it.
+Queues a task with `title` and `prompt`. Tasks always start from fresh context. The task sits pending — nothing runs until you start it.
 
 ## Use cases
 

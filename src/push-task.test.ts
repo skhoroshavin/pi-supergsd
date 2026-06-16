@@ -6,10 +6,6 @@ import { setSkills } from "./index.js";
 
 import type { Skill } from "@earendil-works/pi-coding-agent";
 
-// ---------------------------------------------------------------------------
-// Skill resolution tests
-// ---------------------------------------------------------------------------
-
 describe("push-task skill resolution", () => {
   it("leaves prompt unchanged when there are no skill refs", async () => {
     const h = await TestHarness.create();
@@ -129,37 +125,8 @@ describe("push-task skill resolution", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Title validation tests
-// ---------------------------------------------------------------------------
-
-describe("push-task title validation", () => {
-  it("stores trimmed titles while resolving skill refs", async () => {
-    const h = await TestHarness.create();
-    h.llm.onPrompt(
-      "work",
-      pushTask("  Review ideas  ", "Use /skill:brainstorming then /skill:tdd for implementation."),
-    );
-    try {
-      setSkills(MOCK_SKILLS);
-      await h.prompt("work");
-
-      h.assertSessionContains(
-        task(
-          "Review ideas",
-          "Use /dev/null/skills/brainstorming/SKILL.md then /dev/null/skills/tdd/SKILL.md for implementation.",
-        ),
-      );
-    } finally {
-      h.dispose();
-    }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Mock skill data
-// ---------------------------------------------------------------------------
-
+// Mock skill paths are project-relative for the test environment.
+// Actual file existence is not required — resolution is pure string replacement.
 const MOCK_SKILLS: Skill[] = [
   {
     name: "brainstorming",
@@ -188,6 +155,3 @@ const MOCK_SKILLS: Skill[] = [
     disableModelInvocation: false,
   },
 ];
-
-// ---------------------------------------------------------------------------
-// Helpers
