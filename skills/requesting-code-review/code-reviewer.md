@@ -6,6 +6,7 @@ Use this template when dispatching a code reviewer task.
 
 ```
 push-task:
+  title: Review code changes
   prompt: |
     You are a Senior Code Reviewer with expertise in software architecture,
     design patterns, and best practices. Your job is to review completed work

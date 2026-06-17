@@ -50,10 +50,14 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
   it("calls the real push-task tool from a faux provider tool call", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("delegate work", pushTask("subtask", true));
+    h.llm.onPrompt("delegate work", pushTask("subtask", "some prompt"));
 
     await h.prompt("delegate work");
-    h.assertSession(user("delegate work"), assistant("", "toolUse"), task("subtask", true));
+    h.assertSession(
+      user("delegate work"),
+      assistant("", "toolUse"),
+      task("subtask", "some prompt"),
+    );
     h.assertStatus("pending task: subtask");
     h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
@@ -68,12 +72,12 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
   it("fails loudly when /start-task hits an unmatched provider prompt", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("queue AAA", pushTask("Task AAA"));
+    h.llm.onPrompt("queue AAA", pushTask("AAA", "some prompt"));
 
     await h.prompt("queue AAA");
     await assert.rejects(
       async () => h.prompt("/start-task"),
-      /No MockLLM rule matched provider prompt: Task AAA/,
+      /No MockLLM rule matched provider prompt: some prompt/,
     );
   });
 
@@ -89,32 +93,36 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
   it("builds one assistant turn from multiple prompt descriptors", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("Analyze X", responds("preparing subagent"), pushTask("Detailed X analysis"));
+    h.llm.onPrompt(
+      "Analyze X",
+      responds("preparing subagent"),
+      pushTask("analyse x", "Analysis details"),
+    );
 
     await h.prompt("Analyze X");
     h.assertSession(
       user("Analyze X"),
       assistant("preparing subagent", "toolUse"),
-      task("Detailed X analysis"),
+      task("analyse x", "Analysis details"),
     );
-    h.assertStatus("pending task: detailed-x-analysis");
+    h.assertStatus("pending task: analyse x");
     h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
   it("assertSessionContains still scans durable whole-session entries across branches", async (t) => {
     const h = await makeHarness(t);
-    h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
-    h.llm.onPrompt("Task AAA", responds("Done."));
+    h.llm.onPrompt("main work", responds("working..."), pushTask("AAA", "some prompt"));
+    h.llm.onPrompt("some prompt", responds("Done."));
 
     await h.prompt("main work");
     await h.prompt("/start-task");
 
-    h.assertSession(user("Task AAA"), assistant("Done."));
-    h.assertStatus("current task: task-aaa");
+    h.assertSession(user("some prompt"), assistant("Done."));
+    h.assertStatus("current task: AAA");
     h.assertSessionContains(
       user("main work"),
       assistant("working...", "toolUse"),
-      task("Task AAA"),
+      task("AAA", "some prompt"),
     );
   });
 
@@ -122,8 +130,8 @@ describe("AgentSession-backed TestHarness foundation", () => {
     const h = await makeHarness(t);
     h.llm.onPrompt("main work", responds("working..."));
     h.user.onAssistant("working...", userPrompts("queue follow-up"));
-    h.llm.onPrompt("queue follow-up", pushTask("follow-up"));
-    h.user.onQueuedTask("follow-up", userPrompts("answer follow-up"));
+    h.llm.onPrompt("queue follow-up", pushTask("follow-up", "follow-up work"));
+    h.user.onQueuedTask("follow-up work", userPrompts("answer follow-up"));
     h.llm.onPrompt("answer follow-up", responds("queued response"));
 
     await h.prompt("main work");
@@ -134,7 +142,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
       assistant("working..."),
       user("queue follow-up"),
       assistant("", "toolUse"),
-      task("follow-up"),
+      task("follow-up", "follow-up work"),
       user("answer follow-up"),
       assistant("queued response"),
     );

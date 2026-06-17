@@ -32,7 +32,7 @@ If `[model]` is passed to `/start-task`, the model switches before the task prom
 
 ### `push-task` tool
 
-Queues a task with `inherit_context` defaulting to `false` (fresh session). Set `inherit_context: true` to continue on the current branch. The task sits pending — nothing runs until you start it.
+Queues a task with `title` and `prompt`. Tasks always start from fresh context. The task sits pending — nothing runs until you start it.
 
 ## Use cases
 
@@ -43,7 +43,7 @@ The LLM queues a review after implementation. You start it manually, correct rev
 ```
 LLM:     Implementation done. Let me queue a fresh review.
 
-LLM:     [calls push-task({ prompt: "Review the implementation
+LLM:     [calls push-task({ title: "Review implementation", prompt: "Review the implementation
          against the plan. Check correctness, edge cases,
          and test coverage."})]
 
@@ -75,7 +75,7 @@ You prepared a detailed multi-phase plan for implementing a feature, and run it 
 ```
 LLM:     Roadmap has 3 phases. Let me queue phase 1.
 
-LLM:     [calls push-task with phase 1 plan]
+LLM:     [calls push-task({ title: "Implement phase 1", prompt: "..." })]
 
 You:     /auto
 
@@ -83,7 +83,7 @@ Pi:      [branches to fresh context, injects phase 1 plan]
 
 LLM:     Scaffolds project, writes core types. Let me do clean review.
 
-LLM:     [calls push-task with review prompt]
+LLM:     [calls push-task({ title: "Review phase 1", prompt: "..." })]
 
 Pi:      [branches to fresh context, injects review prompt]
 
@@ -97,7 +97,7 @@ Pi:      [returns to main branch, with report attached]
 
 LLM:     [reads report] Great! Let me queue phase 2.
 
-LLM:     [calls push-task with phase 2 plan]
+LLM:     [calls push-task({ title: "Implement phase 2", prompt: "..." })]
 
 Pi:      [branches to fresh context, injects phase 2 plan]
 

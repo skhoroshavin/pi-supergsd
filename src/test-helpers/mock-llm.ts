@@ -34,10 +34,10 @@ export const thinks = (text: string) => ({
   text,
 });
 
-export const pushTask = (prompt: string, inherit_context = false) => ({
+export const pushTask = (title: string, prompt: string) => ({
   type: "response:push-task" as const,
+  title,
   prompt,
-  inherit_context,
 });
 
 type PromptRule = {

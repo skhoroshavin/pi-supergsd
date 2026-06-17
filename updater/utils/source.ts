@@ -85,7 +85,7 @@ export function superpowersGetFile(filePath: string): string {
 
 const REPO = "obra/superpowers";
 
-const REF = "main";
+const REF = "v5.1.0";
 
 function cacheDir(): string {
   return process.env.PI_SUPERGSD_CACHE_DIR || CACHE_DIR;

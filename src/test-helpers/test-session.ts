@@ -47,16 +47,16 @@ export const assistant = (content: string, stopReason?: string) => ({
 
 export const assistantAborted = () => assistant("", "aborted");
 
-export const task = (prompt: string, inherit_context = false) => ({
+export const task = (title: string, prompt: string) => ({
   type: "custom" as const,
   customType: "task" as const,
-  data: { prompt, inherit_context },
+  data: { title, prompt },
 });
 
-export const taskResult = (slug: string, content?: string) => ({
+export const taskResult = (title: string, content?: string) => ({
   type: "custom_message" as const,
   customType: "task-result" as const,
-  details: { slug },
+  details: { title },
   ...(content !== undefined ? { content: [textBlock(content)] } : {}),
 });
 
@@ -88,12 +88,12 @@ function sessionEntries(entries: PiSessionEntry[]): SessionEntry[] {
         break;
       case "custom":
         if (entry.customType === "task" && isTaskData(entry.data)) {
-          result.push(task(entry.data.prompt, entry.data.inherit_context));
+          result.push(task(entry.data.title, entry.data.prompt));
         }
         break;
       case "custom_message":
-        if (entry.customType === "task-result" && hasSlug(entry.details)) {
-          result.push(taskResult(entry.details.slug, textContent(entry.content) || undefined));
+        if (entry.customType === "task-result" && hasTitle(entry.details)) {
+          result.push(taskResult(entry.details.title, textContent(entry.content) || undefined));
         }
         break;
     }
@@ -112,16 +112,12 @@ function visibleStopReason(stopReason: unknown): string | undefined {
   return typeof stopReason === "string" && stopReason !== "stop" ? stopReason : undefined;
 }
 
-function isTaskData(value: unknown): value is { prompt: string; inherit_context: boolean } {
-  return (
-    isRecord(value) &&
-    typeof value.prompt === "string" &&
-    typeof value.inherit_context === "boolean"
-  );
+function isTaskData(value: unknown): value is { title: string; prompt: string } {
+  return isRecord(value) && typeof value.title === "string" && typeof value.prompt === "string";
 }
 
-function hasSlug(value: unknown): value is { slug: string } {
-  return isRecord(value) && typeof value.slug === "string";
+function hasTitle(value: unknown): value is { title: string } {
+  return isRecord(value) && typeof value.title === "string";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

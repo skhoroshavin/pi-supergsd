@@ -143,6 +143,11 @@ export class TestHarness {
     assert.deepStrictEqual(this.testSession.entries(), expected);
   }
 
+  /** Inject a raw custom entry (for testing legacy/edge-case session shapes). */
+  appendCustomEntry(customType: string, data: unknown): void {
+    this.sessionManager.appendCustomEntry(customType, data);
+  }
+
   assertSessionContains(...expected: TestSessionEntry[]): void {
     const actual = this.testSession.allEntries();
     for (const expectedEntry of expected) {
@@ -260,14 +265,14 @@ export class TestHarness {
 function isTaskEntryData(entry: SessionEntry): entry is SessionEntry & {
   type: "custom";
   customType: "task";
-  data: { prompt: string; inherit_context: boolean };
+  data: { title: string; prompt: string };
 } {
   return (
     entry.type === "custom" &&
     entry.customType === "task" &&
     isRecord(entry.data) &&
-    typeof entry.data.prompt === "string" &&
-    typeof entry.data.inherit_context === "boolean"
+    typeof entry.data.title === "string" &&
+    typeof entry.data.prompt === "string"
   );
 }
 

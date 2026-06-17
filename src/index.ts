@@ -18,9 +18,7 @@ import { Box, Text, type AutocompleteItem } from "@earendil-works/pi-tui";
 
 import { Type, type Static } from "typebox";
 
-import { makeSlug } from "./slug.js";
-
-import { firstTextContent, renderTextContent, taskResultTextContent } from "./text-content.js";
+import { renderTextContent, taskResultTextContent } from "./text-content.js";
 
 export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
   return defineTool({
@@ -34,9 +32,8 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
     ],
     parameters: pushTaskParameters,
     renderCall(args: PushTaskParams, theme, context) {
-      const header =
-        theme.fg("toolTitle", theme.bold("push-task")) +
-        (args.inherit_context ? " " + theme.fg("warning", "[inherit]") : "");
+      const title = args.title.trim();
+      const header = theme.fg("toolTitle", theme.bold(`push-task: ${title}`));
 
       const promptLines = args.prompt.split("\n");
       const maxLines = context.expanded ? promptLines.length : 7;
@@ -62,11 +59,13 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
         throw new Error("Task storage aborted.");
       }
 
+      const title = params.title.trim();
+
       const { rewritten, unresolved } = resolveSkillRefs(params.prompt);
 
       pi.appendEntry(TASK_ENTRY_TYPE, {
+        title,
         prompt: rewritten,
-        inherit_context: params.inherit_context ?? false,
       });
 
       if (ctx.hasUI) {
@@ -85,8 +84,8 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
       return {
         content: [],
         details: {
+          title,
           prompt: rewritten,
-          inherit_context: params.inherit_context ?? false,
         },
         terminate: true,
       };
@@ -218,13 +217,13 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
   };
 }
 
-export const rendererTaskResult: MessageRenderer<{ slug?: string }> = (
+export const rendererTaskResult: MessageRenderer<{ title?: string }> = (
   message,
   _options,
   theme,
 ): Box => {
-  const label = message.details?.slug
-    ? theme.fg("customMessageLabel", `${message.details.slug} result:`)
+  const label = message.details?.title
+    ? theme.fg("customMessageLabel", `${message.details.title} result:`)
     : theme.fg("customMessageLabel", "result:");
   const text = renderTextContent(message.content);
   const box = new Box(1, 1, (t: string) => theme.bg("customMessageBg", t));
@@ -241,17 +240,19 @@ export function updateTaskStatus(
   const prefix = options.prefix ?? "";
   const pending = pendingTask(session);
   if (pending) {
-    const slug = makeSlug(pending.data.prompt);
-    setStatus("task", `${prefix}${theme.fg("dim", `pending task: ${slug}`)}`);
+    setStatus(
+      "task",
+      `${prefix}${theme.fg("dim", `pending task: ${taskTitle(pending.data.title)}`)}`,
+    );
     return;
   }
 
-  if (currentTask(session)) {
-    const prompt = findTaskPrompt(session);
-    if (prompt) {
-      const slug = makeSlug(prompt);
-      setStatus("task", `${prefix}${theme.fg("dim", `current task: ${slug}`)}`);
-    }
+  const active = currentTask(session);
+  if (active) {
+    setStatus(
+      "task",
+      `${prefix}${theme.fg("dim", `current task: ${taskTitle(active.data.title)}`)}`,
+    );
     return;
   }
 
@@ -325,10 +326,7 @@ async function startTask(
       return;
     }
     if (matched === "ambiguous") {
-      const lower = options.modelArg.toLowerCase();
-      const names = ctx.modelRegistry
-        .getAvailable()
-        .filter((m) => modelMatchesPrefix(m, lower))
+      const names = matchModels(options.modelArg, ctx.modelRegistry)
         .map((m) => `${m.provider}/${m.id}`)
         .join(", ");
       ctx.ui.notify(`Ambiguous model: matches ${names}.`, "warning");
@@ -348,24 +346,20 @@ async function startTask(
   }
 
   // ── Task start ──────────────────────────────────────────────────
-  const inheritContext = activeTask.data.inherit_context;
-
-  let departureLeafId: string;
-  if (!inheritContext) {
-    departureLeafId = ctx.sessionManager.getLeafId()!;
-    const freshTargetId = findFreshTargetId(ctx.sessionManager);
-    if (!freshTargetId) {
-      ctx.ui.notify("No starting point found on current branch.", "warning");
-      return;
-    }
-
-    const result = await ctx.navigateTree(freshTargetId, { summarize: false });
-    if (result.cancelled) return "cancelled";
-  } else {
-    departureLeafId = ctx.sessionManager.getLeafId()!;
+  const departureLeafId = ctx.sessionManager.getLeafId()!;
+  const freshTargetId = findFreshTargetId(ctx.sessionManager);
+  if (!freshTargetId) {
+    ctx.ui.notify("No starting point found on current branch.", "warning");
+    return;
   }
 
-  const startEntryData: TaskStartData = { returnTo: departureLeafId };
+  const result = await ctx.navigateTree(freshTargetId, { summarize: false });
+  if (result.cancelled) return "cancelled";
+
+  const startEntryData: TaskStartData = {
+    title: taskTitle(activeTask.data.title),
+    returnTo: departureLeafId,
+  };
   if (previousModel) {
     startEntryData.previousModel = previousModel;
   }
@@ -379,7 +373,6 @@ async function startTask(
 async function discardTask(
   pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
-  options: TaskActionOptions = {},
 ): Promise<TaskActionResult> {
   const activeTask = pendingTask(ctx.sessionManager);
   if (!activeTask) {
@@ -390,7 +383,7 @@ async function discardTask(
   pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
   ctx.ui.notify("Task discarded.", "info");
 
-  refreshTaskStatus(ctx, { prefix: options.statusPrefix });
+  refreshTaskStatus(ctx);
 }
 
 async function finishTask(
@@ -413,9 +406,7 @@ async function finishTask(
     : undefined;
   const lastAssistantId = lastAssistant?.id;
 
-  // Find the task prompt on the current branch for the slug label
-  const taskPrompt = findTaskPrompt(ctx.sessionManager);
-  const slug = taskPrompt ? makeSlug(taskPrompt) : undefined;
+  const title = taskTitle(taskStart.data.title);
 
   const result = await ctx.navigateTree(taskStart.data.returnTo, {
     summarize: false,
@@ -430,7 +421,7 @@ async function finishTask(
         // Content is filtered to only TextContent blocks (or original string)
         content: lastAssistantContent,
         display: true,
-        details: { slug },
+        details: { title },
       },
       { triggerTurn: true },
     );
@@ -456,7 +447,6 @@ type TaskCommandAPI = Pick<
 async function abortTask(
   pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
-  options: TaskActionOptions = {},
 ): Promise<TaskActionResult> {
   const taskStart = currentTask(ctx.sessionManager);
   if (!taskStart) {
@@ -473,7 +463,7 @@ async function abortTask(
 
   await restorePreviousModel(pi, taskStart, ctx);
 
-  refreshTaskStatus(ctx, { prefix: options.statusPrefix });
+  refreshTaskStatus(ctx);
 }
 
 /** Restore the model that was active before a task started, if one was recorded. */
@@ -542,8 +532,7 @@ function findFreshTargetId(session: ReadonlySessionLike): string | null {
  * entries) or if there is no leaf.
  */
 function findPreConversationEntry(session: ReadonlySessionLike): SessionEntry | null {
-  const leafId = session.getLeafId();
-  if (!leafId) return null;
+  if (!session.getLeafId()) return null;
 
   const branch = session.getBranch();
   for (const entry of branch) {
@@ -558,40 +547,6 @@ function findPreConversationEntry(session: ReadonlySessionLike): SessionEntry | 
   }
 
   return null;
-}
-
-/**
- * Find the user message content injected as the task prompt after the
- * most recent TASK_START entry. Returns undefined if no task is active.
- */
-function findTaskPrompt(session: ReadonlySessionLike): string | undefined {
-  const branch = session.getBranch();
-
-  const startIdx = findLastEntryIndex(
-    session,
-    (entry) => entry.type === "custom" && entry.customType === TASK_START_ENTRY_TYPE,
-  );
-  if (startIdx === -1) return undefined;
-
-  // Walk forward from TASK_START to find the next user message
-  for (let i = startIdx + 1; i < branch.length; i++) {
-    const entry = branch[i];
-    if (entry.type === "message" && entry.message.role === "user") {
-      return firstTextContent(entry.message.content);
-    }
-  }
-  return undefined;
-}
-
-function findLastEntryIndex(
-  session: ReadonlySessionLike,
-  predicate: (entry: SessionEntry) => boolean,
-): number {
-  const branch = session.getBranch();
-  for (let i = branch.length - 1; i >= 0; i--) {
-    if (predicate(branch[i])) return i;
-  }
-  return -1;
 }
 
 // ── Lookup utilities ──────────────────────────────────────────────
@@ -658,13 +613,13 @@ function isTaskData(value: unknown): value is TaskData {
   return (
     isRecord(value) &&
     typeof value.prompt === "string" &&
-    typeof value.inherit_context === "boolean"
+    (value.title === undefined || typeof value.title === "string")
   );
 }
 
 interface TaskData {
+  title?: string;
   prompt: string;
-  inherit_context: boolean;
 }
 
 function isTaskStartEntry(entry: SessionEntry): entry is TaskStartEntry {
@@ -690,7 +645,13 @@ type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
 };
 
 function isTaskStartData(value: unknown): value is TaskStartData {
-  if (!isRecord(value) || typeof value.returnTo !== "string") return false;
+  if (
+    !isRecord(value) ||
+    typeof value.returnTo !== "string" ||
+    (value.title !== undefined && typeof value.title !== "string")
+  ) {
+    return false;
+  }
   if (value.previousModel !== undefined) {
     return (
       isRecord(value.previousModel) &&
@@ -702,12 +663,18 @@ function isTaskStartData(value: unknown): value is TaskStartData {
 }
 
 interface TaskStartData {
+  title?: string;
   returnTo: string;
   previousModel?: { provider: string; modelId: string };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/** Normalize an optional title to a non-empty display string. */
+function taskTitle(title?: string): string {
+  return title || "untitled";
 }
 
 function resolveSkillRefs(prompt: string): ResolveResult {
@@ -732,13 +699,17 @@ function resolveSkillRefs(prompt: string): ResolveResult {
   return { rewritten, unresolved: [...unresolvedSet] };
 }
 
-/** Check if a model matches a lowercased search string against id, name, or provider/id. */
-function modelMatchesPrefix(m: Model<Api>, lowerPrefix: string): boolean {
-  return (
-    m.id.toLowerCase().includes(lowerPrefix) ||
-    m.name.toLowerCase().includes(lowerPrefix) ||
-    `${m.provider}/${m.id}`.toLowerCase().includes(lowerPrefix)
-  );
+/** Case-insensitive substring match of `pattern` against each available model's id, name, or provider/id. */
+function matchModels(pattern: string, registry: ModelRegistry): Model<Api>[] {
+  const lower = pattern.toLowerCase();
+  return registry
+    .getAvailable()
+    .filter(
+      (m) =>
+        m.id.toLowerCase().includes(lower) ||
+        m.name.toLowerCase().includes(lower) ||
+        `${m.provider}/${m.id}`.toLowerCase().includes(lower),
+    );
 }
 
 interface ResolveResult {
@@ -761,47 +732,38 @@ function resolveModelPattern(
 ): Model<Api> | "ambiguous" | null {
   if (pattern.includes("/")) {
     const slashIdx = pattern.indexOf("/");
-    const provider = pattern.slice(0, slashIdx);
-    const modelId = pattern.slice(slashIdx + 1);
-    const found = registry.find(provider, modelId);
+    const found = registry.find(pattern.slice(0, slashIdx), pattern.slice(slashIdx + 1));
     if (found) return found;
   }
 
-  const lowerPattern = pattern.toLowerCase();
-  const matches = registry.getAvailable().filter((m) => modelMatchesPrefix(m, lowerPattern));
-
+  const matches = matchModels(pattern, registry);
   if (matches.length === 0) return null;
   if (matches.length > 1) return "ambiguous";
   return matches[0];
 }
 
 /**
- * Autocompletion for /start-task model argument.
- * Filters available models by case-insensitive substring match against
- * id, name, and provider/id. Returns up to 20 items.
+ * Autocompletion for /start-task model argument, mirroring the /model
+ * command: label is the model id, description is the provider, and value
+ * is provider/id (what gets typed and resolved). Returns up to 20 items.
  */
 function getModelCompletions(argumentPrefix: string, registry: ModelRegistry): AutocompleteItem[] {
-  const lowerPrefix = argumentPrefix.toLowerCase();
-  const matched = registry.getAvailable().filter((m) => modelMatchesPrefix(m, lowerPrefix));
-
-  return matched.slice(0, 20).map((m) => ({
-    value: `${m.provider}/${m.id}`,
-    label: m.name,
-    description: `${m.provider}/${m.id}`,
-  }));
+  return matchModels(argumentPrefix, registry)
+    .slice(0, 20)
+    .map((m) => ({
+      value: `${m.provider}/${m.id}`,
+      label: m.id,
+      description: m.provider,
+    }));
 }
 
 const pushTaskParameters = Type.Object({
+  title: Type.String({
+    description: "Short task title shown in status, results, and tool rendering.",
+  }),
   prompt: Type.String({
     description: "Full prompt for the task, including all context and instructions.",
   }),
-  inherit_context: Type.Optional(
-    Type.Boolean({
-      default: false,
-      description:
-        "Whether to inherit the current branch context instead of starting fresh. Never set it to true, unless explicitly requested by the user.",
-    }),
-  ),
 });
 
 // ── Skill resolution registry ─────────────────────────────────────

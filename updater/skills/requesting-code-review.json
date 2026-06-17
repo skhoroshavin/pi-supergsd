@@ -47,7 +47,7 @@
         {
           "op": "replace",
           "find": "Task tool (general-purpose):\n  description: \"Review code changes\"\n  prompt: |",
-          "replace": "push-task:\n  prompt: |"
+          "replace": "push-task:\n  title: Review code changes\n  prompt: |"
         }
       ]
     }
