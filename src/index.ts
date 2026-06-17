@@ -743,17 +743,17 @@ function resolveModelPattern(
 }
 
 /**
- * Autocompletion for /start-task model argument.
- * Filters available models by case-insensitive substring match against
- * id, name, and provider/id. Returns up to 20 items.
+ * Autocompletion for /start-task model argument, mirroring the /model
+ * command: label is the model id, description is the provider, and value
+ * is provider/id (what gets typed and resolved). Returns up to 20 items.
  */
 function getModelCompletions(argumentPrefix: string, registry: ModelRegistry): AutocompleteItem[] {
   return matchModels(argumentPrefix, registry)
     .slice(0, 20)
     .map((m) => ({
       value: `${m.provider}/${m.id}`,
-      label: m.name,
-      description: `${m.provider}/${m.id}`,
+      label: m.id,
+      description: m.provider,
     }));
 }
 
