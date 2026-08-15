@@ -208,9 +208,26 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
           // was shut down.
           if (stopped) break;
 
-          if (lastAssistantWasAborted(ctx.sessionManager)) break;
+          const activeTask = currentTask(ctx.sessionManager);
+          const pending = pendingTask(ctx.sessionManager);
+          const lastAssistant = activeTask
+            ? findLastAssistantAfterTaskStart(ctx.sessionManager, activeTask.id)
+            : findLastEntry(ctx.sessionManager, isAssistantMessageEntry);
+          if (
+            (activeTask || pending) &&
+            lastAssistant &&
+            isFailedAssistantResponse(lastAssistant)
+          ) {
+            if (lastAssistant.message.stopReason === "error") {
+              const message = activeTask
+                ? "Auto stopped: the task response failed. The task was preserved for retry."
+                : "Auto stopped: the latest assistant response failed. Pending tasks were preserved.";
+              ctx.ui.notify(message, "error");
+            }
+            break;
+          }
 
-          if (pendingTask(ctx.sessionManager)) {
+          if (pending) {
             const result = await startTask(pi, ctx, {
               statusPrefix: autoStatusOptions.prefix,
               waitForAgentStart,
@@ -220,10 +237,9 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
             continue;
           }
 
-          const activeTask = currentTask(ctx.sessionManager);
           if (activeTask) {
             // 在任务分支产生回复前绝不能自动收尾。
-            if (!hasAssistantAfterTaskStart(ctx.sessionManager, activeTask.id)) break;
+            if (!findLastAssistantAfterTaskStart(ctx.sessionManager, activeTask.id)) break;
 
             const result = await finishTask(pi, ctx, {
               statusPrefix: autoStatusOptions.prefix,
@@ -340,27 +356,31 @@ type AgentStartWaiter = {
 
 const AUTO_AGENT_START_TIMEOUT_MS = 60_000;
 
-function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
-  const branch = session.getBranch();
-  const last = branch[branch.length - 1];
-  return (
-    last?.type === "message" &&
-    last.message.role === "assistant" &&
-    last.message.stopReason === "aborted"
-  );
+function isFailedAssistantResponse(entry: AssistantMessageEntry): boolean {
+  return entry.message.stopReason === "aborted" || entry.message.stopReason === "error";
 }
 
-function hasAssistantAfterTaskStart(session: ReadonlySessionLike, taskStartId: string): boolean {
+function findLastAssistantAfterTaskStart(
+  session: ReadonlySessionLike,
+  taskStartId: string,
+): AssistantMessageEntry | null {
   let afterTaskStart = false;
+  let lastAssistant: AssistantMessageEntry | null = null;
+
   for (const entry of session.getBranch()) {
     if (entry.id === taskStartId) {
       afterTaskStart = true;
       continue;
     }
-    if (afterTaskStart && isAssistantMessageEntry(entry)) return true;
+    if (afterTaskStart && isAssistantMessageEntry(entry)) {
+      lastAssistant = entry;
+    }
   }
-  return false;
+
+  return lastAssistant;
 }
+
+type AssistantMessageEntry = SessionMessageEntry & { message: { role: "assistant" } };
 
 async function startTask(
   pi: TaskCommandAPI,
@@ -564,9 +584,7 @@ function refreshTaskStatus(ctx: TaskStatusContext, options: TaskStatusOptions = 
 type TaskStatusContext = Pick<ExtensionCommandContext, "hasUI" | "sessionManager" | "ui">;
 
 /** Type guard: is the entry an assistant message with content? */
-function isAssistantMessageEntry(
-  entry: SessionEntry,
-): entry is SessionMessageEntry & { message: { role: "assistant" } } {
+function isAssistantMessageEntry(entry: SessionEntry): entry is AssistantMessageEntry {
   return entry.type === "message" && entry.message.role === "assistant";
 }
 
