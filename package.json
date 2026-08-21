@@ -27,6 +27,7 @@
   "files": [
     "index.ts",
     "src/index.ts",
+    "src/prompt-snapshot.ts",
     "src/text-content.ts",
     "skills",
     "README.md",
