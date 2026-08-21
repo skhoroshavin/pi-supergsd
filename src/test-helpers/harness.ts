@@ -169,6 +169,32 @@ export class TestHarness {
       .sort();
   }
 
+  /**
+   * The system prompt actually shipped on each provider request, in order
+   * (i.e. after the `before_provider_request` chain runs).
+   */
+  get systemPrompts(): readonly string[] {
+    return this.fauxProvider.systemPrompts;
+  }
+
+  /** The system prompt shipped on the most recent provider request. */
+  lastRequestSystemPrompt(): string | undefined {
+    return this.fauxProvider.systemPrompts.at(-1);
+  }
+
+  /**
+   * Change the active tool set (rebuilds the base system prompt to reflect it).
+   * Used by tests to simulate task-local prompt-construction state drift.
+   */
+  setActiveTools(names: string[]): void {
+    this.session.setActiveToolsByName(names);
+  }
+
+  /** The current effective base system prompt on the agent state. */
+  currentSystemPrompt(): string {
+    return this.session.systemPrompt;
+  }
+
   private commandContextActions() {
     return {
       waitForIdle: async () => {
@@ -184,6 +210,9 @@ export class TestHarness {
       reload: async () => {
         await this.session.reload();
       },
+      // Mirror the real runtime host binding (agent-session provides
+      // `getSystemPrompt: () => this.systemPrompt`).
+      getSystemPrompt: () => this.session.systemPrompt,
     };
   }
 
