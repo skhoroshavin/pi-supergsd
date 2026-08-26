@@ -49,6 +49,13 @@ export class FauxProvider {
     );
   }
 
+  /**
+   * The system prompt actually shipped on each provider request, in order.
+   * This is the value after the `before_provider_request` chain runs (i.e. the
+   * value the extension may have restored), not the pre-handler base.
+   */
+  readonly systemPrompts: string[] = [];
+
   stream(model: Model<string>, context: Context, options?: SimpleStreamOptions) {
     const lastUser = [...context.messages].reverse().find((message) => message.role === "user");
     const promptText = extractTextContent(lastUser?.content ?? "") ?? "";
@@ -62,6 +69,16 @@ export class FauxProvider {
       this.matchAssistantActions,
     );
     registration.setResponses([message]);
+
+    // Faithfully run the before_provider_request chain: real providers invoke
+    // `options.onPayload(requestBody, model)` before sending. Record the
+    // system prompt that actually ships so tests can assert prefix stability.
+    const payload = buildFauxPayload(model, context);
+    void (async () => {
+      const replaced = options?.onPayload ? await options.onPayload(payload, model) : undefined;
+      const shipped = replaced !== undefined && replaced !== null ? replaced : payload;
+      this.systemPrompts.push(extractShippedSystemPrompt(shipped));
+    })();
 
     return piAi.streamSimple(model, context, options);
   }
@@ -110,4 +127,37 @@ function makeAssistantMessage(responses: MockLLMDescriptor[]): AssistantMessage 
   return piAi.fauxAssistantMessage(content, {
     stopReason: content.some((block) => block.type === "toolCall") ? "toolUse" : "stop",
   });
+}
+
+/**
+ * Build an OpenAI-compatible request body from the agent context so the
+ * `before_provider_request` chain sees the same shape real OpenAI providers
+ * send (system prompt as the first system/developer message).
+ */
+function buildFauxPayload(model: Model<string>, context: Context): Record<string, unknown> {
+  const messages: Array<Record<string, unknown>> = [
+    ...(context.systemPrompt ? [{ role: "system", content: context.systemPrompt }] : []),
+    ...(context.messages as unknown as Array<Record<string, unknown>>),
+  ];
+  return {
+    model: model.id,
+    messages,
+    ...(context.tools && context.tools.length > 0 ? { tools: context.tools } : {}),
+  };
+}
+
+/** Extract the shipped system prompt from a (possibly replaced) request body. */
+function extractShippedSystemPrompt(payload: unknown): string {
+  if (typeof payload !== "object" || payload === null) return "";
+  const record = payload as Record<string, unknown>;
+  if (Array.isArray(record.messages)) {
+    for (const entry of record.messages as Array<Record<string, unknown>>) {
+      if (entry && (entry.role === "system" || entry.role === "developer")) {
+        return typeof entry.content === "string"
+          ? entry.content
+          : JSON.stringify(entry.content ?? "");
+      }
+    }
+  }
+  return typeof record.system === "string" ? record.system : "";
 }

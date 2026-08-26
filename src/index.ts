@@ -20,6 +20,13 @@ import { Type, type Static } from "typebox";
 
 import { renderTextContent, taskResultTextContent } from "./text-content.js";
 
+import { armTaskRestore, captureAtDeparture } from "./prompt-snapshot.js";
+
+// Re-exported so the extension entry (index.ts) can wire the prompt-snapshot
+// restore through the src barrel (import-control forbids importing sibling src
+// modules directly from the entrypoint).
+export { applyTaskRestoreToPayload, clearPromptSnapshots } from "./prompt-snapshot.js";
+
 export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
   return defineTool({
     name: "push-task",
@@ -423,6 +430,11 @@ async function startTask(
 
   // ── Task start ──────────────────────────────────────────────────
   const departureLeafId = ctx.sessionManager.getLeafId()!;
+
+  // Capture the overseer-side prompt state now, before navigating away, so the
+  // first returned request can restore the exact original system prefix.
+  captureAtDeparture(departureLeafId, ctx.getSystemPrompt());
+
   const freshTargetId = findFreshTargetId(ctx.sessionManager);
   if (!freshTargetId) {
     ctx.ui.notify("No starting point found on current branch.", "warning");
@@ -501,6 +513,10 @@ async function finishTask(
   });
   if (result.cancelled) return "cancelled";
 
+  // Restore the captured overseer prompt state on the first returned turn so
+  // the returned request keeps the exact original system prefix.
+  armTaskRestore(taskStart.data.returnTo);
+
   // Inject last assistant message after navigation
   if (lastAssistantId && lastAssistantContent !== undefined) {
     pi.sendMessage(
@@ -546,6 +562,10 @@ async function abortTask(
     summarize: false,
   });
   if (result.cancelled) return "cancelled";
+
+  // Restore the captured overseer prompt state on the next turn so the
+  // abandoned task's drifted state does not leak into the returned branch.
+  armTaskRestore(taskStart.data.returnTo);
 
   ctx.ui.notify("Task aborted. Branch abandoned without summary.", "info");
 

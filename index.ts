@@ -5,6 +5,8 @@ import {
   cmdAuto,
   cmdDiscardTask,
   cmdFinishTask,
+  applyTaskRestoreToPayload,
+  clearPromptSnapshots,
   toolPushTask,
   cmdStartTask,
   rendererTaskResult,
@@ -29,9 +31,19 @@ export default function register(pi: ExtensionAPI): void {
     }
   });
 
+  // Restore the captured overseer system prompt on the first returned request.
+  // The task-return turn is triggered via `sendMessage(..., { triggerTurn })`,
+  // which bypasses `before_agent_start`, so the payload is the reliable seam.
+  pi.on("before_provider_request", (event) => applyTaskRestoreToPayload(event.payload));
+
   pi.on("session_start", async (_event, ctx) => {
+    clearPromptSnapshots();
     setModelRegistry(ctx.modelRegistry);
     updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+  });
+
+  pi.on("session_shutdown", async () => {
+    clearPromptSnapshots();
   });
 
   pi.on("turn_end", async (_event, ctx) => {
