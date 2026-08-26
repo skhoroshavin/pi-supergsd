@@ -238,7 +238,7 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
           }
 
           if (activeTask) {
-            // 在任务分支产生回复前绝不能自动收尾。
+            // Never auto-finish before the task branch has produced a response.
             if (!findLastAssistantAfterTaskStart(ctx.sessionManager, activeTask.id)) break;
 
             const result = await finishTask(pi, ctx, {
@@ -441,8 +441,8 @@ async function startTask(
   }
   pi.appendEntry(TASK_START_ENTRY_TYPE, startEntryData);
 
-  // 扩展 API 会在 Pi 将 agent 标记为 active 前从 sendUserMessage 返回。
-  // 必须先建立屏障，避免 /auto 在这个窗口内误判为空闲。
+  // The extension API returns from sendUserMessage before Pi marks the agent as active.
+  // Set up the barrier first to prevent /auto from falsely detecting idle during this window.
   const taskStartId = ctx.sessionManager.getLeafId()!;
   const agentStarted = options.waitForAgentStart?.(taskStartId);
   pi.sendUserMessage(activeTask.data.prompt);
